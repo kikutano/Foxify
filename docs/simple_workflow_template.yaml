@@ -1,0 +1,85 @@
+# Project Flow Test Template (English Schema)
+# -----------------------------------------
+# Metadata provides global info for tracking, reporting, and AI context.
+metadata:
+  name: "Example User Journey - Full Checkout Loop" # Human-readable name of the flow/test.
+  description: "Tests the full end-to-end user workflow from listing products to final purchase confirmation."
+  environment: "dev_credentials.json"         # Path to the environment file (API keys, base URLs).
+  api_version: "v1"                           # Explicit versioning for schema tracking.
+
+# -----------------------------------------
+# Functions/Templates Library: Reusable API Blocks
+# These blocks define individual, callable units of work that can be referenced multiple times.
+functions:
+  # Function 1: Retrieve User Information (GET Request)
+  GetUserDetails:
+    type: HTTP_REQUEST
+    method: GET
+    endpoint: "/api/v1/user/{user_id}" # Using a variable placeholder for flexibility.
+    headers:
+      Content-Type: application/json
+      Authorization: ${GLOBAL_TOKEN}     # Uses a global token defined in 'environment'.
+    body: ""
+    extract:
+      current_profile_data: $.userProfileData # Saves user data into a variable accessible by name.
+
+  # Function 2: Create a New Resource (POST Request)
+  CreateProductRecord:
+    type: HTTP_REQUEST
+    method: POST
+    endpoint: "/api/v1/product/create"
+    headers:
+      Content-Type: application/json
+      X-Source-ID: ${user_id} # Dependency on user ID from another function.
+    body: '{
+      "input_param": "Initial test value",
+      "linked_by": "${user_id}" 
+    }'
+    extract:
+      product_record_id: $.data.newProductId # Saves the newly created ID.
+
+  # Function 3: Final Status Update (PUT Request)
+  UpdateFinalStatus:
+    type: HTTP_REQUEST
+    method: PUT
+    endpoint: "/api/v1/status/${resource_id}" # Endpoint path parameterized by another function's output.
+    headers:
+      Authorization: ${GLOBAL_TOKEN}
+      Content-Type: application/json
+    body: '{
+      "status": "success",
+      "notes": "Finished testing cycle."
+    }'
+    extract:
+      final_status_code: $.data.httpStatusCode
+
+# -----------------------------------------
+# Workflow Definition (The Execution Sequence)
+# This defines the actual path taken by the flow engine, calling reusable functions.
+workflow:
+  - type: function # Tells the engine to execute a stored function definition.
+    function_name: GetUserDetails # Calls the defined "GetUserDetails" block.
+
+  # Optional delay between major steps.
+  - name: FlowDelay1
+    type: DELAY
+    duration_seconds: 2.0
+
+  # Execute creation and capture ID
+  - type: function
+    function_name: CreateProductRecord
+    depends_on: [GetUserDetails] # Explicitly stating dependency on previous step's variables (e.g., user_id).
+
+  # Another delay for human simulation time.
+  - name: FlowDelay2
+    type: DELAY
+    duration_seconds: 1.0
+
+  # Finalization step, using dependencies from the functions above.
+  - type: function
+    function_name: UpdateFinalStatus
+    depends_on: [CreateProductRecord] # Ensures 'product_record_id' is available for this step's endpoint variable.
+
+settings:
+  timeout: 20     # Global timeout (seconds) for any single API call.
+  max_retries: 3   # Number of times to retry transient failures.

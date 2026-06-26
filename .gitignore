@@ -1,0 +1,8 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/src/tyfapi.cli/.vs/tyfapi.cli.slnx
+/src/tyfapi.cli/obj
+/src/tyfapi.cli/bin/Debug/net10.0
