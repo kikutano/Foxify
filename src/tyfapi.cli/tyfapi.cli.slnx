@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="../tyfapi.cli.tests/tyfapi.cli.tests.csproj" Id="ba41c20d-c8fe-4087-8ce9-907bf3b4fa2c" />
   <Project Path="tyfapi.cli.csproj" />
 </Solution>
