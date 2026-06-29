@@ -6,3 +6,6 @@
 /src/tyfapi.cli/.vs/tyfapi.cli.slnx
 /src/tyfapi.cli/obj
 /src/tyfapi.cli/bin/Debug/net10.0
+/src/tyfapi.cli.tests/bin/Debug/net10.0
+/src/tyfapi.cli.tests/obj
+/src/tyfapi.cli/.vs/ProjectEvaluation
