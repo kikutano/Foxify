@@ -11,15 +11,10 @@ public class WorkflowParser
     public WorkflowParser()
     {
         _deserializer = new DeserializerBuilder()
-            .WithNamingConvention(CamelCaseNamingConvention.Instance)
+            .WithNamingConvention(UnderscoredNamingConvention.Instance)
             .Build();
     }
 
-    /// <summary>
-    /// Parses a YAML string into a WorkflowTemplate object.
-    /// </summary>
-    /// <param name="yamlContent">The raw YAML content of the workflow file.</param>
-    /// <returns>A populated WorkflowTemplate instance.</returns>
     public WorkflowTemplate Parse(string yamlContent)
     {
         if (string.IsNullOrWhiteSpace(yamlContent))
@@ -37,12 +32,3 @@ public class WorkflowParser
         return result;
     }
 }
-
-/*</write_to_file>
-<task_progress>
-- [x] Explore project structure
-- [x] Define models based on YAML schema
-- [ ] Implement parsing logic (no reflection)
-- [ ] Write unit test
-</task_progress>
-</write_to_file>*/
