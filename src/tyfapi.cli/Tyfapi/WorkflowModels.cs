@@ -1,4 +1,4 @@
-namespace TyfApi.Cli.Models;
+namespace tyfapi.cli.Tyfapi;
 
 public class WorkflowMetadata
 {

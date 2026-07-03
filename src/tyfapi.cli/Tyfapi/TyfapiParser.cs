@@ -1,14 +1,13 @@
-using TyfApi.Cli.Models;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace TyfApi.Cli.Parsers;
+namespace tyfapi.cli.Tyfapi;
 
-public class WorkflowParser
+public class TyfapiParser
 {
     private readonly IDeserializer _deserializer;
 
-    public WorkflowParser()
+    public TyfapiParser()
     {
         _deserializer = new DeserializerBuilder()
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
