@@ -3,7 +3,7 @@
 Console.WriteLine("Enter the path to the YAML file:");
 //string filePath = Console.ReadLine();
 
-string filePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\hello_world.yaml"; // Hardcoded for testing
+string filePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\multiple_calls_with_delay.yaml"; // Hardcoded for testing
 
 if (!string.IsNullOrWhiteSpace(filePath))
 {

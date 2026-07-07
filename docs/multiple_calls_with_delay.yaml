@@ -1,0 +1,51 @@
+# Project Flow Test Template (English Schema)
+# -----------------------------------------
+# Metadata provides global info for tracking, reporting, and AI context.
+metadata:
+  name: "Multiple Google Calls with Delays" # Human-readable name of the flow/test.
+  description: "Tests multiple pings to google.com with 2-second delays between each call."
+  environment: "dev_credentials.json"         # Path to the environment file (API keys, base URLs).
+  api_version: "v1"                           # Explicit versioning for schema tracking.
+
+# -----------------------------------------
+# Functions/Templates Library: Reusable API Blocks
+# These blocks define individual, callable units of work that can be referenced multiple times.
+functions:
+  # Function: Ping Google (GET Request)
+  PingGoogle:
+    type: HTTP_REQUEST
+    method: GET
+    endpoint: "https://www.google.com" # Simple ping to google.com
+    headers:
+      Content-Type: application/json
+      User-Agent: "Ping-Test-Client/1.0"
+    body: ""
+    extract:
+      response_status: $.status # Saves the HTTP status code
+
+# -----------------------------------------
+# Workflow Definition (The Execution Sequence)
+# This defines the actual path taken by the flow engine, calling reusable functions.
+workflow:
+  - type: function # Tells the engine to execute a stored function definition.
+    function_name: PingGoogle # Calls the defined "PingGoogle" block.
+
+  # Delay of 2 seconds between calls
+  - name: FlowDelay1
+    type: DELAY
+    duration_seconds: 2.0
+
+  - type: function
+    function_name: PingGoogle # Calls the defined "PingGoogle" block again.
+
+  # Another delay of 2 seconds between calls
+  - name: FlowDelay2
+    type: DELAY
+    duration_seconds: 1.0
+
+  - type: function
+    function_name: PingGoogle # Calls the defined "PingGoogle" block for the third time.
+
+settings:
+  timeout: 10     # Global timeout (seconds) for any single API call.
+  max_retries: 3   # Number of times to retry transient failures.
