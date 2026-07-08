@@ -138,6 +138,11 @@ public class TyfapiEngine
         });
     }
 
+    public void SetVariable(string name, object value)
+    {
+        _variables[name] = value;
+    }
+
     public void Dispose()
     {
         _httpClient?.Dispose();
