@@ -10,6 +10,7 @@ public class TyfapiEngine
     public TyfapiEngine()
     {
         _httpClient = new HttpClient();
+        _httpClient.BaseAddress = new Uri("http://localhost");
         _variables = new Dictionary<string, object>();
     }
 
