@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace tyfapi.cli.Tyfapi;
 
 public class WorkflowMetadata
@@ -6,12 +8,14 @@ public class WorkflowMetadata
     public string Description { get; set; } = string.Empty;
     public string Environment { get; set; } = string.Empty;
     public string ApiVersion { get; set; } = string.Empty;
+    public Dictionary<string, object> Variables { get; set; } = new();
 }
 
 public class FunctionDefinition
 {
     public string Type { get; set; } = string.Empty;
     public string Method { get; set; } = string.Empty;
+    public string Baseurl { get; set; } = string.Empty;
     public string Endpoint { get; set; } = string.Empty;
     public Dictionary<string, string> Headers { get; set; } = new();
     public string Body { get; set; } = string.Empty;
@@ -36,7 +40,9 @@ public class WorkflowSettings
 public sealed class WorkflowTemplate
 {
     public WorkflowMetadata Metadata { get; set; } = new();
-    public Dictionary<string, FunctionDefinition> Functions { get; set; } = [];
-    public List<WorkflowStep> Workflow { get; set; } = [];
+    public Dictionary<string, FunctionDefinition> Functions { get; set; } = new();
+    public List<WorkflowStep> Workflow { get; set; } = new();
     public WorkflowSettings Settings { get; set; } = new();
+    public Dictionary<string, object> Variables { get; set; } = new();
+    public Dictionary<string, object> EnvironmentVariables { get; set; } = new();
 }

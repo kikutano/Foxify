@@ -1,5 +1,6 @@
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using System.Text.Json;
 
 namespace tyfapi.cli.Tyfapi;
 
@@ -14,7 +15,7 @@ public class TyfapiParser
             .Build();
     }
 
-    public WorkflowTemplate Parse(string yamlContent)
+    public WorkflowTemplate Parse(string yamlContent, Dictionary<string, object> environmentVariables = null)
     {
         if (string.IsNullOrWhiteSpace(yamlContent))
         {
@@ -26,6 +27,15 @@ public class TyfapiParser
         if (result == null)
         {
             throw new InvalidOperationException("Failed to deserialize the workflow YAML content.");
+        }
+
+        // Add environment variables to the workflow template if provided
+        if (environmentVariables != null)
+        {
+            foreach (var envVar in environmentVariables)
+            {
+                result.EnvironmentVariables[envVar.Key] = envVar.Value;
+            }
         }
 
         return result;

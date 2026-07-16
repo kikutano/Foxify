@@ -1,0 +1,36 @@
+# Test Variables Template
+metadata:
+  name: "Test Variables Flow"
+  description: "Tests workflow with variables support."
+  environment: "dev_credentials.json"
+  api_version: "v1"
+
+functions:
+  Ping:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseurl}
+    endpoint: ping
+
+  GetTestData:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseurl}
+    endpoint: test-data
+    headers:
+      Content-Type: application/json
+    extract:
+      test_value: $.value
+      test_id: $.id
+
+workflow:
+  - type: function
+    function_name: Ping
+    
+  - type: function
+    function_name: GetTestData
+    depends_on: [Ping]
+
+settings:
+  timeout: 10
+  max_retries: 3

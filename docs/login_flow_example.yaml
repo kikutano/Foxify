@@ -1,0 +1,68 @@
+# Project Flow Test Template (English Schema)
+# -----------------------------------------
+# Metadata provides global info for tracking, reporting, and AI context.
+metadata:
+  name: "Login Flow Example" # Human-readable name of the flow/test.
+  description: "Tests a login workflow where a bearer token is obtained and used for subsequent authenticated calls."
+  api_version: "v1"                           # Explicit versioning for schema tracking.
+
+# -----------------------------------------
+# Functions/Templates Library: Reusable API Blocks
+# These blocks define individual, callable units of work that can be referenced multiple times.
+functions:
+  # Function 1: Perform Login (POST Request)
+  Ping:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrlDev}
+    endpoint: ping
+  LoginUser:
+    type: HTTP_REQUEST
+    method: POST
+    baseurl: ${baseUrlDev}
+    endpoint: "login"
+    headers:
+      Content-Type: application/json
+    body: '{
+      "username": "test_user",
+      "password": "test_password"
+    }'
+    extract:
+      bearer_token: $.token # Saves the bearer token into a variable accessible by name.
+
+  # Function 2: Get Protected Resource (GET Request using Bearer Token)
+  GetProtectedResource:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrlDev}
+    endpoint: "me"
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer ${bearer_token}"     # Uses the bearer token from login step.
+    body: ""
+    extract:
+      resource_data: $.data # Saves protected resource data into a variable accessible by name.
+
+# -----------------------------------------
+# Workflow Definition (The Execution Sequence)
+# This defines the actual path taken by the flow engine, calling reusable functions.
+workflow:
+  - type: function
+    function_name: Ping
+    
+  - type: function # Tells the engine to execute a stored function definition.
+    function_name: LoginUser # Calls the defined "LoginUser" block to authenticate.
+
+  # Optional delay between login and subsequent call
+  - name: FlowDelay1
+    type: DELAY
+    duration_seconds: 1.0
+
+  # Execute protected resource call using the token from login
+  - type: function
+    function_name: GetProtectedResource
+    depends_on: [LoginUser] # Ensures 'bearer_token' is available for this step's authorization header.
+
+settings:
+  timeout: 10     # Global timeout (seconds) for any single API call.
+  max_retries: 3   # Number of times to retry transient failures.
