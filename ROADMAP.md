@@ -191,5 +191,6 @@ The existing code compiles, but is **rejected as a foundation** for these verifi
 |---|---|---|---|
 | 2026-08-24 | — | Roadmap created; v0.1 baseline audited; full rewrite approved (format kept, code replaced); AD-1 & AD-6 flagged for decision | Cline |
 | 2026-08-24 | — | `README.md`: added "🎯 Purpose: What Problem Are We Solving?" section (Function / Flow / Environment model, one-click multi-env, AI-generated flows) | Cline |
+| 2026-08-24 | — | `README.md`: added minimal YAML flow example in Purpose (login → token extraction → protected resource), aligned with `docs/*.yaml` conventions | Cline |
 
   - *Accept:* design note in `docs/architecture.md` + stress test running 20 concurrent executor instances against the mock API.
