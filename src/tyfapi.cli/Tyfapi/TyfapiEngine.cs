@@ -7,6 +7,7 @@ public class TyfapiEngine : IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly Dictionary<string, object> _variables;
+    private readonly HashSet<string> _executedFunctions;
 
     public TyfapiEngine()
     {
@@ -15,6 +16,7 @@ public class TyfapiEngine : IDisposable
         var baseAddress = "http://localhost";
         _httpClient.BaseAddress = new Uri(baseAddress);
         _variables = new Dictionary<string, object>();
+        _executedFunctions = new HashSet<string>();
     }
 
     public async Task ExecuteWorkflowAsync(WorkflowTemplate workflow)
@@ -27,6 +29,7 @@ public class TyfapiEngine : IDisposable
 
         // Set base URL from environment variables if available
         //TODO: Variables should be resolved from the workflow's environment variables, not from the system environment variables.
+        ///PERO' giustamente lui non sa che quella variabile è una baseurl come fa a saperlo?
         if (workflow.EnvironmentVariables.TryGetValue("baseUrlDev", out var baseUrl))
         {
             _httpClient.BaseAddress = new Uri(baseUrl.ToString());
@@ -63,7 +66,7 @@ public class TyfapiEngine : IDisposable
         // Check dependencies
         foreach (var dependency in step.DependsOn ?? [])
         {
-            if (!_variables.ContainsKey(dependency))
+            if (!_executedFunctions.Contains(dependency))
             {
                 Console.WriteLine($"Dependency '{dependency}' not available");
                 return;
@@ -122,28 +125,34 @@ public class TyfapiEngine : IDisposable
             Console.WriteLine($"Response Status: {response.StatusCode}");
 
             // Extract variables if defined
-            foreach (var extract in function.Extract)
+            if (function.Extract.Any())
             {
-                // Parse JSON response and extract values based on JSONPath expression
                 try
                 {
                     var responseContent = await response.Content.ReadAsStringAsync();
                     Console.WriteLine($"Response Content: {responseContent}");
 
                     var jsonDocument = JsonDocument.Parse(responseContent);
-                    var value = ExtractValueFromJson(jsonDocument, extract.Value);
-
-                    if (value != null)
+                    
+                    foreach (var extract in function.Extract)
                     {
-                        _variables[extract.Key] = value;
-                        Console.WriteLine($"Extracted {extract.Key}: {value}");
+                        var value = ExtractValueFromJson(jsonDocument, extract.Value);
+
+                        if (value != null)
+                        {
+                            _variables[extract.Key] = value;
+                            Console.WriteLine($"Extracted {extract.Key}: {value}");
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error extracting {extract.Key}: {ex.Message}");
+                    Console.WriteLine($"Error extracting variables: {ex.Message}");
                 }
             }
+            
+            // Mark this function as executed
+            _executedFunctions.Add(step.FunctionName);
         }
         catch (Exception ex)
         {

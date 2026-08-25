@@ -1,21 +1,15 @@
-# Project Flow Test Template (English Schema)
+# Final Demo Workflow: Complete Variable Extraction Example
 # -----------------------------------------
 # Metadata provides global info for tracking, reporting, and AI context.
 metadata:
-  name: "Login Flow Example" # Human-readable name of the flow/test.
-  description: "Tests a login workflow where a bearer token is obtained and used for subsequent authenticated calls."
+  name: "Final Demo Workflow" # Human-readable name of the flow/test.
+  description: "Complete demonstration of variable extraction from API responses and usage in subsequent requests."
   api_version: "v1"                           # Explicit versioning for schema tracking.
 
 # -----------------------------------------
 # Functions/Templates Library: Reusable API Blocks
-# These blocks define individual, callable units of work that can be referenced multiple times.
 functions:
-  # Function 1: Perform Login (POST Request)
-  Ping:
-    type: HTTP_REQUEST
-    method: GET
-    baseurl: ${baseUrlDev}
-    endpoint: ping
+  # Function 1: Perform Login (POST Request) - Extracts multiple variables
   LoginUser:
     type: HTTP_REQUEST
     method: POST
@@ -28,9 +22,10 @@ functions:
       "password": "test_password"
     }'
     extract:
-      token: $.token # Saves the token into a variable accessible by name.
+      token: $.token # Saves the bearer token into a variable accessible by name.
       user_id: $.user.id # Saves the user ID into a variable accessible by name.
       username: $.user.username # Saves the username into a variable accessible by name.
+      expires_at: $.expires_at # Saves expiration timestamp
 
   # Function 2: Get Protected Resource (GET Request using Bearer Token)
   GetProtectedResource:
@@ -45,14 +40,23 @@ functions:
     extract:
       resource_data: $.data # Saves protected resource data into a variable accessible by name.
 
+  # Function 3: Get User Details using extracted user_id
+  GetUserDetails:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrlDev}
+    endpoint: "user/${user_id}" # Uses the user_id from login step
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer ${token}"     # Uses the token from login step.
+    body: ""
+    extract:
+      user_details: $.data # Saves user details into a variable accessible by name.
+
 # -----------------------------------------
 # Workflow Definition (The Execution Sequence)
-# This defines the actual path taken by the flow engine, calling reusable functions.
 workflow:
   - type: function
-    function_name: Ping
-    
-  - type: function # Tells the engine to execute a stored function definition.
     function_name: LoginUser # Calls the defined "LoginUser" block to authenticate.
 
   # Optional delay between login and subsequent call
@@ -63,7 +67,12 @@ workflow:
   # Execute protected resource call using the token from login
   - type: function
     function_name: GetProtectedResource
-    depends_on: [LoginUser] # Ensures 'bearer_token' is available for this step's authorization header.
+    depends_on: [LoginUser] # Ensures 'token' is available for this step's authorization header.
+
+  # Execute user details call using extracted user_id and token
+  - type: function
+    function_name: GetUserDetails
+    depends_on: [LoginUser] # Ensures 'user_id' and 'token' are available for this step's headers and endpoint.
 
 settings:
   timeout: 10     # Global timeout (seconds) for any single API call.
