@@ -6,29 +6,17 @@ Tyfapi is a **Git-native, declarative API scenario runner** designed to make rea
 
 Tyfapi is **AI-friendly, not AI-powered**.
 
-It does not contain an AI model, does not require an AI provider, and does not lock users into a specific LLM. Users can use any LLM or coding agent they prefer — or no AI at all — to create and modify Tyfapi YAML files.
+It does not contain an AI model, does not require an AI provider, and does not lock users into a specific LLM. Developers can use any LLM or coding agent they prefer — or no AI at all — to create and modify Tyfapi YAML files.
 
 The core product is a deterministic execution engine and a simple, machine-readable scenario format.
 
 ---
 
-## 1. The Problem
+# 1. Vision
 
-API testing is often fragmented across:
+API endpoint testing is easy. Testing a realistic journey through an entire backend is harder.
 
-- manually written test code;
-- Postman or similar collections;
-- shell scripts;
-- integration-test frameworks;
-- custom CI scripts;
-- load-testing tools;
-- environment-specific configurations.
-
-Individual endpoints are relatively easy to test.
-
-The harder problem is verifying **realistic user journeys through a backend**.
-
-For example:
+A real user does not interact with one endpoint at a time. They perform sequences such as:
 
 ```text
 Login
@@ -36,6 +24,8 @@ Login
 Extract authentication token
   ↓
 Get profile
+  ↓
+Search product
   ↓
 Create cart
   ↓
@@ -46,17 +36,74 @@ Checkout
 Verify order
 ```
 
-These scenarios contain state, dependencies, extracted values, ordering, delays, and environment-specific configuration.
+These scenarios contain state, dependencies, extracted values, authentication, ordering, delays, and environment-specific configuration.
 
-Tyfapi aims to represent those scenarios as **version-controlled declarative files** that can be executed consistently anywhere.
+Tyfapi aims to make these scenarios **first-class, version-controlled artifacts**.
+
+The long-term vision is:
+
+> **Define a realistic API scenario once and reliably reuse it everywhere.**
+
+The same scenario should eventually be usable for:
+
+```text
+Local development
+       ↓
+Integration testing
+       ↓
+CI/CD
+       ↓
+Staging verification
+       ↓
+Production smoke testing
+       ↓
+Load testing
+```
 
 ---
 
-# 2. The Core Idea
+# 2. The Problem
 
-Tyfapi is built around three concepts:
+Backend API testing is often fragmented across:
 
-### Function
+- manually written integration tests;
+- Postman or similar collections;
+- shell scripts;
+- custom test frameworks;
+- CI-specific scripts;
+- load-testing tools;
+- manually executed requests.
+
+Individual endpoint checks are useful, but they do not always capture how the system is actually used.
+
+For example, testing:
+
+```text
+POST /login
+GET /users/me
+POST /cart
+POST /checkout
+```
+
+individually does not necessarily verify that:
+
+```text
+login → token → cart → checkout
+```
+
+works as a complete user journey.
+
+Tyfapi focuses on that missing layer:
+
+> **Scenario-level API verification.**
+
+---
+
+# 3. The Core Idea
+
+Tyfapi is built around three concepts.
+
+## Function
 
 A reusable API operation.
 
@@ -72,7 +119,7 @@ Login:
     token: $.token
 ```
 
-### Flow
+## Flow
 
 A composition of Functions representing a realistic scenario.
 
@@ -87,7 +134,7 @@ workflow:
       - Login
 ```
 
-### Environment
+## Environment
 
 The same scenario can run against different targets without changing the scenario itself.
 
@@ -98,48 +145,61 @@ tyfapi run checkout.yaml --env staging
 tyfapi run checkout.yaml --env prod
 ```
 
-The same Git-tracked scenario can therefore be reused for:
+The scenario describes **behavior**.
 
-- local development;
-- integration testing;
-- staging verification;
-- CI/CD;
-- production smoke tests;
-- future load testing.
+The environment describes **where that behavior is executed**.
 
 ---
 
-# 3. What Tyfapi Is
+# 4. What Tyfapi Is
 
 Tyfapi is:
 
 - **Declarative** — scenarios are described as YAML rather than imperative test code.
 - **Git-native** — scenarios are ordinary text files that can be versioned, reviewed, diffed, and shared.
-- **Deterministic** — the execution engine itself does not depend on an AI model.
+- **Deterministic** — the execution engine does not depend on AI.
 - **AI-friendly** — the format is intentionally simple and structured so LLMs and coding agents can generate and modify it reliably.
 - **Environment-independent** — scenarios should not need to change when the target environment changes.
 - **CLI-first** — the execution engine is designed for developers and CI/CD pipelines first.
 - **Composable** — reusable Functions can be combined into realistic Flows.
 - **Machine-readable** — validation and execution results should be available in structured formats suitable for automation and AI agents.
 - **Portable** — the core runner should be distributed as a lightweight standalone executable.
+- **Open-source friendly** — the core should be usable without an account, cloud service, or proprietary platform.
 
 ---
 
-# 4. What Tyfapi Is NOT
+# 5. What Tyfapi Is NOT
 
 Tyfapi is deliberately **not**:
 
 - an AI assistant;
 - an LLM provider;
 - a ChatGPT replacement;
-- a hosted-only testing platform;
+- a mandatory cloud platform;
 - a browser automation framework;
-- a traditional GUI-first API client;
-- a replacement for every existing load-testing tool.
+- a Postman clone;
+- a replacement for every load-testing platform;
+- a proprietary API testing format that requires a hosted service.
 
-Tyfapi should not require users to send their source code, API definitions, requests, or credentials to a third-party AI service.
+Tyfapi should work completely locally.
 
-If a user wants AI assistance, they choose the provider or agent themselves.
+A developer should be able to clone a repository, install the CLI, and run:
+
+```bash
+tyfapi run ./flows/checkout.yaml --env local
+```
+
+without creating an account.
+
+---
+
+# 6. AI-Friendly, Not AI-Powered
+
+This is a fundamental product principle.
+
+Tyfapi does **not** include an AI model.
+
+The user chooses their own AI tooling.
 
 For example:
 
@@ -147,98 +207,124 @@ For example:
 Claude Code
 Codex
 Gemini CLI
-Copilot
+GitHub Copilot
 Local LLM
-Any future agent
-        ↓
+Future AI Agent
+        │
+        ▼
    Tyfapi YAML
-        ↓
+        │
+        ▼
    Tyfapi CLI
-        ↓
-      API
+        │
+        ▼
+       API
 ```
+
+The AI is simply a **consumer and producer of the Tyfapi format**.
+
+This means Tyfapi does not need to:
+
+- host models;
+- pay model providers;
+- manage AI API keys;
+- select an AI provider;
+- maintain proprietary prompts;
+- compete directly with AI companies;
+- change whenever a new LLM becomes popular.
+
+Tyfapi remains useful with zero AI involvement.
 
 ---
 
-# 5. The AI-Friendly Philosophy
+# 7. Why Make the Format AI-Friendly?
 
-The key principle is:
+Modern coding agents are increasingly capable of reading repositories, modifying files, executing commands, and iterating based on command results.
 
-> **AI should be a consumer and producer of Tyfapi files, not a dependency of Tyfapi itself.**
+Tyfapi should make that workflow particularly easy.
 
-An AI coding agent should be able to:
+An agent should be able to:
 
-1. read an OpenAPI specification;
-2. inspect an existing Tyfapi repository;
-3. understand the available Functions and environments;
-4. generate a new scenario;
-5. run Tyfapi;
-6. consume structured validation or execution results;
-7. modify the YAML when something fails;
-8. run the scenario again.
+1. Read an OpenAPI specification or existing backend code.
+2. Understand the Tyfapi schema.
+3. Generate a scenario.
+4. Run validation.
+5. Execute the scenario.
+6. Read structured failures.
+7. Modify the YAML.
+8. Run it again.
 
 Conceptually:
 
 ```text
-             OpenAPI / Source Code
-                      │
-                      ▼
-                AI / Agent
-                      │
-                      ▼
-                Tyfapi YAML
-                      │
-                      ▼
-                tyfapi validate
-                      │
-                      ▼
-                  tyfapi run
-                      │
-                      ▼
-                    API
-                      │
-                      ▼
-            Machine-readable result
-                      │
-                      ▼
-                  AI / Agent
+Developer intent
+       │
+       ▼
+   AI Agent
+       │
+       ▼
+Tyfapi YAML
+       │
+       ▼
+tyfapi validate
+       │
+       ▼
+tyfapi run
+       │
+       ▼
+     API
+       │
+       ▼
+Structured result
+       │
+       ▼
+   AI Agent
+       │
+       └──────→ modify YAML
 ```
 
-Tyfapi does not need to know which AI model is involved.
+The important point is:
 
-This keeps the project independent from rapidly changing AI providers and allows the ecosystem to evolve without requiring changes to the core product.
+> **Tyfapi itself remains deterministic.**
 
 ---
 
-# 6. Why YAML?
+# 8. YAML as the Source of Truth
 
-YAML is intended to be:
+The Tyfapi YAML file is the canonical representation of a scenario.
 
-- human-readable;
-- Git-friendly;
-- easy to review;
+It should be:
+
+- readable by humans;
+- writable by humans;
+- writable by AI agents;
 - easy to diff;
-- expressive enough for API scenarios;
-- easy for LLMs to generate;
-- easy for tools to parse;
-- independent from a programming language.
+- easy to review;
+- easy to store in Git;
+- independent of the UI;
+- independent of the cloud.
 
-The syntax should intentionally avoid unnecessary complexity.
+A visual editor, if introduced later, must operate **around the YAML**, not replace it.
 
-The goal is not to create a programming language.
+The intended relationship is:
 
-The goal is to create a **small declarative language for describing API behavior**.
+```text
+             Tyfapi YAML
+                  │
+        ┌─────────┴─────────┐
+        ▼                   ▼
+     CLI/Core            Visual UI
+        │                   │
+        └─────────┬─────────┘
+                  ▼
+            Same scenario
+```
 
-A good Tyfapi file should be understandable by:
-
-- a backend developer;
-- a CI pipeline;
-- an AI coding agent;
-- the Tyfapi CLI.
+The YAML remains the source of truth.
 
 ---
 
-# 7. Example
+# 9. Example
 
 A minimal scenario:
 
@@ -254,11 +340,14 @@ functions:
     method: POST
     baseurl: ${baseUrl}
     endpoint: /login
+
     headers:
       Content-Type: application/json
+
     body:
       username: ${username}
       password: ${password}
+
     extract:
       token: $.token
 
@@ -267,6 +356,7 @@ functions:
     method: GET
     baseurl: ${baseUrl}
     endpoint: /me
+
     headers:
       Authorization: "Bearer ${token}"
 
@@ -297,35 +387,37 @@ tyfapi run ./login.yaml --env dev
 
 ---
 
-# 8. Variable Extraction
+# 10. Variables
 
-Tyfapi supports extracting values from API responses and reusing them later in a Flow.
+Variables allow scenarios to pass state between requests.
 
-Example:
+For example:
 
 ```yaml
 LoginUser:
   type: HTTP_REQUEST
   method: POST
   endpoint: /login
+
   extract:
     token: $.token
     user_id: $.user.id
     username: $.user.username
 ```
 
-Variables can then be used in subsequent requests:
+The extracted variables can then be used by later steps:
 
 ```yaml
 GetProfile:
   type: HTTP_REQUEST
   method: GET
   endpoint: /users/${user_id}
+
   headers:
     Authorization: "Bearer ${token}"
 ```
 
-Initial JSONPath support includes:
+Initial JSONPath support should include:
 
 ```text
 $.token
@@ -334,17 +426,15 @@ $.user.username
 $.items[0].name
 ```
 
-The syntax may evolve, but the principle should remain simple:
+The exact syntax may evolve, but the principle should remain simple:
 
 > **Capture values from one step and make them available to later steps.**
 
 ---
 
-# 9. Dependencies and Flow Semantics
+# 11. Dependencies
 
-Flows should explicitly describe dependencies between steps.
-
-Example:
+Flows should explicitly describe relationships between steps.
 
 ```yaml
 workflow:
@@ -363,7 +453,7 @@ workflow:
       - CreateCart
 ```
 
-Dependencies communicate both to humans and AI agents that:
+This expresses:
 
 ```text
 Login
@@ -373,19 +463,17 @@ CreateCart
 AddProduct
 ```
 
-The engine is responsible for enforcing the execution semantics.
-
 The initial implementation should prioritize predictable sequential execution.
 
-Future versions may support more advanced dependency graphs and controlled parallelism.
+More advanced dependency graphs and controlled parallelism can be introduced later if real use cases require them.
 
 ---
 
-# 10. Environment Independence
+# 12. Environment Independence
 
-A major design goal is:
+A core design goal is:
 
-> **The scenario should describe behavior, not infrastructure.**
+> **The scenario describes behavior, not infrastructure.**
 
 For example:
 
@@ -393,11 +481,9 @@ For example:
 baseurl: ${baseUrl}
 ```
 
-The environment provides the actual value.
+Environment configuration provides the actual value:
 
-Conceptually:
-
-```text
+```yaml
 local:
   baseUrl: http://localhost:5000
 
@@ -413,23 +499,21 @@ prod:
 
 The scenario remains unchanged.
 
-This makes the same Flow usable for:
+This makes the same Flow usable across:
 
 ```text
 local → CI → dev → staging → production
 ```
 
-without duplicating test definitions.
-
-Secrets should not be committed into scenario files.
+Secrets should never be committed directly into scenario files.
 
 ---
 
-# 11. Machine-Readable Execution
+# 13. Machine-Readable Results
 
-Because Tyfapi is intended to work well with AI agents and automation, CLI output should support both:
+Machine-readable output is a first-class requirement.
 
-### Human-readable output
+Human-readable output:
 
 ```text
 ✓ LoginUser              182ms
@@ -439,303 +523,144 @@ Because Tyfapi is intended to work well with AI agents and automation, CLI outpu
 Total: 225ms
 ```
 
-### Machine-readable output
-
-For example:
+Machine-readable output:
 
 ```bash
 tyfapi run checkout.yaml --format json
 ```
 
-could produce structured data such as:
+could produce:
 
 ```json
 {
   "status": "failed",
   "flow": "checkout",
-  "step": "Checkout",
-  "request": {
-    "method": "POST",
-    "endpoint": "/checkout"
-  },
-  "response": {
-    "status": 500
-  },
-  "duration_ms": 241
+  "steps": [
+    {
+      "name": "Login",
+      "status": "passed",
+      "duration_ms": 182
+    },
+    {
+      "name": "Checkout",
+      "status": "failed",
+      "duration_ms": 241,
+      "response_status": 500
+    }
+  ]
 }
 ```
 
-The exact schema is to be defined.
+The exact schema will be defined during development.
 
-The important principle is that **agents and automation should be able to understand failures without parsing human-oriented terminal text**.
+The requirement is:
 
-This is a first-class product requirement, not an afterthought.
+> **An AI agent or CI pipeline must be able to understand the result without parsing human-oriented terminal output.**
+
+This is important both for automation and for the AI-friendly philosophy.
 
 ---
 
-# 12. Architecture
+# 14. CLI
 
-Tyfapi follows a **CLI-first architecture**.
+The CLI is the first and most important interface.
 
-```text
-                 ┌──────────────────────┐
-                 │   Tyfapi YAML Files  │
-                 └──────────┬───────────┘
-                            │
-                            ▼
-                 ┌──────────────────────┐
-                 │    Tyfapi CLI/Core   │
-                 │                      │
-                 │  Parser              │
-                 │  Validator           │
-                 │  Variable Engine     │
-                 │  Flow Executor       │
-                 │  HTTP Engine         │
-                 │  Result Reporter     │
-                 └──────────┬───────────┘
-                            │
-                ┌───────────┼───────────┐
-                ▼           ▼           ▼
-              Local         CI       Remote API
+Initial commands:
+
+## Validate
+
+```bash
+tyfapi validate ./flows/checkout.yaml
 ```
 
-The core engine must remain usable without a web application.
+## Run
 
-The CLI is the primary interface.
+```bash
+tyfapi run ./flows/checkout.yaml --env dev
+```
+
+## Machine-readable run
+
+```bash
+tyfapi run ./flows/checkout.yaml --env dev --format json
+```
+
+Future capability:
+
+```bash
+tyfapi run ./flows --env staging
+```
+
+Future load testing:
+
+```bash
+tyfapi load ./flows/checkout.yaml --bots 1000
+```
+
+The CLI must provide real value even if the user never installs a VS Code extension or uses the cloud platform.
 
 ---
 
-# 13. Core Technology
+# 15. Technology
 
 The initial implementation uses:
 
 - **C# / .NET**
 - **Native AOT**
-- `HttpClient` / `SocketsHttpHandler`
+- `HttpClient`
+- `SocketsHttpHandler`
 - source-generated serialization where appropriate
-- a lightweight YAML parser compatible with the project's AOT requirements
+- an AOT-compatible YAML parser
 
 The objectives are:
 
 - fast startup;
 - small footprint;
 - low operational overhead;
-- easy distribution;
+- simple distribution;
 - no external runtime dependency;
 - suitability for CI/CD;
-- efficient concurrent HTTP execution.
+- efficient HTTP execution.
 
 Native AOT is an implementation choice, not the primary product value proposition.
 
-The user value is:
+The value proposition is:
 
 > **Run the same API scenario reliably anywhere.**
 
 ---
 
-# 14. CLI
+# 16. MVP — The First Release
 
-The initial CLI should provide a small and predictable command surface.
+The first release must be deliberately small.
 
-### Validate
+The goal is **not** to build the complete Tyfapi platform.
 
-```bash
-tyfapi validate ./flows/checkout.yaml
-```
+The goal is to validate one hypothesis:
 
-### Run
+> **Do developers find it useful to describe realistic API journeys in YAML, version them with Git, and run them repeatedly across environments?**
 
-```bash
-tyfapi run ./flows/checkout.yaml --env dev
-```
+The first MVP is therefore a:
 
-### Machine-readable execution
-
-```bash
-tyfapi run ./flows/checkout.yaml --env dev --format json
-```
-
-Future commands may include:
-
-```bash
-tyfapi run ./flows --env staging
-tyfapi load ./flows/checkout.yaml --bots 1000
-```
-
-The CLI should remain useful even if the user never uses the web application or VS Code extension.
-
----
-
-# 15. Project Principles
-
-These principles are the source of truth for product decisions.
-
-## Principle 1 — The YAML is the source of truth
-
-The scenario file is the canonical representation.
-
-UI, cloud services, and other tooling must operate around the YAML rather than replacing it with a proprietary internal representation.
-
----
-
-## Principle 2 — AI is optional
-
-Tyfapi must work perfectly without AI.
-
-AI integration means:
+## Scenario Runner
 
 ```text
-Any AI → Tyfapi YAML → Tyfapi
+Tyfapi YAML
+     ↓
+Tyfapi CLI
+     ↓
+Real API
+     ↓
+Structured result
 ```
 
-not:
-
-```text
-Tyfapi → mandatory AI provider
-```
-
 ---
 
-## Principle 3 — Deterministic execution
+# 17. MVP Scope
 
-Given the same environment, inputs, and scenario, execution should be predictable.
+The MVP should include only the following capabilities.
 
-The core engine should not depend on probabilistic behavior.
-
----
-
-## Principle 4 — Git first
-
-Tyfapi files should behave like source code:
-
-- commit them;
-- review them;
-- diff them;
-- branch them;
-- merge them;
-- run them in CI.
-
----
-
-## Principle 5 — Scenarios over endpoints
-
-The core abstraction is not:
-
-> "Test this endpoint."
-
-It is:
-
-> "Verify this behavior through the system."
-
-Endpoint-level testing is a building block.
-
-Flows are the product abstraction.
-
----
-
-## Principle 6 — CLI before UI
-
-The core engine must provide real value before any visual interface exists.
-
-A web dashboard or VS Code extension should improve the experience, not be required for basic functionality.
-
----
-
-## Principle 7 — Automation first
-
-Everything important should be automatable:
-
-- validation;
-- execution;
-- CI;
-- reporting;
-- future load testing;
-- AI-agent interaction.
-
----
-
-# 16. What Tyfapi Could Eventually Become
-
-The long-term vision is:
-
-```text
-                  Tyfapi Scenario
-                        │
-          ┌─────────────┼─────────────┐
-          │             │             │
-        Local           CI         Production
-          │             │             │
-          └─────────────┼─────────────┘
-                        │
-                  Same definition
-                        │
-          ┌─────────────┼─────────────┐
-          │             │             │
-       Regression     Smoke        Load
-         Tests        Tests       Testing
-```
-
-A single scenario definition can become the common language for different forms of backend verification.
-
----
-
-# 17. Roadmap
-
-The roadmap is intentionally ordered around **validation of the core product before building the platform around it**.
-
----
-
-## Milestone 0 — Product Validation
-
-**Goal:** Prove that developers actually want Git-native API scenarios.
-
-Before investing heavily in the complete platform, validate the concept with a small working prototype.
-
-### Objectives
-
-- Build a minimal CLI.
-- Support a minimal YAML schema.
-- Support HTTP requests.
-- Support sequential workflows.
-- Support variable extraction.
-- Support environment variables.
-- Support structured output.
-- Create 3–5 realistic example scenarios.
-- Test the workflow with real backend developers.
-
-### Success signal
-
-The most important metric is not GitHub stars.
-
-It is:
-
-> **Do developers put Tyfapi files into real repositories and execute them again after the first trial?**
-
----
-
-# Milestone 1 — Core Engine
-
-**Goal:** Build a reliable, standalone API scenario execution engine.
-
-### Objectives
-
-- Define the stable YAML specification.
-- Define schema validation rules.
-- Implement HTTP requests.
-- Implement environment resolution.
-- Implement variable substitution.
-- Implement JSON response extraction.
-- Implement workflow execution.
-- Implement dependencies.
-- Implement delays.
-- Implement timeouts.
-- Implement retries.
-- Implement clear failure reporting.
-- Implement machine-readable output.
-- Ensure Native AOT compatibility.
-- Support concurrent execution primitives in the architecture without prematurely building distributed load testing.
-
-### Initial supported HTTP methods
+### HTTP
 
 ```text
 GET
@@ -745,37 +670,355 @@ PATCH
 DELETE
 ```
 
-Additional methods may be added later.
+### Requests
 
-### Success criteria
+- URL/base URL;
+- headers;
+- query parameters;
+- request body.
 
-A developer should be able to:
+### Variables
 
-```bash
-tyfapi validate ./flows/checkout.yaml
-tyfapi run ./flows/checkout.yaml --env local
+```text
+${token}
+${userId}
+${baseUrl}
 ```
 
-and obtain reliable, understandable results.
+### Response extraction
+
+```text
+$.token
+$.user.id
+$.items[0].id
+```
+
+### Flows
+
+Ordered execution:
+
+```text
+A → B → C → D
+```
+
+### Dependencies
+
+```yaml
+depends_on:
+  - Login
+```
+
+### Delays
+
+```yaml
+- type: DELAY
+  duration_seconds: 1
+```
+
+### Environment configuration
+
+Separate environment files.
+
+### Validation
+
+```bash
+tyfapi validate scenario.yaml
+```
+
+### Execution
+
+```bash
+tyfapi run scenario.yaml --env dev
+```
+
+### Exit codes
+
+```text
+0 = success
+1 = failure
+```
+
+### Output
+
+- human-readable terminal output;
+- machine-readable JSON output.
 
 ---
 
-# Milestone 2 — Git & CI/CD
+# 18. What the MVP Does NOT Include
 
-**Goal:** Make Tyfapi useful as a serious development and deployment tool.
+The first release should explicitly avoid:
 
-### Objectives
+- AI integration;
+- AI API calls;
+- proprietary AI agents;
+- SaaS;
+- user accounts;
+- database;
+- cloud dashboard;
+- VS Code extension;
+- visual editor;
+- distributed load testing;
+- multi-region infrastructure;
+- advanced analytics;
+- enterprise authentication;
+- complex plugin systems.
 
-- GitHub Action.
-- Lightweight Docker image.
-- CI-friendly exit codes.
-- `--fail-fast`.
-- JSON output.
-- JUnit-compatible reporting if useful.
-- Run multiple flows.
-- Environment configuration suitable for CI.
-- Secure secret injection.
-- Clear pipeline summaries.
+These are potential future features, not MVP requirements.
+
+---
+
+# 19. MVP Example Scenarios
+
+The MVP should ship with at least three compelling examples.
+
+## Authentication
+
+```text
+POST /login
+     ↓
+extract token
+     ↓
+GET /me
+```
+
+Demonstrates:
+
+- variables;
+- extraction;
+- dependencies;
+- authentication headers.
+
+## CRUD
+
+```text
+Create
+  ↓
+Read
+  ↓
+Update
+  ↓
+Delete
+```
+
+Demonstrates:
+
+- resource IDs;
+- variable propagation;
+- chained operations;
+- realistic stateful testing.
+
+## Realistic business flow
+
+For example:
+
+```text
+Login
+  ↓
+Search product
+  ↓
+Create cart
+  ↓
+Add product
+  ↓
+Checkout
+  ↓
+Verify order
+```
+
+This is the most important example because it demonstrates why Tyfapi exists.
+
+The goal is to show **behavior**, not simply endpoint testing.
+
+---
+
+# 20. AI Validation Experiment
+
+Even though the MVP contains no AI, AI compatibility should be tested manually.
+
+Take an OpenAPI specification and ask several different AI agents to generate Tyfapi YAML.
+
+For example:
+
+```text
+OpenAPI
+   ↓
+Claude
+   ↓
+Tyfapi YAML
+```
+
+Then repeat with other agents such as Codex or Gemini.
+
+No custom integration is required.
+
+The experiment is simply:
+
+> **Can general-purpose AI agents understand the Tyfapi format and produce valid, useful scenarios?**
+
+If the answer is yes, the AI-friendly design hypothesis becomes much stronger.
+
+---
+
+# 21. Product Validation
+
+The MVP is primarily a **market validation experiment**.
+
+The first users should ideally be backend developers.
+
+Give them a real API and ask them to create scenarios such as:
+
+```text
+Login
+Create resource
+Update resource
+Delete resource
+```
+
+Do not only ask whether they "like the idea."
+
+Observe how they actually use it.
+
+Questions to answer:
+
+- Do they understand the YAML?
+- Do they understand Functions and Flows?
+- Can they create a scenario without extensive explanation?
+- Can they debug failures?
+- Is the scenario easier to maintain than their current approach?
+- Would they commit the YAML to their repository?
+- Would they run it again later?
+- Would they put it into CI?
+- Would they use it for another scenario?
+
+---
+
+# 22. Success Metrics
+
+The most important MVP metric is **not GitHub stars**.
+
+It is **continued usage**.
+
+## Primary metric — Second-use rate
+
+How many users who try Tyfapi once use it again for a second scenario?
+
+For example:
+
+```text
+10 people try Tyfapi
+  ↓
+8 create first scenario
+  ↓
+5 create second scenario
+  ↓
+4 commit scenarios to a repository
+  ↓
+3 use Tyfapi in CI
+```
+
+That would be a strong signal.
+
+A weaker signal would be:
+
+```text
+100 people try Tyfapi
+  ↓
+90 say "cool"
+  ↓
+2 ever use it again
+```
+
+The objective is not curiosity.
+
+The objective is **workflow adoption**.
+
+---
+
+# 23. Strongest Validation Signal
+
+The strongest early signal would be:
+
+> **A developer puts a Tyfapi YAML file into a real repository and keeps using it without being asked.**
+
+Even better:
+
+```text
+Scenario
+   ↓
+Git commit
+   ↓
+CI
+   ↓
+Developer changes scenario
+   ↓
+CI runs again
+```
+
+At that point Tyfapi has moved from "interesting tool" to "part of a development workflow."
+
+---
+
+# 24. Suggested MVP Repository
+
+The initial repository can remain very small:
+
+```text
+tyfapi/
+│
+├── src/
+│   └── Tyfapi.Cli/
+│
+├── examples/
+│   ├── authentication.yaml
+│   ├── crud.yaml
+│   └── checkout.yaml
+│
+├── environments/
+│   ├── local.yaml
+│   └── example.yaml
+│
+├── schema/
+│   └── tyfapi.schema.json
+│
+├── README.md
+├── LICENSE
+└── .gitignore
+```
+
+Avoid creating infrastructure for features that have not yet been validated.
+
+---
+
+# 25. Roadmap After MVP
+
+The roadmap should follow evidence from real users.
+
+## Milestone 1 — Core Engine
+
+After MVP validation:
+
+- stabilize the YAML specification;
+- improve schema validation;
+- improve error reporting;
+- improve environment handling;
+- improve retries/timeouts;
+- improve structured output;
+- improve performance;
+- expand HTTP capabilities where needed.
+
+## Milestone 2 — CI/CD
+
+Potential capabilities:
+
+- GitHub Action;
+- Docker image;
+- CI-friendly output;
+- `--fail-fast`;
+- JUnit-compatible reports;
+- running multiple flows;
+- secure secret injection;
+- pipeline summaries.
 
 Example:
 
@@ -785,67 +1028,61 @@ tyfapi run ./flows --env staging --fail-fast
 
 A failed scenario should be able to fail the deployment pipeline.
 
----
+## Milestone 3 — Agent-Friendly Tooling
 
-# Milestone 3 — Agent-Friendly Tooling
+Make Tyfapi exceptionally easy for AI coding agents to operate.
 
-**Goal:** Make Tyfapi exceptionally easy for AI coding agents to use without embedding AI into the product.
+Potential capabilities:
 
-### Objectives
+- precise JSON schema;
+- excellent validation errors;
+- structured execution results;
+- agent-oriented documentation;
+- examples specifically designed for LLM consumption;
+- clear CLI semantics;
+- deterministic exit codes.
 
-- Publish a precise machine-readable schema.
-- Provide excellent validation errors.
-- Provide structured execution results.
-- Document the format for LLMs.
-- Provide examples designed for agent consumption.
-- Provide instructions/prompts users can optionally give to their preferred agents.
-- Ensure agents can perform:
+The agent workflow should be:
 
 ```text
 Generate
-  ↓
+   ↓
 Validate
-  ↓
+   ↓
 Run
-  ↓
+   ↓
 Read result
-  ↓
+   ↓
 Modify
-  ↓
+   ↓
 Run again
 ```
 
-### Important constraint
+Still:
 
-No AI model is added to the Tyfapi core.
+> **No AI model inside Tyfapi.**
 
-The project remains model/provider agnostic.
+## Milestone 4 — VS Code Extension
 
----
+Only after the CLI and YAML format are proven.
 
-# Milestone 4 — VS Code Extension
+Potential capabilities:
 
-**Goal:** Reduce friction while keeping YAML and Git as the source of truth.
+- automatic CLI installation;
+- YAML editing;
+- validation feedback;
+- flow visualization;
+- environment selection;
+- run individual steps;
+- run complete flows;
+- execution results;
+- integration with existing AI coding tools.
 
-### Objectives
+The extension should remain a UI around the YAML, not a replacement for it.
 
-- Cross-platform extension.
-- Automatic CLI installation.
-- YAML editing.
-- Validation feedback.
-- Flow visualization.
-- Run individual steps or complete flows.
-- Environment selection.
-- Human-friendly execution results.
-- Optional integration with the user's existing AI coding tools.
+## Milestone 5 — Local Load Testing
 
-The visual interface should be a representation of the YAML, not a replacement for it.
-
----
-
-# Milestone 5 — Local Load Testing
-
-**Goal:** Reuse the same scenario definitions for traffic simulation.
+Reuse the same scenarios for traffic simulation.
 
 Example:
 
@@ -853,131 +1090,188 @@ Example:
 tyfapi load ./flows/checkout.yaml --bots 1000
 ```
 
-### Objectives
+Potential capabilities:
 
-- Clone a Flow into concurrent workers ("Bots").
-- Support configurable concurrency.
-- Support duration and iteration limits.
-- Collect latency and throughput metrics.
-- Collect error rates.
-- Support realistic delays.
-- Reuse existing Functions and Flows.
-- Keep load testing based on the same scenario definition.
-
-The goal is not initially to replace specialized load-testing platforms.
+- concurrent scenario workers;
+- configurable concurrency;
+- duration/iteration limits;
+- latency metrics;
+- throughput;
+- error rates;
+- realistic delays.
 
 The goal is:
 
 > **Turn an existing realistic API scenario into traffic with minimal additional configuration.**
 
----
+## Milestone 6 — Cloud Platform
 
-# Milestone 6 — Cloud Platform
-
-**Goal:** Add collaboration and centralized reporting without making the cloud platform mandatory.
+Only after strong CLI adoption.
 
 Potential capabilities:
 
-- team accounts;
 - centralized run history;
 - dashboards;
 - historical latency;
 - reliability trends;
-- shared API specifications;
-- scenario management;
-- CI run history;
+- shared scenarios;
+- team collaboration;
+- CI history;
 - notifications;
 - access control.
 
 The CLI should remain useful independently.
 
----
-
-# Milestone 7 — Distributed Cloud Load Testing
-
-**Goal:** Provide managed distributed traffic generation.
+## Milestone 7 — Distributed Cloud Load Testing
 
 Potential capabilities:
 
-- multi-region load generation;
+- multi-region traffic generation;
 - large-scale Bot execution;
-- configurable geographic distribution;
+- geographic distribution;
 - cloud-managed workers;
 - real-time metrics;
-- historical reports.
+- historical performance reports.
 
-This is a potential premium capability because it consumes infrastructure and provides clear direct value.
+This is a natural candidate for a paid service because it consumes infrastructure and provides direct operational value.
 
 ---
 
-# 18. Monetization Strategy
+# 26. Open Source Strategy
 
-The core philosophy should favor a **free/open-source or generous free CLI**.
+Open source can be particularly valuable for Tyfapi because the project introduces a new scenario format.
 
-The objective is to maximize adoption of the scenario format.
+The core idea is:
 
-Potential model:
+> **Users should own their scenarios, not be locked into our cloud.**
 
-### Free / Open Source
+The YAML format should be public.
 
+The core runner should be usable locally.
+
+A developer should be able to keep:
+
+```text
+checkout.yaml
+```
+
+in their own repository and run it without an account.
+
+This provides:
+
+- **Trust** — users can inspect what the runner does.
+- **Adoption** — developers can try the tool without signing up.
+- **Git-native workflow** — scenarios remain ordinary repository files.
+- **Ecosystem growth** — developers can contribute examples, integrations, and improvements.
+- **AI compatibility** — public schemas and examples can be consumed by AI coding agents.
+- **Reduced lock-in** — scenario files remain useful independently of the cloud service.
+
+---
+
+# 27. Possible Open Source / Commercial Split
+
+A possible long-term model is **open-core**.
+
+## Open Source
+
+Potentially:
+
+- YAML specification;
+- JSON schema;
 - CLI;
-- YAML format;
+- execution engine;
 - local execution;
 - environment support;
 - variable extraction;
-- Git integration;
-- CI execution;
+- CI usage;
 - local load testing.
 
-### Cloud / Pro
+## Commercial
 
+Potentially:
+
+- cloud dashboard;
 - centralized reporting;
-- historical runs;
+- historical analytics;
 - team collaboration;
-- advanced dashboards;
-- notifications;
-- hosted CI results;
-- advanced analytics.
-
-### Enterprise
-
-Potential capabilities:
-
-- SSO;
+- hosted runners;
+- distributed load testing;
+- enterprise authentication;
 - RBAC;
 - audit logs;
-- private runners;
-- enterprise integrations;
-- self-hosted deployment;
 - governance features.
 
-### Cloud Load Testing
-
-Potentially usage-based:
-
-```text
-Local load testing     → Free
-Cloud load testing     → Paid
-Distributed testing    → Paid
-```
-
-This creates a natural relationship between cost and revenue.
-
-The project does not need to monetize the basic CLI to be commercially viable.
+The exact licensing model should be decided later based on adoption and competitive considerations.
 
 ---
 
-# 19. Competitive Positioning
+# 28. Monetization
 
-Tyfapi should not attempt to win by being "another Postman."
+The project should not depend on charging users for basic local execution.
 
-Existing tools are already strong at API exploration and endpoint testing.
+A potential model:
 
-The intended positioning is closer to:
+```text
+                 Tyfapi
+                    │
+          ┌─────────┴─────────┐
+          │                   │
+     Open Source             Cloud
+          │                   │
+        CLI              Dashboard
+        YAML              Analytics
+        Runner            Teams
+        CI                History
+        Local Load        Hosted Runs
+```
 
-> **A Git-native scenario engine for realistic API behavior.**
+Potential free capabilities:
 
-The key distinction is the combination of:
+- local execution;
+- YAML scenarios;
+- Git;
+- environment support;
+- CI;
+- local load testing.
+
+Potential paid capabilities:
+
+- centralized reporting;
+- team collaboration;
+- hosted execution;
+- historical analytics;
+- notifications;
+- distributed cloud load testing;
+- enterprise functionality.
+
+A particularly natural model is:
+
+```text
+Local load testing       → Free
+Cloud load testing       → Paid
+Distributed testing      → Paid
+```
+
+The infrastructure cost of the paid feature directly corresponds to its value.
+
+---
+
+# 29. Competitive Positioning
+
+Tyfapi should not attempt to win by becoming "another Postman."
+
+Established API clients are already excellent at:
+
+- exploring APIs;
+- manually sending requests;
+- inspecting responses;
+- organizing requests.
+
+The intended positioning is different:
+
+> **Tyfapi is a Git-native scenario engine for realistic API behavior.**
+
+The core differentiation is the combination of:
 
 ```text
 Declarative scenarios
@@ -995,88 +1289,98 @@ AI-agent compatibility
 Future load testing
 ```
 
-The competitive advantage should come from the workflow and the format, not from simply having more HTTP features than established API clients.
+The product should focus on **behavioral scenarios**, not merely endpoint collections.
 
 ---
 
-# 20. Non-Goals
+# 30. Non-Goals
 
-To avoid scope creep, the following are not initial goals:
+To prevent scope creep, the following are not initial goals:
 
 - building a proprietary AI assistant;
-- training or hosting an LLM;
-- replacing browser automation frameworks;
-- replacing every load-testing platform;
-- building a full API design platform;
+- hosting or training an LLM;
+- integrating a mandatory AI provider;
 - building a Postman clone;
-- building a visual editor before the CLI is proven;
-- building a SaaS platform before the core scenario format is validated.
+- replacing browser automation;
+- replacing specialized load-testing platforms;
+- building a complete API design platform;
+- building a cloud platform before the CLI is validated;
+- building a visual editor before the YAML format is proven;
+- supporting every protocol from day one.
+
+Features should be added because real users need them, not because they are technically interesting.
 
 ---
 
-# 21. MVP Definition
+# 31. Product Principles
 
-The first genuinely useful version of Tyfapi should be surprisingly small.
+These principles should guide future decisions.
 
-It needs to prove this loop:
+## 1. YAML is the source of truth
 
-```text
-API specification / developer intent
-              ↓
-       YAML scenario
-              ↓
-       tyfapi validate
-              ↓
-         tyfapi run
-              ↓
-          API system
-              ↓
-     structured result
-```
+Everything else is built around the scenario file.
 
-The MVP should support:
+## 2. AI is optional
 
-- HTTP requests;
-- reusable Functions;
-- sequential Flows;
-- variables;
-- response extraction;
-- environment configuration;
-- dependencies;
-- delays;
-- retries;
-- validation;
-- human-readable output;
-- machine-readable output;
-- non-zero exit codes on failure.
+Tyfapi works perfectly without AI.
 
-Everything else comes later.
+## 3. Deterministic execution
+
+The core engine must remain predictable and reproducible.
+
+## 4. Git first
+
+Scenarios should behave like source code.
+
+## 5. Scenarios over endpoints
+
+The primary abstraction is a user journey through the backend.
+
+## 6. CLI before UI
+
+The core product must work without a graphical interface.
+
+## 7. Automation first
+
+Everything important should be scriptable.
+
+## 8. Machine-readable by design
+
+Tools and AI agents should be able to consume Tyfapi results directly.
+
+## 9. Environment-independent scenarios
+
+Changing the target environment should not require rewriting the scenario.
+
+## 10. Evidence before complexity
+
+Do not build large features until real users demonstrate that they need them.
 
 ---
 
-# 22. The North Star
+# 32. North Star
 
-The project should always come back to one question:
+Every future product decision should come back to one question:
 
 > **Can a developer define a realistic API scenario once and reliably reuse it everywhere?**
 
 The ideal workflow is:
 
 ```text
-              DEFINE ONCE
-                   │
-                   ▼
-             Tyfapi YAML
-                   │
-        ┌──────────┼──────────┐
-        ▼          ▼          ▼
-      Local        CI       Staging
-                              │
-                              ▼
-                            Prod
+                 DEFINE ONCE
+                      │
+                      ▼
+                Tyfapi YAML
+                      │
+          ┌───────────┼───────────┐
+          ▼           ▼           ▼
+        Local         CI       Staging
+                                  │
+                                  ▼
+                                Prod
 ```
 
-And when an AI coding agent is available:
+And with an AI coding agent:
 
 ```text
        Developer intent
@@ -1098,7 +1402,7 @@ Tyfapi should be the **deterministic layer between developer/agent intent and AP
 
 ---
 
-# 23. Final Product Statement
+# 33. Final Product Statement
 
 > **Tyfapi is a Git-native, declarative API scenario runner. Define realistic backend workflows once in simple YAML, run them against any environment, execute them locally or in CI, and let any AI coding agent generate or modify the scenarios without making AI a dependency of the product.**
 
@@ -1106,8 +1410,10 @@ The product is not the AI.
 
 The product is not the dashboard.
 
-The product is not the load-testing infrastructure.
+The product is not the cloud infrastructure.
 
-**The product is the scenario format and the engine that makes those scenarios portable, executable, automatable, and useful everywhere.**
+The product is:
+
+> **A simple scenario format and a deterministic engine that make realistic API behavior portable, executable, automatable, and reusable everywhere.**
 
 Everything else should grow around that core.
