@@ -1,412 +1,999 @@
 # Milestone 1 — Core Engine: Task Specification
 
-> **Status:** v1.0 · 2026-08-24
-> **Purpose.** Defines the concrete tasks and their detailed descriptions required to deliver **Milestone 1 — Core Engine** (README §25 "Milestone 1: Core Engine (CLI)").
-> **Tracking.** Task IDs and status checkboxes live in `ROADMAP.md` §5 — it is the single source of truth per its working rules. This document expands each ID into a workable description, acceptance criteria, and dependencies.
-> **Inputs.** `README.md` (Milestone 1 Features, AI-friendly principles, out-of-scope) · `ROADMAP.md` §2 (v0.1 baseline audit) · `ROADMAP.md` §3 (ADRs).
+> **Status:** v1.1 · 2026-08-27  
+> **Purpose:** Defines the concrete engineering tasks required to deliver **Milestone 1 — Core Engine**.  
+> **Tracking:** Task IDs and status checkboxes live in `ROADMAP.md` §5. `ROADMAP.md` remains the single source of truth for task status.  
+> **Inputs:** `README.md` (product vision, MVP, AI-friendly principles, Milestone 1 scope) · `ROADMAP.md` §2 (baseline audit) · `ROADMAP.md` §3 (ADRs).
 
 ---
 
 ## 1. Objective
 
-Deliver a **Git-friendly, AI-first, CLI-first** API testing engine that:
-
-- Reads and validates a flat, AI-readable YAML flow format (`metadata` / `functions` / `workflow` / `settings`).
-- Executes HTTP steps deterministically: variables, extraction, delays, dependencies, timeouts, retries.
-- Fails fast with meaningful, contextual errors — never silent, never generic.
-- Publishes as a dependency-free **Native AOT** binary (near-instant startup, zero runtime dependencies).
-- Is **AI-generatable**: LLMs can convert OpenAPI specs into flow files that pass `validate` and `run` without manual fixes.
-- Emits a machine-readable JSON report — the foundation for M3 (CI/load) and M4 (cloud).
-
-### Out of scope (explicitly deferred)
-
-| Item | Deferred to |
-|---|---|
-| Bots / parallel execution (`--bots N`, topological parallel branches) | M3-1, M3-6 |
-| Load metrics (RPS, p50/p95/p99, error rate) | M3-2 |
-| AI error diagnostics (LLM explanation of failures) | M3-5 |
-| VS Code extension / Webview UI | M2 |
-| Cloud platform, dashboards, distributed load | M4 |
-
-## 2. Prerequisites (Milestone 0 must be complete)
-
-- **M0-1…M0-3** — clean solution layout, exactly one entry point, CLI surface (`tyfapi validate`, `tyfapi run`) with stable exit codes `0` success · `1` execution failed · `2` validation failed · `3` usage error.
-- **M0-4** — AD-1 settled (AOT-safe deserialization) and proven with `dotnet publish -c Release`.
-- **M0-5** — zero-warning build (`TreatWarningsAsErrors=true`), reproducible pipeline script.
-- **AD-6** — recorded for M1: `depends_on` means **strict validation + sequential execution** (parallelism is an M3 concern).
-
-## 3. Baseline gaps this milestone must close (verified in `ROADMAP.md` §2)
-
-| v0.1 gap (evidence) | Fixed by |
-|---|---|
-| No fail-fast: missing functions / unmet `depends_on` silently skipped | M1-4, M1-9 |
-| No HTTP status validation | M1-11 |
-| `settings.timeout` & `max_retries` parsed but unused | M1-10 |
-| `FunctionDefinition.Baseurl` ignored (engine special-cases `baseUrlDev`) | M1-5 |
-| Content-Type stripped and never re-applied on POST bodies | M1-5 |
-| `metadata.variables` and env files never seeded into the engine | M1-6 |
-| Extraction coerces numbers/booleans to strings | M1-7 |
-| No error on unknown `${var}` (silent empty string) | M1-6 |
-| Fake handler constructed in tests but never injected; `Assert.True(true)` everywhere | M1-14, M1-15 |
-| `PublishAot=true` but reflection-based YamlDotNet deserialization (IL3050) | M0-4, M1-17 |
-
-## 4. Task breakdown
-
-Status legend (see `ROADMAP.md`): `[ ]` TODO · `[~]` IN PROGRESS · `[x]` DONE · `[-]` DEFERRED · `[?]` NEEDS DECISION.
-
-### 4.1 Syntax & validation
-
-#### M1-1 — Formal flow schema specification
-
-**Goal.** Establish the single, authoritative, machine-checkable definition of the flow YAML format.
-
-**Description.**
-- Produce `docs/flow-schema.md`: a prose specification plus an embedded JSON Schema (draft 2020-12) covering the full flow document — `metadata` (name, description, environment, api_version, variables), `functions` (HTTP_REQUEST: method, baseurl, endpoint, headers, body, extract, expected_status), `workflow` (function steps with `depends_on`, `DELAY` steps), `settings` (timeout, max_retries).
-- Keep the schema flat and AI-friendly (AD-3): minimal nesting, descriptive key names, explicit defaults documented next to each field — this is the surface that LLMs generate against.
-- The JSON Schema must be machine-consumable: the M1-2 validator, the M2 Monaco schema service, and any future tooling reference the same artifact.
-
-**Acceptance criteria.**
-- [ ] `docs/flow-schema.md` exists with prose + JSON Schema; every sample in `docs/*.yaml` validates against it unchanged.
-- [ ] Defaults are documented per field (e.g., `expected_status` = any 2xx, `max_retries` = 0).
-
-**Dependencies.** M0-4 (AD-1 settled — the spec must not contradict the AOT-safe deserialization path).
-
-#### M1-2 — `tyfapi validate`: schema + semantic validation
-
-**Goal.** A full static validation pass that makes the format safe for AI to generate without human review.
-
-**Description.**
-- Implement the M0-3 `validate` command: schema conformance per M1-1, then semantic checks:
-  - `function_name` referenced in `workflow` but not defined in `functions`;
-  - `depends_on` referencing unknown steps, or unsatisfiable dependencies (cycles);
-  - duplicate variable names in scope (`metadata.variables`, `extract` targets);
-  - malformed JSONPath inside `extract` blocks;
-  - invalid HTTP method, missing/invalid `endpoint`, out-of-range delay;
-  - missing required sections (`metadata`, `settings`) per the schema.
-- Errors are human-readable and pinpoint the offending step/function/field; any violation → exit code `2`.
-- An invalid flow must be **unrunnable** — `run` re-invokes the same validation before executing.
-
-**Acceptance criteria.**
-- [ ] One negative test per semantic check; every error message includes the element path (e.g., `workflow[3] → depends_on: unknown step 'x'`).
-- [ ] `tyfapi run` refuses to execute a flow that fails `validate`.
-
-**Dependencies.** M1-1, M0-3.
-
-#### M1-3 — AI-generation validation (the core requirement)
-
-**Goal.** Prove the format is AI-generatable — the product's first requirement, not an afterthought.
-
-**Description.**
-- Prompt **GPT and Claude** to convert **3+ real OpenAPI/Swagger specs** into our flow format, with no manual correction allowed; the result must pass `tyfapi validate` and succeed under `tyfapi run` against the mock API.
-- Record the prompt, the generated flow, and the outcome in `docs/ai-validation.md`.
-- Treat a model that consistently trips over something as a **spec or error-message bug** (README: "the syntax should allow LLMs to generate without manual fixes") — iterate on the spec/validator, not on the model's output.
-
-**Acceptance criteria.**
-- [ ] 3+ specs converted by each of GPT and Claude, all validating and executing green.
-- [ ] `docs/ai-validation.md` committed with prompts, flows, and results.
-
-**Dependencies.** M1-1, M1-2, M1-5…M1-7 (runnable engine), M1-16 mock API (may be built ahead of its full acceptance).
-
-#### M1-4 — Error model (fail-fast, contextual, machine-readable)
-
-**Goal.** Every failure is fast, specific, and actionable — the "no silent failures" guarantee of the README.
-
-**Description.**
-- Define typed, contextual error types:
-  - `FlowValidationError` — static problems; carries the offending path (step/function/field) and, where possible, a suggested fix.
-  - `ExecutionError` — runtime failures; carries step id, function name, request summary (method, URL, non-sensitive headers), response status/body, and retry count where applicable.
-- **Fail-fast:** the first failing step aborts the flow — never a silent skip (closes the v0.1 gaps where missing functions and unmet `depends_on` were skipped silently).
-- Every failure path maps to a stable exit code (M0-3): `1` execution, `2` validation, `3` usage.
-- The error payload shape is the future input contract for M3-5 (AI diagnostics) — design it to be serializable.
-
-**Acceptance criteria.**
-- [ ] No failure mode exits silently or with a generic message.
-- [ ] Error message formats covered by tests; `FlowValidationError`/`ExecutionError` are serializable (JSON) without throwing.
-
-**Dependencies.** M0-3.
-
-### 4.2 Execution engine
-
-#### M1-5 — HTTP step execution (GET/POST/PUT/DELETE)
-
-**Goal.** Correct, observable, AOT-safe HTTP execution — the heart of the engine.
-
-**Description.**
-- Execute HTTP functions: GET/POST/PUT/DELETE (+ PATCH/HEAD), against the function's `baseurl` + `endpoint` (closes the v0.1 gap where `FunctionDefinition.Baseurl` was ignored in favor of a special-cased `baseUrlDev`).
-- `Content-Type` handling: explicit header wins; JSON default for object bodies — never stripped and lost (v0.1 gap).
-- Custom headers including `Authorization`.
-- One shared `SocketsHttpHandler` per executor for connection keep-alive (binding convention); `HttpMessageHandler` injectable per AD-4 — no `new HttpClient()` inside engine code.
-
-**Acceptance criteria.**
-- [ ] Fake-handler tests assert the **exact** method, URL, headers, and body sent for each request.
-- [ ] Per-function `baseurl` respected; `Content-Type` correct for JSON POST and for explicit overrides.
-
-**Dependencies.** M0-4 (AOT-safe deserialization), M1-4.
-
-#### M1-6 — Variable engine (substitution + environment variables)
-
-**Goal.** A single, predictable variable model — including the README feature "Environment variable support".
-
-**Description.**
-- `${var}` substitution in `endpoint`, headers, and `body` templates.
-- Seed `metadata.variables` and `--env` file into the engine before execution (v0.1 seeded neither).
-- Precedence per AD-5: `--set k=v` > env file > `metadata.variables`; **extracted values always overwrite** when a function extracts.
-- Unknown `${var}` → `ExecutionError` naming the variable and the step where it appeared (v0.1 substituted silent empty strings).
-
-**Acceptance criteria.**
-- [ ] Each precedence tier covered by a test; extraction-overwrite tested.
-- [ ] Unknown-variable failure test asserts the variable name and step in the message.
-
-**Dependencies.** M1-4, M1-5.
-
-#### M1-7 — Extraction engine (JSONPath, typed, multi-variable)
-
-**Goal.** Reliable, typed data flow between steps.
-
-**Description.**
-- JSONPath extraction: `$.a.b` dot paths and array indexing `$.items[0].name`.
-- **Typed extraction:** numbers, booleans, and strings keep their native types; nested objects/arrays are preserved as JSON (v0.1 coerced everything to strings).
-- Multi-variable `extract` block — multiple paths per function, one step (README feature "Multi-variable extraction").
-- Clear `ExecutionError` when a path is missing or the response is not valid JSON.
-
-**Acceptance criteria.**
-- [ ] Unit tests per type (number, boolean, string, nested) and per error case.
-- [ ] Integration test: token extracted from a login response arrives in the `Authorization` header of the next step.
-
-**Dependencies.** M1-5, M1-6.
-
-#### M1-8 — DELAY steps
-
-**Goal.** Deterministic, cancellable pacing between steps.
-
-**Description.**
-- `DELAY` steps with `duration_seconds` (decimal supported), implemented as a cancellation-aware wait — no busy-wait.
-- Bounds sanity-checked by M1-2 validation (≥ 0, sane upper bound).
-- Delay steps appear in progress output (M1-12).
-
-**Acceptance criteria.**
-- [ ] A 0.5 s delay test asserts elapsed ≥ 500 ms and < ~1.5 s; cancellation test proves the wait is interruptible.
-
-**Dependencies.** M1-5 (step pipeline).
-
-#### M1-9 — `depends_on` (strict, sequential in M1)
-
-**Goal.** Dependencies are enforced, never decorative.
-
-**Description.**
-- `depends_on` strictly validated: unknown references and cycles are `FlowValidationError` at `validate` (M1-2) and re-checked at `run` start.
-- M1 executes sequentially following the declared dependency order (AD-6: parallelization is deferred to M3-6).
-- An unmet dependency at runtime is an `ExecutionError` — never a silent skip (v0.1 gap).
-
-**Acceptance criteria.**
-- [ ] Tests for: cycle detection, unknown-reference rejection, and a satisfied-dependency flow that executes in dependency order.
-
-**Dependencies.** M1-2, M1-4, M1-5.
-
-#### M1-10 — Timeouts & retries
-
-**Goal.** `settings` actually controls behavior (v0.1 parsed both and ignored both).
-
-**Description.**
-- `settings.timeout`: per-request timeout **and** an overall run timeout — both wired into execution.
-- `settings.max_retries`: retry with backoff on 429 / 5xx / timeout; honor `Retry-After` on 429 when present.
-- Retry attempts are visible in progress output and included in `ExecutionError` context (attempts performed, last response).
-
-**Acceptance criteria.**
-- [ ] Fake-handler tests: 429→429→200 with `max_retries: 2` passes; 500×3 with `max_retries: 2` fails after exactly 3 attempts; per-request timeout fires and is reported.
-
-**Dependencies.** M1-4, M1-5.
-
-#### M1-11 — Response policy (`expected_status`)
-
-**Goal.** A failing HTTP call is a failed flow — the README's first acceptance criterion.
-
-**Description.**
-- Per-function `expected_status` (explicit status code or range), defaulting to any 2xx.
-- Mismatch → `ExecutionError` carrying response status **and body** — this payload is the input contract for M3-5 (AI diagnostics).
-- Fail-fast aborts the flow immediately.
-
-**Acceptance criteria.**
-- [ ] Test: expected 200, received 403 → run exits code `1`, message contains status and body.
-- [ ] Test: default (no `expected_status`) — 204 and 201 pass, 404 fails.
-
-**Dependencies.** M1-4, M1-5.
-
-#### M1-12 — Console UX & JSON reports
-
-**Goal.** Output that serves both the human running the flow and the machine consuming it.
-
-**Description.**
-- Per-step progress line: `step N/M · function · HTTP status · ms`.
-- Final summary: pass/fail, total time, extracted variable count.
-- `--json-report`: stable, **versioned** machine-readable report — flow metadata, per-step results, timings, extracted variable names, full failure payload (status + body). Schema documented in `docs/json-report-schema.md`; this is the contract M3-2 (CI) and M4 (cloud) build on.
-
-**Acceptance criteria.**
-- [ ] JSON report validates against its own documented schema (test).
-- [ ] Console formatting covered by tests; report contains the full `ExecutionError` payload on failure.
-
-**Dependencies.** M1-4…M1-11.
-
-#### M1-13 — Bots-ready architecture
-
-**Goal.** Prove now that the engine can be instantiated N times — so M3 load testing is a feature, not a rewrite.
-
-**Description.**
-- Execution core: **no static mutable state**, non-blocking awaits, all externals (HTTP, clock, output sink) injectable per AD-4.
-- The executor must be safely instantiable N times for concurrent identical flows (the `--bots N` load layer itself is M3-1; M1 only proves the architecture allows it).
-- Record the design in `docs/architecture.md` (thread-safety, state isolation, shared handler strategy under concurrency).
-
-**Acceptance criteria.**
-- [ ] `docs/architecture.md` committed.
-- [ ] Concurrency proof: 20 executor instances over the same flow run simultaneously against the mock API with zero cross-contamination (assert per-instance variable isolation).
-
-**Dependencies.** M1-5…M1-12.
-
-### 4.3 Tests & quality gates
-
-#### M1-14 — Unit tests: parser + validator
-
-**Goal.** The format and its rules are locked down by tests, not by memory.
-
-**Description.**
-- Tests for every schema rule (M1-1) and every semantic check (M1-2), plus JSONPath edge cases (M1-7).
-- **Real assertions only — no `Assert.True(true)`** (v0.1 test-hygiene gap): each test asserts a concrete value, message, or exit code.
-
-**Acceptance criteria.**
-- [ ] Zero `Assert.True(true)`/trivial assertions in the test project.
-- [ ] One negative test per semantic check from M1-2.
-
-**Dependencies.** M1-1, M1-2, M1-7.
-
-#### M1-15 — Engine tests (fake handler)
-
-**Goal.** The engine's behavior is pinned to its contract by deterministic tests.
-
-**Description.**
-- Inject a fake `HttpMessageHandler` (AD-4) and assert the **exact outgoing request** (method, URL, headers, body) — v0.1 built the fake handler but never injected it.
-- Verify extracted variables reach subsequent steps (headers/body) across a multi-step flow.
-
-**Acceptance criteria.**
-- [ ] Every engine test goes through the injected handler; no network access in unit tests.
-- [ ] Variable-flow test (extract → substitute → send) present and asserting the substituted value on the wire.
-
-**Dependencies.** M1-5…M1-11.
-
-#### M1-16 — Integration tests (in-process mock API)
-
-**Goal.** End-to-end proof: real YAML → real engine → real HTTP → real assertions.
-
-**Description.**
-- In-process `HttpListener` mock API implementing at least: login (returns token) → protected endpoint (requires `Authorization`).
-- Real `docs/*.yaml` fixtures executed end-to-end through the engine and the CLI surface (`tyfapi run`), asserting exit codes, extracted data, and failure behavior.
-- This mock API is the shared harness for M1-3 (AI validation) and M1-17 (AOT smoke).
-
-**Acceptance criteria.**
-- [ ] Login→token→protected-endpoint fixture passes end-to-end.
-- [ ] A deliberately-failing fixture (401 on protected endpoint) fails with exit code `1` and a body-bearing error.
-
-**Dependencies.** M1-5…M1-11.
-
-#### M1-17 — AOT gate
-
-**Goal.** The "dependency-free binary" claim is enforced, not assumed (v0.1 baseline: IL3050 — a published AOT binary is broken).
-
-**Description.**
-- Automated pipeline step: `dotnet publish -c Release -r <rid>` followed by running a smoke flow (M1-16 harness) with the **published binary only** — no dev-time dependencies available.
-- Failure of this step fails the build.
-
-**Acceptance criteria.**
-- [ ] Published binary executes the smoke flow green on a clean machine/container (no `dotnet` runtime assumption beyond the self-contained binary).
-- [ ] Gate wired into the M0-5 pipeline script.
-
-**Dependencies.** M0-4, M1-16 (smoke flow + mock API).
-
-#### M1-18 — Coverage gate
-
-**Goal.** The 80% line-coverage goal on the core engine is measured and enforced.
-
-**Description.**
-- Coverlet integrated into the test project; report generated in the pipeline test step (M0-5).
-- Threshold: **≥ 80% line coverage on the core engine** (`tyfapi.cli` engine code), enforced by the pipeline script.
-- Coverage of the *engine* is the bar — CLI plumbing and test-only code excluded from the denominator.
-
-**Acceptance criteria.**
-- [ ] Pipeline fails when core-engine coverage drops below 80%.
-- [ ] Current build reports ≥ 80% with the M1-14/M1-15/M1-16 suites.
-
-**Dependencies.** M1-14…M1-16.
+Milestone 1 delivers the first usable Tyfapi core:
+
+```text
+Tyfapi YAML
+    ↓
+Validate
+    ↓
+Execute
+    ↓
+Real API
+    ↓
+Human + machine-readable result
+```
+
+The engine must:
+
+- read and validate a simple, flat, **AI-friendly** YAML flow format;
+- execute HTTP scenarios deterministically;
+- support variables, extraction, delays and sequential dependencies;
+- fail fast with contextual errors;
+- work across environments;
+- produce stable machine-readable results;
+- publish as a self-contained Native AOT binary;
+- provide enough structure for future CI/CD and load-testing work.
+
+### Important product principle
+
+Tyfapi is **AI-friendly, not AI-powered**.
+
+There is no AI model, AI provider, AI API or agent runtime inside the product.
+
+AI generation is validated as an **external compatibility experiment**: any LLM or coding agent should be able to generate Tyfapi YAML using the public schema and documentation.
 
 ---
 
-## 5. README "Milestone 1 Features" coverage map
+## 2. MVP vs Engineering Scope
 
-Every feature in README §25 must be covered by at least one task:
+Milestone 1 has two distinct purposes.
+
+### Product validation
+
+The MVP must answer:
+
+> **Do developers find it useful to define realistic API journeys in YAML, keep them in Git, and run them repeatedly?**
+
+The minimum product loop is:
+
+```text
+YAML
+ ↓
+realistic flow
+ ↓
+variables / extraction
+ ↓
+HTTP execution
+ ↓
+assertion
+ ↓
+useful result
+```
+
+The strongest validation signal is repeated real-world usage:
+
+```text
+Developer tries Tyfapi
+       ↓
+Creates a second scenario
+       ↓
+Commits scenarios to Git
+       ↓
+Runs them again
+       ↓
+Uses them in CI
+```
+
+### Engineering quality
+
+Milestone 1 also hardens the core with:
+
+- deterministic validation;
+- stable error semantics;
+- tests;
+- machine-readable reports;
+- AOT publishing;
+- concurrency-safe architecture;
+- CI quality gates.
+
+These are engineering goals, **not substitutes for product validation**.
+
+---
+
+## 3. Out of Scope
+
+| Item | Deferred to |
+|---|---|
+| AI integration inside Tyfapi | Never required; external AI remains optional |
+| VS Code extension / Webview UI | M2 |
+| Visual editor | M2 |
+| Bots / `--bots N` | M3 |
+| Parallel workflow execution | M3 |
+| Load metrics | M3 |
+| AI error diagnostics | M3 |
+| Cloud platform / dashboard | M4 |
+| Distributed cloud load testing | M4 |
+| User accounts / SaaS infrastructure | M4 |
+
+M1 may make the engine **compatible with future concurrency**, but must not become a load-testing implementation.
+
+---
+
+## 4. Prerequisites
+
+Milestone 0 must be complete.
+
+- **M0-1…M0-3** — clean solution layout, exactly one entry point, CLI surface:
+  - `tyfapi validate`
+  - `tyfapi run`
+- Stable exit codes:
+  - `0` success
+  - `1` execution failed
+  - `2` validation failed
+  - `3` usage error
+- **M0-4** — AOT-safe deserialization strategy settled and proven.
+- **M0-5** — zero-warning build with `TreatWarningsAsErrors=true` and reproducible pipeline script.
+- **AD-6** — `depends_on` means strict validation + sequential execution in M1. Parallelism is deferred to M3.
+
+---
+
+## 5. Baseline Gaps This Milestone Must Close
+
+| Gap | Fixed by |
+|---|---|
+| Missing functions / unmet dependencies can be silently skipped | M1-2, M1-4, M1-9 |
+| No HTTP status validation | M1-11 |
+| `settings.timeout` and `max_retries` parsed but unused | M1-10 |
+| `FunctionDefinition.Baseurl` ignored | M1-5 |
+| Content-Type handling incorrect for request bodies | M1-5 |
+| `metadata.variables` and environment values not seeded | M1-6 |
+| Extraction coerces values to strings | M1-7 |
+| Unknown `${var}` silently becomes empty | M1-6 |
+| Fake HTTP handler not actually injected in tests | M1-15 |
+| Trivial assertions in tests | M1-14 |
+| Native AOT broken by reflection-based YAML deserialization | M0-4, M1-17 |
+
+---
+
+## 6. Task Breakdown
+
+Status legend:
+
+`[ ]` TODO · `[~]` IN PROGRESS · `[x]` DONE · `[-]` DEFERRED · `[?]` NEEDS DECISION
+
+### 6.1 Syntax & Validation
+
+#### M1-1 — Formal Flow Schema Specification
+
+**Goal:** Establish the authoritative, versioned definition of the Tyfapi YAML format.
+
+**Description**
+
+Produce:
+
+```text
+docs/flow-schema.md
+```
+
+containing prose documentation plus a machine-readable JSON Schema covering:
+
+- `metadata`;
+- `functions`;
+- `workflow`;
+- `settings`.
+
+The schema must remain:
+
+- flat;
+- predictable;
+- descriptive;
+- easy for humans to read;
+- easy for LLMs and coding agents to generate.
+
+The schema is authoritative for the **current format**, but must remain versionable and evolvable. The first schema must not be treated as permanently frozen.
+
+**Acceptance criteria**
+
+- [ ] `docs/flow-schema.md` exists.
+- [ ] JSON Schema is machine-consumable.
+- [ ] Examples validate against the schema.
+- [ ] Defaults are documented.
+- [ ] Schema versioning strategy is documented.
+- [ ] No unnecessary nesting is introduced merely for implementation convenience.
+
+**Dependencies:** M0-4.
+
+---
+
+#### M1-2 — `tyfapi validate`: Schema + Semantic Validation
+
+**Goal:** Make invalid scenarios fail before execution and provide errors useful to both humans and AI agents.
+
+Implement:
+
+```bash
+tyfapi validate ./flow.yaml
+```
+
+Validation occurs in two stages:
+
+1. Schema validation.
+2. Semantic validation.
+
+Checks include:
+
+- workflow references an undefined function;
+- `depends_on` references an unknown step;
+- dependency cycles;
+- duplicate variable definitions where prohibited;
+- malformed JSONPath;
+- invalid HTTP method;
+- invalid/missing endpoint;
+- invalid delay;
+- invalid required fields.
+
+Every error must identify its location.
+
+Example:
+
+```text
+workflow[3] → depends_on: unknown step 'CreateCart'
+```
+
+A flow that fails validation must not execute.
+
+`run` must invoke the same validation before execution.
+
+**Acceptance criteria**
+
+- [ ] One negative test per semantic validation rule.
+- [ ] Errors contain precise element paths.
+- [ ] `run` refuses invalid flows.
+- [ ] Exit code is `2`.
+
+**Dependencies:** M1-1, M0-3.
+
+---
+
+#### M1-3 — AI-Generation Compatibility Validation
+
+**Goal:** Verify that the format is genuinely easy for external AI tools to generate.
+
+This is a **validation experiment, not an AI feature**.
+
+Use at least two general-purpose AI systems, initially GPT and Claude, to convert at least three real OpenAPI/Swagger specifications into Tyfapi scenarios.
+
+For every generated scenario:
+
+```text
+OpenAPI
+  ↓
+External AI
+  ↓
+Tyfapi YAML
+  ↓
+tyfapi validate
+  ↓
+tyfapi run
+```
+
+No manual editing should be allowed before validation/execution.
+
+Record:
+
+- prompt;
+- source specification;
+- generated YAML;
+- validation result;
+- execution result;
+- semantic usefulness;
+- recurring generation problems.
+
+Store the experiment in:
+
+```text
+docs/ai-validation.md
+```
+
+A generated file is not considered successful merely because it parses. Evaluate:
+
+1. syntax success;
+2. execution success;
+3. semantic usefulness.
+
+Systematic friction should trigger a review of the schema or diagnostics. Isolated model mistakes should not automatically trigger schema changes.
+
+**Acceptance criteria**
+
+- [ ] At least 3 real OpenAPI specs tested with GPT.
+- [ ] At least 3 real OpenAPI specs tested with Claude.
+- [ ] Generated files validate without manual correction.
+- [ ] Generated files execute successfully against an appropriate test/mock API.
+- [ ] Each scenario is reviewed for semantic usefulness.
+- [ ] `docs/ai-validation.md` contains prompts, inputs, outputs and results.
+
+**Dependencies:** M1-1, M1-2, M1-5…M1-7, M1-16.
+
+---
+
+#### M1-4 — Error Model
+
+**Goal:** Guarantee that failures are contextual, deterministic and machine-readable.
+
+Define typed errors such as:
+
+- `FlowValidationError`
+- `ExecutionError`
+
+`FlowValidationError` should include:
+
+- offending path;
+- relevant field/function/step;
+- useful diagnostic message;
+- suggested fix where practical.
+
+`ExecutionError` should include:
+
+- step;
+- function;
+- method;
+- URL;
+- non-sensitive request context;
+- response status;
+- response body where available;
+- retry information where applicable.
+
+Fail-fast is mandatory:
+
+> The first failing step aborts the flow.
+
+Sensitive values such as passwords and secrets must not be leaked into errors or reports.
+
+**Acceptance criteria**
+
+- [ ] No known failure path silently succeeds or skips work.
+- [ ] Errors identify the relevant scenario element.
+- [ ] Errors can be serialized to JSON.
+- [ ] Sensitive values are excluded from error payloads.
+- [ ] Exit codes remain stable.
+
+**Dependencies:** M0-3.
+
+---
+
+### 6.2 Execution Engine
+
+#### M1-5 — HTTP Step Execution
+
+**Goal:** Correct and observable HTTP execution.
+
+Required methods:
+
+```text
+GET
+POST
+PUT
+DELETE
+```
+
+PATCH and HEAD may be implemented as low-cost extensions, but are not required for MVP validation.
+
+Requests support:
+
+- per-function base URL;
+- endpoint;
+- headers;
+- request body;
+- Authorization;
+- query parameters where supported.
+
+`baseurl` must be respected per function.
+
+Content-Type handling must be correct:
+
+- explicit header wins;
+- JSON bodies receive an appropriate default when applicable;
+- headers are never silently discarded.
+
+HTTP dependencies must be injectable for deterministic testing.
+
+**Acceptance criteria**
+
+- [ ] Fake-handler tests assert exact method, URL, headers and body.
+- [ ] Per-function `baseurl` is respected.
+- [ ] JSON Content-Type is correct.
+- [ ] Explicit Content-Type overrides work.
+- [ ] No engine code constructs uncontrolled HTTP clients.
+
+**Dependencies:** M0-4, M1-4.
+
+---
+
+#### M1-6 — Variable Engine
+
+**Goal:** Provide a predictable variable model.
+
+Support:
+
+```text
+${variable}
+```
+
+in:
+
+- endpoint;
+- headers;
+- body.
+
+Variables come from:
+
+1. `--set`
+2. environment file
+3. `metadata.variables`
+
+with the precedence defined by AD-5.
+
+Extracted values overwrite existing variables when explicitly extracted.
+
+Unknown variables must fail:
+
+```text
+ExecutionError:
+unknown variable 'token' in workflow step 'GetProfile'
+```
+
+They must never silently become an empty string.
+
+**Acceptance criteria**
+
+- [ ] Precedence rules are tested.
+- [ ] Extraction-overwrite behavior is tested.
+- [ ] Unknown-variable failure identifies variable and step.
+
+**Dependencies:** M1-4, M1-5.
+
+---
+
+#### M1-7 — Extraction Engine
+
+**Goal:** Provide reliable data flow between steps.
+
+Initial JSONPath support:
+
+```text
+$.token
+$.user.id
+$.items[0].name
+```
+
+Support:
+
+- strings;
+- numbers;
+- booleans;
+- nested objects;
+- arrays.
+
+Multiple values may be extracted from one response.
+
+Missing paths and invalid JSON must produce contextual execution errors.
+
+**MVP rule:**
+
+> A required extraction that cannot resolve is a failed step.
+
+This provides basic response-content validation without requiring a generic assertion DSL in M1.
+
+A richer assertion language may be introduced later.
+
+**Acceptance criteria**
+
+- [ ] Tests cover string, number, boolean, nested object and array values.
+- [ ] Missing path fails the step.
+- [ ] Invalid JSON fails the step when extraction requires JSON.
+- [ ] Login token extraction reaches the next request's Authorization header.
+
+**Dependencies:** M1-5, M1-6.
+
+---
+
+#### M1-8 — DELAY Steps
+
+**Goal:** Support deterministic pacing between requests.
+
+Example:
+
+```yaml
+- type: DELAY
+  duration_seconds: 0.5
+```
+
+Requirements:
+
+- decimal durations;
+- cancellation-aware waiting;
+- no busy waiting;
+- sensible upper bound validation.
+
+**Acceptance criteria**
+
+- [ ] Delay test verifies approximate elapsed time.
+- [ ] Cancellation interrupts the delay.
+- [ ] Invalid delay values are rejected by validation.
+
+**Dependencies:** M1-5.
+
+---
+
+#### M1-9 — `depends_on`
+
+**Goal:** Make dependencies meaningful and deterministic.
+
+In M1:
+
+> `depends_on` means validation + sequential execution.
+
+Parallel execution is deferred to M3.
+
+Requirements:
+
+- unknown dependency → validation error;
+- cyclic dependency → validation error;
+- unmet runtime dependency → execution error;
+- execution follows dependency order.
+
+**Acceptance criteria**
+
+- [ ] Cycle detection test.
+- [ ] Unknown-reference test.
+- [ ] Valid dependency-order test.
+- [ ] No dependency can be silently skipped.
+
+**Dependencies:** M1-2, M1-4, M1-5.
+
+---
+
+#### M1-10 — Timeouts & Retries
+
+**Goal:** Make execution settings operational.
+
+Implement:
+
+- per-request timeout;
+- overall run timeout;
+- configurable retries.
+
+Initial retry cases:
+
+- 429;
+- 5xx;
+- timeout.
+
+Honor `Retry-After` for 429 when present.
+
+Keep the policy simple and deterministic. Retry behavior is supporting infrastructure, not a core product differentiator.
+
+**Acceptance criteria**
+
+- [ ] Retry count is respected.
+- [ ] Timeout is enforced.
+- [ ] Retry attempts are represented in the result.
+- [ ] 429/5xx/timeout behavior is tested.
+- [ ] No retry occurs when `max_retries = 0`.
+
+**Dependencies:** M1-4, M1-5.
+
+---
+
+#### M1-11 — Response Policy
+
+**Goal:** Make failed HTTP calls produce failed scenarios.
+
+Support:
+
+```yaml
+expected_status: 200
+```
+
+Default behavior:
+
+> Any 2xx response passes unless otherwise specified.
+
+Mismatch produces an `ExecutionError` containing expected status, received status and response body where safe.
+
+**Acceptance criteria**
+
+- [ ] Expected 200 / received 403 fails.
+- [ ] Error includes status and body.
+- [ ] 201 and 204 pass under default 2xx behavior.
+- [ ] 4xx/5xx fail by default.
+
+**Dependencies:** M1-4, M1-5.
+
+---
+
+### 6.3 Output & Future-Proofing
+
+#### M1-12 — Console UX & JSON Reports
+
+**Goal:** Serve both the human developer and automation.
+
+Example:
+
+```text
+step 1/3 · LoginUser · 200 · 182ms
+step 2/3 · GetProfile · 200 · 43ms
+step 3/3 · CreateCart · 201 · 91ms
+
+PASS · 3/3 steps · 316ms
+```
+
+Machine-readable output:
+
+```bash
+tyfapi run ./flow.yaml --format json
+```
+
+The JSON report must be stable and versioned.
+
+Include:
+
+- flow metadata;
+- overall status;
+- per-step status;
+- timings;
+- HTTP status;
+- extracted variable names;
+- retry information;
+- contextual failure payloads.
+
+This is important for future CI and for external AI agents consuming Tyfapi results. It does **not** require AI inside Tyfapi.
+
+**Acceptance criteria**
+
+- [ ] `docs/json-report-schema.md` exists.
+- [ ] Report validates against its own schema.
+- [ ] Console output is tested.
+- [ ] Failure reports contain useful context.
+- [ ] Secrets are not emitted.
+
+**Dependencies:** M1-4…M1-11.
+
+---
+
+#### M1-13 — Concurrency-Safe Architecture
+
+**Goal:** Ensure M3 load execution will not require rewriting the core.
+
+M1 does **not** implement load testing.
+
+Requirements:
+
+- no static mutable execution state;
+- asynchronous I/O;
+- isolated variable state per execution;
+- injectable HTTP handler;
+- no hidden singleton state coupling executions.
+
+Document the design in:
+
+```text
+docs/architecture.md
+```
+
+The objective is:
+
+> **Do not prevent future concurrency.**
+
+It is not:
+
+> **Build the load-testing architecture now.**
+
+**Acceptance criteria**
+
+- [ ] `docs/architecture.md` committed.
+- [ ] Multiple executor instances can run concurrently without state contamination.
+- [ ] Per-execution variables remain isolated.
+- [ ] No `--bots` implementation exists in M1.
+
+**Dependencies:** M1-5…M1-12.
+
+---
+
+### 6.4 Tests & Quality Gates
+
+#### M1-14 — Unit Tests: Parser + Validator
+
+**Goal:** Make the format and validation behavior executable specifications.
+
+Tests cover:
+
+- schema rules;
+- semantic validation;
+- dependency validation;
+- variable validation;
+- JSONPath validation.
+
+**Acceptance criteria**
+
+- [ ] No trivial assertions.
+- [ ] Negative tests exist for every semantic validation rule.
+- [ ] Tests assert actual values, errors or exit codes.
+
+**Dependencies:** M1-1, M1-2, M1-7.
+
+---
+
+#### M1-15 — Engine Unit Tests
+
+**Goal:** Pin engine behavior to deterministic contracts.
+
+Use an injected fake `HttpMessageHandler`.
+
+Verify:
+
+- exact method;
+- URL;
+- headers;
+- body;
+- variable substitution;
+- extraction;
+- status validation;
+- retry behavior;
+- timeouts.
+
+No uncontrolled external network access in unit tests.
+
+**Acceptance criteria**
+
+- [ ] Every HTTP engine test uses the injected handler.
+- [ ] Exact outgoing requests are asserted.
+- [ ] Extract → substitute → send is tested.
+
+**Dependencies:** M1-5…M1-11.
+
+---
+
+#### M1-16 — Integration Tests
+
+**Goal:** Prove the complete product loop:
+
+```text
+Real YAML
+   ↓
+Real validator
+   ↓
+Real engine
+   ↓
+Real HTTP
+   ↓
+Real result
+```
+
+Create an in-process mock API supporting at least:
+
+```text
+POST /login
+    ↓
+token
+
+GET /protected
+    ↓
+requires Authorization
+```
+
+Use real YAML fixtures and exercise the actual CLI surface.
+
+At least one fixture must pass:
+
+```text
+login → extract token → protected request
+```
+
+At least one fixture must intentionally fail.
+
+**Acceptance criteria**
+
+- [ ] Login → token → protected endpoint passes.
+- [ ] Failure scenario produces exit code `1`.
+- [ ] Failure contains useful response context.
+- [ ] CLI `run` is exercised.
+
+**Dependencies:** M1-5…M1-11.
+
+---
+
+#### M1-17 — Native AOT Gate
+
+**Goal:** Enforce the self-contained binary claim.
+
+Pipeline:
+
+```bash
+dotnet publish -c Release -r <rid>
+```
+
+Then execute the published binary against the M1 smoke flow.
+
+The test must use the published artifact rather than development-time dependencies.
+
+**Acceptance criteria**
+
+- [ ] Published binary runs successfully.
+- [ ] Smoke flow passes.
+- [ ] No external .NET runtime is required for the self-contained binary.
+- [ ] Gate is part of the M0-5 pipeline.
+
+**Dependencies:** M0-4, M1-16.
+
+---
+
+#### M1-18 — Coverage Gate
+
+**Goal:** Maintain sufficient engineering confidence in the core engine.
+
+Target:
+
+> **≥ 80% line coverage on core engine code.**
+
+Coverage is an engineering quality gate, **not a product-validation metric**.
+
+**Acceptance criteria**
+
+- [ ] Pipeline fails below 80%.
+- [ ] Current engine meets ≥80%.
+- [ ] Coverage report is reproducible in CI.
+
+**Dependencies:** M1-14…M1-16.
+
+---
+
+## 7. README Feature Coverage
 
 | README feature | Implemented by | Notes |
 |---|---|---|
-| HTTP execution (GET, POST, PUT, DELETE) | M1-5 | + PATCH/HEAD as bonus methods |
-| Variable substitution `${var}` | M1-6 | Unknown var is an error, not empty string |
-| Workflow with functions and delays | M1-8, M1-9 | DELAY step + `depends_on` ordering |
-| Environment variable support | M1-6 | Precedence fixed by AD-5 |
-| Basic JSON response parsing | M1-7 | Typed, non-coercing |
-| Variable extraction from responses | M1-7 | JSONPath `$.path.to.value`, `$.items[0].name` |
-| Multi-variable extraction | M1-7 | Multiple paths per function, one step |
-| Dependency tracking between functions | M1-9 | Strict in M1; parallel in M3-6 |
+| HTTP execution | M1-5 | GET/POST/PUT/DELETE required |
+| Variable substitution | M1-6 | Unknown variable is an error |
+| Workflow with functions and delays | M1-8, M1-9 | Sequential in M1 |
+| Environment support | M1-6 | Precedence defined by ADR |
+| Basic JSON response parsing | M1-7 | Typed where practical |
+| Variable extraction | M1-7 | Initial JSONPath subset |
+| Multi-variable extraction | M1-7 | Multiple paths per function |
+| Dependency tracking | M1-9 | Sequential in M1 |
+| Response validation | M1-11 | Default 2xx |
+| Machine-readable output | M1-12 | Versioned JSON |
+| AI compatibility | M1-3 | External AI only |
 
-## 6. Dependencies & suggested execution order
+---
+
+## 8. Suggested Execution Order
 
 ```mermaid
 flowchart LR
-    M0[M0 done] --> T1[M1-1 schema]
-    T1 --> T2[M1-2 validate]
+    M0[M0 complete] --> T1[M1-1 schema]
+    T1 --> T2[M1-2 validation]
     T2 --> T4[M1-4 errors]
     T4 --> T5[M1-5 HTTP]
     T5 --> T6[M1-6 variables]
     T6 --> T7[M1-7 extraction]
     T5 --> T8[M1-8 delay]
-    T5 --> T9[M1-9 depends_on]
+    T5 --> T9[M1-9 dependencies]
     T5 --> T10[M1-10 timeout/retry]
-    T5 --> T11[M1-11 expected_status]
-    T7 & T10 & T11 & T9 --> T12[M1-12 UX/report]
-    T12 --> T13[M1-13 bots-ready]
+    T5 --> T11[M1-11 status]
+    T7 --> T12[M1-12 reports]
+    T10 --> T12
+    T11 --> T12
+    T9 --> T12
     T12 --> T16[M1-16 integration]
     T16 --> T3[M1-3 AI validation]
-    T16 --> T17[M1-17 AOT gate]
+    T12 --> T13[M1-13 concurrency-safe]
+    T16 --> T17[M1-17 AOT]
     T16 --> T18[M1-18 coverage]
 ```
 
-**Recommended sequence (parallelizable work in the same phase):**
+Recommended phases:
 
-1. **Foundation** — M1-1 → M1-2 → M1-4 (spec, validation, error model).
-2. **Engine core** — M1-5 → M1-6 → M1-7 → M1-8 → M1-9 → M1-10 → M1-11. Write the M1-14/M1-15 tests *alongside* each task (tests first where practical).
-3. **Surface** — M1-12 (console UX + JSON report).
-4. **Proof** — M1-16 (mock API + integration tests; can start in phase 2) → M1-3 (AI generation, GPT + Claude) → M1-13 (bots-ready + `docs/architecture.md`).
-5. **Gates** — M1-17 (AOT) → M1-18 (coverage) wired into the M0-5 pipeline.
+1. **Foundation** — M1-1 → M1-2 → M1-4
+2. **Engine** — M1-5 → M1-6 → M1-7 → M1-8 → M1-9 → M1-10 → M1-11
+3. **Surface** — M1-12
+4. **Proof** — M1-16 → M1-3
+5. **Engineering gates** — M1-13, M1-17, M1-18
 
-M1-3 is listed in 4.1 but is *executed* late on purpose: it needs a working `validate` + `run` + mock API, and it is the acceptance proof of the whole milestone.
+The AI experiment intentionally happens late because it needs a working `validate` + `run` loop.
 
-## 7. Definition of Done (Milestone 1)
+---
 
-Milestone 1 is complete when **all** of the following hold:
+## 9. Definition of Done
 
-- [ ] All tasks M1-1…M1-18 are `[x]` in `ROADMAP.md` §5.
-- [ ] Every README §25 feature in the coverage map above is implemented and test-covered.
-- [ ] `dotnet build` + `dotnet test` pass with zero warnings (M0-5 rules).
-- [ ] Core-engine line coverage ≥ 80% (M1-18 gate green).
-- [ ] Published Native AOT binary executes the smoke flow green (M1-17 gate green).
-- [ ] GPT and Claude each converted 3+ OpenAPI specs to passing flows with no manual fixes (M1-3, `docs/ai-validation.md`).
-- [ ] `docs/flow-schema.md`, `docs/json-report-schema.md`, `docs/architecture.md` committed.
-- [ ] No silent failure mode remains: every error is contextual, exit codes stable (M1-4).
-- [ ] Changelog entry recorded in `ROADMAP.md` §11.
+Milestone 1 is complete when:
 
-## 8. Tracking rules
+- [ ] All M1 tasks are complete in `ROADMAP.md`.
+- [ ] Every README MVP feature is implemented and test-covered.
+- [ ] `dotnet build` and `dotnet test` pass with zero warnings.
+- [ ] Core-engine coverage is ≥80%.
+- [ ] Published Native AOT binary executes the smoke flow successfully.
+- [ ] JSON execution reports validate against their documented schema.
+- [ ] No known silent failure path remains.
+- [ ] Errors have stable semantics and exit codes.
+- [ ] At least 3 OpenAPI specifications have been tested with GPT and 3 with Claude.
+- [ ] AI-generated flows require no manual correction before validation/execution.
+- [ ] AI-generated flows are reviewed for semantic usefulness, not only syntactic validity.
+- [ ] `docs/flow-schema.md` exists.
+- [ ] `docs/json-report-schema.md` exists.
+- [ ] `docs/architecture.md` exists.
+- [ ] `docs/ai-validation.md` exists.
+- [ ] No AI provider or AI runtime is required by Tyfapi.
+- [ ] No load-testing implementation has leaked into M1.
 
-- Update task status in **`ROADMAP.md` §5 only** (`[ ]` → `[~]` → `[x]`); this document never tracks status.
-- Any new requirement discovered during implementation is appended to `ROADMAP.md` before implementation starts (its working rules).
-- Scope changes to tasks in this document get a note in `ROADMAP.md` §11 (Changelog).
-- Deferred items (bots, load metrics, AI diagnostics) stay **out** of this milestone — no partial implementations.
+---
 
+## 10. Product Validation Gate
 
+This is deliberately separate from the engineering Definition of Done.
 
+M1 engineering being green does **not** mean the business idea is validated.
 
+The product validation question is:
 
+> **Will real developers voluntarily keep using Tyfapi?**
+
+Strong signals include:
+
+```text
+Developer creates scenario
+        ↓
+Developer runs scenario
+        ↓
+Developer finds it useful
+        ↓
+Developer creates another scenario
+        ↓
+Developer commits YAML to Git
+        ↓
+Developer runs it again
+        ↓
+Developer adds it to CI
+```
+
+The most important early metric is:
+
+> **Second-use rate.**
+
+A developer saying "this is cool" is weak evidence.
+
+A developer creating a second scenario without being asked is strong evidence.
+
+---
+
+## 11. Tracking Rules
+
+- Task status is tracked in **`ROADMAP.md` §5 only**.
+- This document defines task scope and acceptance criteria but does not track implementation status.
+- New requirements discovered during implementation must be recorded in `ROADMAP.md` before implementation begins.
+- Scope changes must be recorded in `ROADMAP.md` §11.
+- Deferred functionality remains deferred; do not implement partial versions of M3/M4 features.
+- If implementation complexity grows significantly, revisit the requirement against the MVP/product-validation objective before adding more abstraction.
+
+---
+
+## 12. Milestone Principle
+
+The purpose of M1 is not to prove that we can build a sophisticated API testing platform.
+
+It is to build the **smallest solid core capable of answering whether the central Tyfapi workflow is valuable**:
+
+```text
+Define a realistic scenario
+          ↓
+Store it as Git-friendly YAML
+          ↓
+Validate it
+          ↓
+Run it anywhere
+          ↓
+Get a useful result
+          ↓
+Use it again
+```
+
+Everything else remains subordinate to that goal.
