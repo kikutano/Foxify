@@ -1,19 +1,19 @@
-﻿using tyfapi.cli.Tyfapi;
+using Tyfapi.Core.Execution;
+using Tyfapi.Core.Parsing;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-Console.WriteLine("Enter the path to the YAML file:");
-string filePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\login_flow_example.yaml"; // Hardcoded for testing
-
-if (string.IsNullOrWhiteSpace(filePath))
+if (args.Length == 0)
 {
-    Console.WriteLine("No file path provided.");
+    Console.WriteLine("Usage: tyfapi <path-to-flow.yaml> [path-to-environment.yaml]");
     return;
 }
 
+string filePath = args[0];
+
 if (!File.Exists(filePath))
 {
-    Console.WriteLine("File not found.");
+    Console.WriteLine($"File not found: {filePath}");
     return;
 }
 
@@ -22,20 +22,27 @@ try
     var yamlContent = File.ReadAllText(filePath);
     Console.WriteLine($"Loading workflow from: {filePath}");
 
-    // Load environment variables from environment.yaml file
+    // Load environment variables from an optional environment YAML file passed as the second argument.
     Dictionary<string, object> environmentVariables = new();
-    string envFilePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\environment.yaml";
-    if (File.Exists(envFilePath))
+    if (args.Length > 1)
     {
-        var envDeserializer = new DeserializerBuilder()
-            .WithNamingConvention(UnderscoredNamingConvention.Instance)
-            .Build();
+        string envFilePath = args[1];
+        if (File.Exists(envFilePath))
+        {
+            var envDeserializer = new DeserializerBuilder()
+                .WithNamingConvention(UnderscoredNamingConvention.Instance)
+                .Build();
 
-        var envContent = File.ReadAllText(envFilePath);
-        environmentVariables = envDeserializer.Deserialize<Dictionary<string, object>>(envContent) ?? new();
+            var envContent = File.ReadAllText(envFilePath);
+            environmentVariables = envDeserializer.Deserialize<Dictionary<string, object>>(envContent) ?? new();
+        }
+        else
+        {
+            Console.WriteLine($"Environment file not found: {envFilePath}");
+        }
     }
 
-    var parser = new TyfapiParser();
+    var parser = new WorkflowParser();
     var workflow = parser.Parse(yamlContent, environmentVariables);
 
     Console.WriteLine($"Workflow: {workflow.Metadata.Name}");
@@ -63,8 +70,7 @@ try
 
     Console.WriteLine("\nExecuting workflow...");
 
-    // Create engine and execute workflow
-    using var engine = new TyfapiEngine();
+    using var engine = new WorkflowEngine();
     await engine.ExecuteWorkflowAsync(workflow);
 
     Console.WriteLine("Workflow execution completed!");

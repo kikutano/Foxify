@@ -66,9 +66,11 @@ The existing code compiles, but is **rejected as a foundation** for these verifi
 
 > Goal: clean, compiling, AOT-publishable skeleton with a real command surface and zero dead code.
 
-- [ ] **M0-1** Remove prototype dead code and orphans: `TyfapiConsole.cs` (or absorb its logic), duplicate `Tyfapi/Program.cs`, root `test_parsing.cs`, `test_variables.cs`, empty `docs/tyfapi.json`, `docs/dev_credentials.json`.
+- [~] **M0-1** Remove prototype dead code and orphans: `TyfapiConsole.cs` (or absorb its logic), duplicate `Tyfapi/Program.cs`, root `test_parsing.cs`, `test_variables.cs`, empty `docs/tyfapi.json`, `docs/dev_credentials.json`.
+  - *Status note (2026-09-03):* all listed files removed; CLI entry point now reads `args[0]` instead of a hardcoded path. Pending: confirm `dotnet build` + `dotnet test` pass locally (no .NET SDK available in this session) before flipping to `[x]`.
   - *Accept:* no orphan `.cs` at repo root; exactly one entry point in the solution.
-- [ ] **M0-2** New solution layout: `src/tyfapi` (AOT-safe core library), `src/tyfapi.cli` (thin executable), `tests/tyfapi.tests`; proper `.gitignore` (`bin/`, `obj/`); remove committed build artifacts.
+- [~] **M0-2** New solution layout: `src/Tyfapi.Core` (AOT-safe core library), `src/Tyfapi.Cli` (thin executable), `tests/Tyfapi.Core.Tests`; proper `.gitignore` (`bin/`, `obj/`); remove committed build artifacts.
+  - *Status note (2026-09-03):* layout created (PascalCase project names to match .NET conventions, deviating from the lowercase names originally sketched here); root `tyfapi.slnx` added referencing all three projects; namespaces reorganized (`Tyfapi.Core.Models` / `.Parsing` / `.Execution`, `Tyfapi.Cli`, `Tyfapi.Core.Tests.*`), one class per file; `WorkflowModels.cs` split into 5 files; `TyfapiEngine`/`TyfapiParser` renamed to `WorkflowEngine`/`WorkflowParser`. `.gitignore` rewritten to a standard recursive `bin/`/`obj/`/`.vs/` pattern. No build artifacts were actually committed (verified via `git ls-files`), so nothing to remove there. Pending: verify `dotnet build` + `dotnet test` locally.
   - *Accept:* `dotnet build` clean; no `bin/obj` visible in git status.
 - [ ] **M0-3** CLI surface v1:
   - `tyfapi validate <flow.yaml>`
@@ -192,5 +194,6 @@ The existing code compiles, but is **rejected as a foundation** for these verifi
 | 2026-08-24 | — | Roadmap created; v0.1 baseline audited; full rewrite approved (format kept, code replaced); AD-1 & AD-6 flagged for decision | Cline |
 | 2026-08-24 | — | `README.md`: added "🎯 Purpose: What Problem Are We Solving?" section (Function / Flow / Environment model, one-click multi-env, AI-generated flows) | Cline |
 | 2026-08-24 | — | `README.md`: added minimal YAML flow example in Purpose (login → token extraction → protected resource), aligned with `docs/*.yaml` conventions | Cline |
+| 2026-09-03 | M0-1, M0-2 | Repo cleanup: removed dead/orphan files and `docs/dev_credentials.json`; fixed CLI to read the flow path from `args[0]`; restructured into `src/Tyfapi.Core` (library), `src/Tyfapi.Cli` (executable), `tests/Tyfapi.Core.Tests`; added root `tyfapi.slnx`; reorganized namespaces and renamed files/classes (`TyfapiEngine`→`WorkflowEngine`, `TyfapiParser`→`WorkflowParser`, one class per file). Build/test verification still pending locally. | Claude |
 
   - *Accept:* design note in `docs/architecture.md` + stress test running 20 concurrent executor instances against the mock API.

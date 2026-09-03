@@ -90,6 +90,6 @@
 2. **Core Documentation**:
    - README.md for project architecture overview
    - agent_ai.md for general AI agent guidelines
-   - src/tyfapi.cli/Tyfapi/TyfapiEngine.cs for implementation details
+   - src/Tyfapi.Core/Execution/WorkflowEngine.cs for implementation details
 
 This document serves as a comprehensive guide for proper task execution and code generation within the tyfapi project environment.

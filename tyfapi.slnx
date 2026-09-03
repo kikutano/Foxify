@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/Tyfapi.Core/Tyfapi.Core.csproj" />
+  <Project Path="src/Tyfapi.Cli/Tyfapi.Cli.csproj" />
+  <Project Path="tests/Tyfapi.Core.Tests/Tyfapi.Core.Tests.csproj" />
+</Solution>
