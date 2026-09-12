@@ -32,14 +32,15 @@ public class WorkflowEngineIntegrationTests
               Content-Type: application/json
             body: '{
               ""username"": ""test_user"",
-              ""password"": ""test_password""
+              ""password"": ""test_password1""
             }'
+            excepted:
+              status_code: 200 # Expected HTTP status code for successful login.
             extract:
               token: $.token # Saves the bearer token into a variable accessible by name.
               user_id: $.user.id # Saves the user ID into a variable accessible by name.
               username: $.user.username # Saves the username into a variable accessible by name.
               expires_at: $.expires_at # Saves expiration timestamp
-
           # Function 2: Get Protected Resource (GET Request using Bearer Token)
           GetProtectedResource:
             type: HTTP_REQUEST
@@ -111,12 +112,13 @@ public class WorkflowEngineIntegrationTests
         var parser = new WorkflowParser();
         var workflow = parser.Parse(WorkFlowYamlSource, environmentVariables);
 
-        // Act & Assert - This should execute without throwing exceptions
+        // Act
         var engine = new WorkflowEngine(httpClient);
-        await engine.ExecuteWorkflowAsync(workflow);
+        var report = await engine.ExecuteWorkflowAsync(workflow);
 
-        // The main assertion here is that no exception was thrown during execution
-        Assert.True(true);
+        // Assert
+        Assert.NotNull(report);
+        Assert.Equal(HttpStatusCode.OK, report.StepReports[0].ExceptedStatusCode); // LoginUser step
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Net;
 
 using Tyfapi.Core.Models;
 
@@ -19,8 +20,13 @@ public class WorkflowEngine : IDisposable
         _executedFunctions = new HashSet<string>();
     }
 
-    public async Task ExecuteWorkflowAsync(WorkflowTemplate workflow)
+    public async Task<WorkflowReport> ExecuteWorkflowAsync(WorkflowTemplate workflow)
     {
+        var workflowReport = new WorkflowReport
+        {
+            WorkflowName = workflow.Metadata.Name
+        };
+
         // Initialize variables with any initial values from the workflow template
         foreach (var variable in workflow.Variables)
         {
@@ -41,26 +47,35 @@ public class WorkflowEngine : IDisposable
         {
             if (step.Type == "function")
             {
-                await ExecuteFunctionStepAsync(workflow, step);
+                var stepReport = await ExecuteFunctionStepAsync(workflow, step);
+                workflowReport.StepReports.Add(stepReport);
+
+                if (!stepReport.IsSuccess)
+                {
+                    Console.WriteLine($"Step '{step.Name}' failed. Stopping workflow execution.");
+                    break; // Stop executing further steps if a step fails
+                }
             }
             else if (step.Type == "DELAY")
             {
                 await ExecuteDelayStepAsync(step);
             }
         }
+
+        return workflowReport;
     }
 
     // Removed the GetBaseAddressFromEnvironment method since we'll use environment variables from YAML
 
-    private async Task ExecuteFunctionStepAsync(WorkflowTemplate workflow, WorkflowStep step)
+    private async Task<StepReport> ExecuteFunctionStepAsync(WorkflowTemplate workflow, WorkflowStep step)
     {
         if (string.IsNullOrEmpty(step.FunctionName))
-            return;
+            return new StepReport { StepName = step.Name };
 
         if (!workflow.Functions.TryGetValue(step.FunctionName, out var function))
         {
             Console.WriteLine($"Function '{step.FunctionName}' not found");
-            return;
+            return new StepReport { StepName = step.Name };
         }
 
         // Check dependencies
@@ -69,7 +84,7 @@ public class WorkflowEngine : IDisposable
             if (!_executedFunctions.Contains(dependency))
             {
                 Console.WriteLine($"Dependency '{dependency}' not available");
-                return;
+                return new StepReport { StepName = step.Name };
             }
         }
 
@@ -151,6 +166,29 @@ public class WorkflowEngine : IDisposable
                 }
             }
 
+            if (function.Excepted.Any())
+            {
+                foreach (var excepted in function.Excepted)
+                {
+                    if (excepted.Key.Equals("status_code", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (Enum.TryParse<HttpStatusCode>(excepted.Value, out var expectedStatusCode))
+                        {
+                            if (response.StatusCode != expectedStatusCode)
+                            {
+                                Console.WriteLine($"Expected status code {expectedStatusCode}, but got {response.StatusCode}!");
+                                return new StepReport
+                                {
+                                    StepName = step.Name,
+                                    ExceptedStatusCode = expectedStatusCode,
+                                    IsSuccess = false
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+
             // Mark this function as executed
             _executedFunctions.Add(step.FunctionName);
         }
@@ -158,6 +196,13 @@ public class WorkflowEngine : IDisposable
         {
             Console.WriteLine($"Error executing function {step.FunctionName}: {ex.Message}");
         }
+
+        return new StepReport
+        {
+            StepName = step.Name,
+            ExceptedStatusCode = response.StatusCode,
+            IsSuccess = true
+        };
     }
 
     private static HttpMethod ParseHttpMethod(FunctionDefinition function)
