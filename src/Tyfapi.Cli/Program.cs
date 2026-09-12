@@ -70,7 +70,13 @@ try
 
     Console.WriteLine("\nExecuting workflow...");
 
-    using var engine = new WorkflowEngine();
+    //Todo: Use the injection and not create a new HttpClient here, but for now, let's keep it simple.
+    HttpClient httpClient = new HttpClient()
+    {
+        BaseAddress = new Uri("http://localhost")
+    };
+
+    using var engine = new WorkflowEngine(httpClient);
     await engine.ExecuteWorkflowAsync(workflow);
 
     Console.WriteLine("Workflow execution completed!");

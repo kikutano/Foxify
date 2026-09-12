@@ -11,12 +11,10 @@ public class WorkflowEngine : IDisposable
     private readonly Dictionary<string, object> _variables;
     private readonly HashSet<string> _executedFunctions;
 
-    public WorkflowEngine()
+    public WorkflowEngine(HttpClient httpClient)
     {
-        _httpClient = new HttpClient();
+        _httpClient = httpClient;
         // Read base URL from environment variables (will be set during workflow execution)
-        var baseAddress = "http://localhost";
-        _httpClient.BaseAddress = new Uri(baseAddress);
         _variables = new Dictionary<string, object>();
         _executedFunctions = new HashSet<string>();
     }

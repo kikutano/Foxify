@@ -1,6 +1,7 @@
 using System.Net;
 using Tyfapi.Core.Execution;
 using Tyfapi.Core.Models;
+using Tyfapi.Core.Tests.Fakes;
 
 namespace Tyfapi.Core.Tests.Execution;
 
@@ -10,7 +11,19 @@ public class WorkflowEngineTests
 
     public WorkflowEngineTests()
     {
-        _engine = new WorkflowEngine();
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("Test response content")
+        };
+
+        var fakeHandler = new FakeHttpMessageHandler(response);
+
+        var httpClient = new HttpClient(fakeHandler)
+        {
+            BaseAddress = new Uri("https://fakeapi.com/")
+        };
+
+        _engine = new WorkflowEngine(httpClient);
     }
 
     [Fact]
@@ -49,7 +62,7 @@ public class WorkflowEngineTests
 
         // Act & Assert - This test will verify that the workflow executes without throwing exceptions
         await _engine.ExecuteWorkflowAsync(workflow);
-        
+
         // The main assertion here is that no exception was thrown
         // We can't easily test HTTP calls in AOT without reflection, so we'll rely on 
         // other tests to cover this functionality
@@ -80,7 +93,7 @@ public class WorkflowEngineTests
         var startTime = DateTime.Now;
         await _engine.ExecuteWorkflowAsync(workflow);
         var endTime = DateTime.Now;
-        
+
         // Should have waited at least 1 second (allowing for some variance)
         Assert.True((endTime - startTime).TotalSeconds >= 1.0);
     }
@@ -189,7 +202,7 @@ public class WorkflowEngineTests
 
         // Act & Assert - This test will verify that the workflow executes without throwing exceptions
         await _engine.ExecuteWorkflowAsync(workflow);
-        
+
         // The main assertion here is that no exception was thrown
         // We can't easily test HTTP calls in AOT without reflection, so we'll rely on 
         // other tests to cover this functionality
@@ -235,7 +248,7 @@ public class WorkflowEngineTests
 
         // Act & Assert - This test will verify that the workflow executes without throwing exceptions
         await _engine.ExecuteWorkflowAsync(workflow);
-        
+
         // The main assertion here is that no exception was thrown
         // We can't easily test variable resolution in AOT without reflection, so we'll 
         // rely on other tests to cover this functionality

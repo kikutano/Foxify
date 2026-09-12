@@ -12,7 +12,19 @@ public class WorkflowEngineVariableTests
 
     public WorkflowEngineVariableTests()
     {
-        _engine = new WorkflowEngine();
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("Test response content")
+        };
+
+        var fakeHandler = new FakeHttpMessageHandler(response);
+
+        var httpClient = new HttpClient(fakeHandler)
+        {
+            BaseAddress = new Uri("https://fakeapi.com/")
+        };
+
+        _engine = new WorkflowEngine(httpClient);
     }
 
     [Fact]
@@ -31,7 +43,7 @@ public class WorkflowEngineVariableTests
         };
 
         var fakeHandler = new FakeHttpMessageHandler(response);
-        
+
         // Create a workflow that simulates a login flow with token extraction
         var workflow = new WorkflowTemplate
         {
@@ -106,7 +118,7 @@ public class WorkflowEngineVariableTests
         {
             // This would normally be more sophisticated, but for testing we'll just verify it can execute
         };
-        
+
         // Create a workflow that simulates a complete login and protected resource access flow
         var workflow = new WorkflowTemplate
         {
@@ -199,7 +211,7 @@ public class WorkflowEngineVariableTests
         };
 
         var fakeHandler = new FakeHttpMessageHandler(response);
-        
+
         // Create a workflow that tests complex JSON path extraction
         var workflow = new WorkflowTemplate
         {
@@ -260,7 +272,7 @@ public class WorkflowEngineVariableTests
         };
 
         var fakeHandler = new FakeHttpMessageHandler(response);
-        
+
         // Create a workflow with an invalid JSON path (should not cause crash)
         var workflow = new WorkflowTemplate
         {

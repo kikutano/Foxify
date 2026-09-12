@@ -1,5 +1,7 @@
+using System.Net;
 using Tyfapi.Core.Execution;
 using Tyfapi.Core.Models;
+using Tyfapi.Core.Tests.Fakes;
 
 namespace Tyfapi.Core.Tests.Execution;
 
@@ -9,7 +11,18 @@ public class WorkflowEngineUnitTests
 
     public WorkflowEngineUnitTests()
     {
-        _engine = new WorkflowEngine();
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("Test response content")
+        };
+
+        var fakeHandler = new FakeHttpMessageHandler(response);
+        var httpClient = new HttpClient(fakeHandler)
+        {
+            BaseAddress = new Uri("https://fakeapi.com/")
+        };
+
+        _engine = new WorkflowEngine(httpClient);
     }
 
     [Fact]
