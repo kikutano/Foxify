@@ -135,7 +135,7 @@ public class WorkflowEngine : IDisposable
                     Console.WriteLine($"Response Content: {responseContent}");
 
                     var jsonDocument = JsonDocument.Parse(responseContent);
-                    
+
                     foreach (var extract in function.Extract)
                     {
                         var value = ExtractValueFromJson(jsonDocument, extract.Value);
@@ -152,7 +152,7 @@ public class WorkflowEngine : IDisposable
                     Console.WriteLine($"Error extracting variables: {ex.Message}");
                 }
             }
-            
+
             // Mark this function as executed
             _executedFunctions.Add(step.FunctionName);
         }

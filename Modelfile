@@ -1,0 +1,22 @@
+# Indica a Ollama su quale modello base lavorare
+FROM MobiusDevelopment/Qwen3.8-27B-MTP-Q4_K_M_GGUF-Uncensored:latest
+
+# PARAMETRI PER SPEZZARE I LOOP E MIGLIORARE IL RAGIONAMENTO
+# Aumenta la variabilità per uscire dai cicli di pensiero
+PARAMETER temperature 0.75
+
+# Penalizza le parole o strutture ripetute di recente
+PARAMETER repeat_penalty 1.15
+
+# Considera un raggio leggermente più ampio per valutare le ripetizioni
+PARAMETER repeat_last_n 128
+
+# Imposta il contesto massimo desiderato (32768 per 32k)
+PARAMETER num_ctx 32768
+
+# PROMPT DI SISTEMA PER SNELLIRE IL RAGIONAMENTO
+SYSTEM """
+Sei un assistente specializzato nella programmazione. 
+Fornisci risposte dirette, pulite ed efficienti.
+Evita di cadere in ragionamenti o analisi ridondanti e cicliche.
+"""
