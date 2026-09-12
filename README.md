@@ -1,4 +1,4 @@
-# Tyfapi
+# Tyfapi (Test Your Fucking Api!)
 
 > **Define API scenarios once. Run them anywhere. Let any AI agent generate them.**
 
