@@ -1,7 +1,6 @@
-﻿using System.Text.Json;
+﻿using System.Net;
+using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Net;
-
 using Tyfapi.Core.Models;
 
 namespace Tyfapi.Core.Execution;
@@ -78,6 +77,8 @@ public class WorkflowEngine : IDisposable
             return new StepReport { StepName = step.Name };
         }
 
+        HttpResponseMessage? response = null;
+
         // Check dependencies
         foreach (var dependency in step.DependsOn ?? [])
         {
@@ -135,7 +136,7 @@ public class WorkflowEngine : IDisposable
 
             Console.WriteLine($"Executing {function.Method} {function.Endpoint}");
 
-            var response = await _httpClient.SendAsync(request);
+            response = await _httpClient.SendAsync(request);
 
             Console.WriteLine($"Response Status: {response.StatusCode}");
 
@@ -180,7 +181,7 @@ public class WorkflowEngine : IDisposable
                                 return new StepReport
                                 {
                                     StepName = step.Name,
-                                    ExceptedStatusCode = expectedStatusCode,
+                                    ExceptedStatusCode = response.StatusCode,
                                     IsSuccess = false
                                 };
                             }
@@ -200,7 +201,7 @@ public class WorkflowEngine : IDisposable
         return new StepReport
         {
             StepName = step.Name,
-            ExceptedStatusCode = response.StatusCode,
+            ExceptedStatusCode = response!.StatusCode,
             IsSuccess = true
         };
     }

@@ -32,7 +32,7 @@ public class WorkflowEngineIntegrationTests
               Content-Type: application/json
             body: '{
               ""username"": ""test_user"",
-              ""password"": ""test_password1""
+              ""password"": ""test_password""
             }'
             excepted:
               status_code: 200 # Expected HTTP status code for successful login.
