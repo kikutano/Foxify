@@ -1,8 +1,8 @@
-using System.Net;
 using Foxify.Core.Execution;
 using Foxify.Core.Models;
 using Foxify.Core.Parsing;
 using Foxify.Core.Tests.Fakes;
+using System.Net;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -96,7 +96,7 @@ public class WorkflowEngineIntegrationTests
     public async Task ExecuteWorkflowAsync_WithFakeHttpMessageHandler_ShouldExecuteWithoutException()
     {
         // Arrange
-        var fakeHandler = new FakeHttpLoginMessageHandler();
+        var fakeHandler = new FakeHttpAuthScenarioHandler();
         var httpClient = new HttpClient(fakeHandler)
         {
             BaseAddress = new Uri("https://fakeapi.com/") // Base URL for the fake API
@@ -118,7 +118,9 @@ public class WorkflowEngineIntegrationTests
 
         // Assert
         Assert.NotNull(report);
-        Assert.Equal(HttpStatusCode.OK, report.StepReports[0].ExceptedStatusCode); // LoginUser step
+        Assert.Equal(HttpStatusCode.OK, report.StepReports[0].ExceptedStatusCode);
+        Assert.Equal(HttpStatusCode.OK, report.StepReports[1].ExceptedStatusCode);
+        Assert.Equal(HttpStatusCode.OK, report.StepReports[2].ExceptedStatusCode);
     }
 
     [Fact]
