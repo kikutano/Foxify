@@ -2,7 +2,7 @@
 
 ## Core Principles
 
-1. **Project-Specific Compliance**: Strictly adhere to tyfapi project conventions and patterns
+1. **Project-Specific Compliance**: Strictly adhere to Foxify project conventions and patterns
 2. **YAML Schema Adherence**: Follow the exact YAML structure defined for workflow definitions
 3. **CLI Engine Integration**: Ensure all generated code integrates properly with the .NET Native AOT CLI engine
 4. **AI-Friendly Design**: Create content that's optimized for LLM generation and understanding
@@ -90,6 +90,6 @@
 2. **Core Documentation**:
    - README.md for project architecture overview
    - agent_ai.md for general AI agent guidelines
-   - src/Tyfapi.Core/Execution/WorkflowEngine.cs for implementation details
+   - src/Foxify.Core/Execution/WorkflowEngine.cs for implementation details
 
-This document serves as a comprehensive guide for proper task execution and code generation within the tyfapi project environment.
+This document serves as a comprehensive guide for proper task execution and code generation within the Foxify project environment.

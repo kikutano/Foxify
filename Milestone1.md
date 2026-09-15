@@ -9,10 +9,10 @@
 
 ## 1. Objective
 
-Milestone 1 delivers the first usable Tyfapi core:
+Milestone 1 delivers the first usable Foxify core:
 
 ```text
-Tyfapi YAML
+Foxify YAML
     ↓
 Validate
     ↓
@@ -36,11 +36,11 @@ The engine must:
 
 ### Important product principle
 
-Tyfapi is **AI-friendly, not AI-powered**.
+Foxify is **AI-friendly, not AI-powered**.
 
 There is no AI model, AI provider, AI API or agent runtime inside the product.
 
-AI generation is validated as an **external compatibility experiment**: any LLM or coding agent should be able to generate Tyfapi YAML using the public schema and documentation.
+AI generation is validated as an **external compatibility experiment**: any LLM or coding agent should be able to generate Foxify YAML using the public schema and documentation.
 
 ---
 
@@ -73,7 +73,7 @@ useful result
 The strongest validation signal is repeated real-world usage:
 
 ```text
-Developer tries Tyfapi
+Developer tries Foxify
        ↓
 Creates a second scenario
        ↓
@@ -104,7 +104,7 @@ These are engineering goals, **not substitutes for product validation**.
 
 | Item | Deferred to |
 |---|---|
-| AI integration inside Tyfapi | Never required; external AI remains optional |
+| AI integration inside Foxify | Never required; external AI remains optional |
 | VS Code extension / Webview UI | M2 |
 | Visual editor | M2 |
 | Bots / `--bots N` | M3 |
@@ -124,8 +124,8 @@ M1 may make the engine **compatible with future concurrency**, but must not beco
 Milestone 0 must be complete.
 
 - **M0-1…M0-3** — clean solution layout, exactly one entry point, CLI surface:
-  - `tyfapi validate`
-  - `tyfapi run`
+  - `Foxify validate`
+  - `Foxify run`
 - Stable exit codes:
   - `0` success
   - `1` execution failed
@@ -165,7 +165,7 @@ Status legend:
 
 #### M1-1 — Formal Flow Schema Specification
 
-**Goal:** Establish the authoritative, versioned definition of the Tyfapi YAML format.
+**Goal:** Establish the authoritative, versioned definition of the Foxify YAML format.
 
 **Description**
 
@@ -205,14 +205,14 @@ The schema is authoritative for the **current format**, but must remain versiona
 
 ---
 
-#### M1-2 — `tyfapi validate`: Schema + Semantic Validation
+#### M1-2 — `Foxify validate`: Schema + Semantic Validation
 
 **Goal:** Make invalid scenarios fail before execution and provide errors useful to both humans and AI agents.
 
 Implement:
 
 ```bash
-tyfapi validate ./flow.yaml
+Foxify validate ./flow.yaml
 ```
 
 Validation occurs in two stages:
@@ -261,7 +261,7 @@ A flow that fails validation must not execute.
 
 This is a **validation experiment, not an AI feature**.
 
-Use at least two general-purpose AI systems, initially GPT and Claude, to convert at least three real OpenAPI/Swagger specifications into Tyfapi scenarios.
+Use at least two general-purpose AI systems, initially GPT and Claude, to convert at least three real OpenAPI/Swagger specifications into Foxify scenarios.
 
 For every generated scenario:
 
@@ -270,11 +270,11 @@ OpenAPI
   ↓
 External AI
   ↓
-Tyfapi YAML
+Foxify YAML
   ↓
-tyfapi validate
+Foxify validate
   ↓
-tyfapi run
+Foxify run
 ```
 
 No manual editing should be allowed before validation/execution.
@@ -631,7 +631,7 @@ PASS · 3/3 steps · 316ms
 Machine-readable output:
 
 ```bash
-tyfapi run ./flow.yaml --format json
+Foxify run ./flow.yaml --format json
 ```
 
 The JSON report must be stable and versioned.
@@ -647,7 +647,7 @@ Include:
 - retry information;
 - contextual failure payloads.
 
-This is important for future CI and for external AI agents consuming Tyfapi results. It does **not** require AI inside Tyfapi.
+This is important for future CI and for external AI agents consuming Foxify results. It does **not** require AI inside Foxify.
 
 **Acceptance criteria**
 
@@ -922,7 +922,7 @@ Milestone 1 is complete when:
 - [ ] `docs/json-report-schema.md` exists.
 - [ ] `docs/architecture.md` exists.
 - [ ] `docs/ai-validation.md` exists.
-- [ ] No AI provider or AI runtime is required by Tyfapi.
+- [ ] No AI provider or AI runtime is required by Foxify.
 - [ ] No load-testing implementation has leaked into M1.
 
 ---
@@ -935,7 +935,7 @@ M1 engineering being green does **not** mean the business idea is validated.
 
 The product validation question is:
 
-> **Will real developers voluntarily keep using Tyfapi?**
+> **Will real developers voluntarily keep using Foxify?**
 
 Strong signals include:
 
@@ -980,7 +980,7 @@ A developer creating a second scenario without being asked is strong evidence.
 
 The purpose of M1 is not to prove that we can build a sophisticated API testing platform.
 
-It is to build the **smallest solid core capable of answering whether the central Tyfapi workflow is valuable**:
+It is to build the **smallest solid core capable of answering whether the central Foxify workflow is valuable**:
 
 ```text
 Define a realistic scenario

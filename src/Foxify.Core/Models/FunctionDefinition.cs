@@ -1,4 +1,4 @@
-namespace Tyfapi.Core.Models;
+namespace Foxify.Core.Models;
 
 public class FunctionDefinition
 {

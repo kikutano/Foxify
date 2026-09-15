@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>Tyfapi.Core.Tests</RootNamespace>
+    <RootNamespace>Foxify.Core.Tests</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Tyfapi.Core\Tyfapi.Core.csproj" />
+    <ProjectReference Include="..\..\src\Foxify.Core\Foxify.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

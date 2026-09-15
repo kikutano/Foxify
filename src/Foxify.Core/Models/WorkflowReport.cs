@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace Tyfapi.Core.Models;
+namespace Foxify.Core.Models;
 
 public class StepReport
 {

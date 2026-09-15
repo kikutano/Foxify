@@ -1,6 +1,6 @@
-# tyfapi — Development Roadmap & Task Tracker
+# Foxify — Development Roadmap & Task Tracker
 
-> **Purpose.** This file is the single source of truth for tyfapi development.
+> **Purpose.** This file is the single source of truth for Foxify development.
 > Every coding session starts here: pick the next unblocked task, implement it,
 > verify its acceptance criteria, flip its status, and append a Changelog entry.
 
@@ -38,12 +38,12 @@ The existing code compiles, but is **rejected as a foundation** for these verifi
 
 | Area | Finding (evidence) |
 |---|---|
-| Entry point | Two `Main` methods (build warning CS7022); the *active* top-level `Program.cs` hardcodes absolute Windows paths; the documented usage `tyfapi <flow.yaml>` is not wired (`TyfapiConsole.cs` is dead code) |
+| Entry point | Two `Main` methods (build warning CS7022); the *active* top-level `Program.cs` hardcodes absolute Windows paths; the documented usage `Foxify <flow.yaml>` is not wired (`FoxifyConsole.cs` is dead code) |
 | Native AOT | csproj sets `PublishAot=true`, but YamlDotNet deserialization is reflection-based (build warning IL3050) → an AOT `dotnet publish` would produce a broken binary |
 | Engine | No fail-fast: missing functions / unmet `depends_on` are silently skipped; no HTTP status validation; `settings.timeout` & `max_retries` parsed but unused; `FunctionDefinition.Baseurl` ignored (engine special-cases a `baseUrlDev` variable); Content-Type header stripped and never re-applied on POST bodies |
 | Variables | `metadata.variables` and environment files are never seeded into the engine; extraction coerces numbers/booleans to strings; no error on unknown `${var}` |
 | Tests | "Integration" tests construct a `FakeHttpMessageHandler` but **never inject it** (engine internally does `new HttpClient()` and hits real `http://localhost`); widespread `Assert.True(true)` smoke assertions |
-| Hygiene | Dead code, orphan `test_parsing.cs` / `test_variables.cs` at repo root, empty `docs/tyfapi.json`, `docs/dev_credentials.json` with local URLs, ~15 nullable warnings |
+| Hygiene | Dead code, orphan `test_parsing.cs` / `test_variables.cs` at repo root, empty `docs/Foxify.json`, `docs/dev_credentials.json` with local URLs, ~15 nullable warnings |
 
 **Decision (approved):** **full ground-up rewrite** of the CLI engine. The YAML flow *format* is kept (backward compatible with the samples in `docs/`); the C# implementation is not.
 
@@ -66,15 +66,15 @@ The existing code compiles, but is **rejected as a foundation** for these verifi
 
 > Goal: clean, compiling, AOT-publishable skeleton with a real command surface and zero dead code.
 
-- [~] **M0-1** Remove prototype dead code and orphans: `TyfapiConsole.cs` (or absorb its logic), duplicate `Tyfapi/Program.cs`, root `test_parsing.cs`, `test_variables.cs`, empty `docs/tyfapi.json`, `docs/dev_credentials.json`.
+- [~] **M0-1** Remove prototype dead code and orphans: `FoxifyConsole.cs` (or absorb its logic), duplicate `Foxify/Program.cs`, root `test_parsing.cs`, `test_variables.cs`, empty `docs/Foxify.json`, `docs/dev_credentials.json`.
   - *Status note (2026-09-03):* all listed files removed; CLI entry point now reads `args[0]` instead of a hardcoded path. Pending: confirm `dotnet build` + `dotnet test` pass locally (no .NET SDK available in this session) before flipping to `[x]`.
   - *Accept:* no orphan `.cs` at repo root; exactly one entry point in the solution.
-- [~] **M0-2** New solution layout: `src/Tyfapi.Core` (AOT-safe core library), `src/Tyfapi.Cli` (thin executable), `tests/Tyfapi.Core.Tests`; proper `.gitignore` (`bin/`, `obj/`); remove committed build artifacts.
-  - *Status note (2026-09-03):* layout created (PascalCase project names to match .NET conventions, deviating from the lowercase names originally sketched here); root `tyfapi.slnx` added referencing all three projects; namespaces reorganized (`Tyfapi.Core.Models` / `.Parsing` / `.Execution`, `Tyfapi.Cli`, `Tyfapi.Core.Tests.*`), one class per file; `WorkflowModels.cs` split into 5 files; `TyfapiEngine`/`TyfapiParser` renamed to `WorkflowEngine`/`WorkflowParser`. `.gitignore` rewritten to a standard recursive `bin/`/`obj/`/`.vs/` pattern. No build artifacts were actually committed (verified via `git ls-files`), so nothing to remove there. Pending: verify `dotnet build` + `dotnet test` locally.
+- [~] **M0-2** New solution layout: `src/Foxify.Core` (AOT-safe core library), `src/Foxify.Cli` (thin executable), `tests/Foxify.Core.Tests`; proper `.gitignore` (`bin/`, `obj/`); remove committed build artifacts.
+  - *Status note (2026-09-03):* layout created (PascalCase project names to match .NET conventions, deviating from the lowercase names originally sketched here); root `Foxify.slnx` added referencing all three projects; namespaces reorganized (`Foxify.Core.Models` / `.Parsing` / `.Execution`, `Foxify.Cli`, `Foxify.Core.Tests.*`), one class per file; `WorkflowModels.cs` split into 5 files; `FoxifyEngine`/`FoxifyParser` renamed to `WorkflowEngine`/`WorkflowParser`. `.gitignore` rewritten to a standard recursive `bin/`/`obj/`/`.vs/` pattern. No build artifacts were actually committed (verified via `git ls-files`), so nothing to remove there. Pending: verify `dotnet build` + `dotnet test` locally.
   - *Accept:* `dotnet build` clean; no `bin/obj` visible in git status.
 - [ ] **M0-3** CLI surface v1:
-  - `tyfapi validate <flow.yaml>`
-  - `tyfapi run <flow.yaml> [--env <env.yaml>] [--set k=v ...] [--timeout <s>] [--retries <n>] [--json-report]`
+  - `Foxify validate <flow.yaml>`
+  - `Foxify run <flow.yaml> [--env <env.yaml>] [--set k=v ...] [--timeout <s>] [--retries <n>] [--json-report]`
   - *Exit codes:* `0` success · `1` execution failed · `2` validation failed · `3` usage error.
   - *Accept:* both commands work from an arbitrary CWD; exit codes covered by tests.
 - [ ] **M0-4** Settle AD-1: prototype the chosen deserialization path and verify with `dotnet publish -c Release` + running `validate`/`run` from the **published** binary.
@@ -92,9 +92,9 @@ The existing code compiles, but is **rejected as a foundation** for these verifi
 
 - [ ] **M1-1** Formal flow schema spec (JSON Schema + prose): `metadata` (name, description, environment, api_version, variables), `functions` (HTTP_REQUEST: method, baseurl, endpoint, headers, body, extract, expected_status), `workflow` (function steps with `depends_on`, `DELAY`), `settings` (timeout, max_retries). Keep flat and AI-friendly.
   - *Accept:* spec doc in `docs/flow-schema.md`; all `docs/*.yaml` samples conform.
-- [ ] **M1-2** `tyfapi validate`: full schema + semantic checks (unknown `function_name`, unknown/unsatisfiable `depends_on`, duplicate variable names, JSONPath syntax, valid HTTP methods, delay bounds). Human-readable errors with step/function context.
+- [ ] **M1-2** `Foxify validate`: full schema + semantic checks (unknown `function_name`, unknown/unsatisfiable `depends_on`, duplicate variable names, JSONPath syntax, valid HTTP methods, delay bounds). Human-readable errors with step/function context.
   - *Accept:* each check covered by a test with an intentional error fixture.
-- [ ] **M1-3** AI-generation validation (README requirement): prompt GPT and Claude to convert 3+ real OpenAPI/Swagger specs into our flow format; `tyfapi validate` + `run` them against the mock API with no manual fixes.
+- [ ] **M1-3** AI-generation validation (README requirement): prompt GPT and Claude to convert 3+ real OpenAPI/Swagger specs into our flow format; `Foxify validate` + `run` them against the mock API with no manual fixes.
   - *Accept:* ≥3 specs converted successfully; results recorded in `docs/ai-validation.md`.
 - [ ] **M1-4** Error model: `FlowValidationError`, `ExecutionError` (carries step id, request summary, response status/body); fail-fast: first failing step aborts the flow.
   - *Accept:* no failure mode ends silently; exit code `1` with actionable message.
@@ -194,6 +194,6 @@ The existing code compiles, but is **rejected as a foundation** for these verifi
 | 2026-08-24 | — | Roadmap created; v0.1 baseline audited; full rewrite approved (format kept, code replaced); AD-1 & AD-6 flagged for decision | Cline |
 | 2026-08-24 | — | `README.md`: added "🎯 Purpose: What Problem Are We Solving?" section (Function / Flow / Environment model, one-click multi-env, AI-generated flows) | Cline |
 | 2026-08-24 | — | `README.md`: added minimal YAML flow example in Purpose (login → token extraction → protected resource), aligned with `docs/*.yaml` conventions | Cline |
-| 2026-09-03 | M0-1, M0-2 | Repo cleanup: removed dead/orphan files and `docs/dev_credentials.json`; fixed CLI to read the flow path from `args[0]`; restructured into `src/Tyfapi.Core` (library), `src/Tyfapi.Cli` (executable), `tests/Tyfapi.Core.Tests`; added root `tyfapi.slnx`; reorganized namespaces and renamed files/classes (`TyfapiEngine`→`WorkflowEngine`, `TyfapiParser`→`WorkflowParser`, one class per file). Build/test verification still pending locally. | Claude |
+| 2026-09-03 | M0-1, M0-2 | Repo cleanup: removed dead/orphan files and `docs/dev_credentials.json`; fixed CLI to read the flow path from `args[0]`; restructured into `src/Foxify.Core` (library), `src/Foxify.Cli` (executable), `tests/Foxify.Core.Tests`; added root `Foxify.slnx`; reorganized namespaces and renamed files/classes (`FoxifyEngine`→`WorkflowEngine`, `FoxifyParser`→`WorkflowParser`, one class per file). Build/test verification still pending locally. | Claude |
 
   - *Accept:* design note in `docs/architecture.md` + stress test running 20 concurrent executor instances against the mock API.

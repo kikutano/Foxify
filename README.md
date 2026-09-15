@@ -1,12 +1,14 @@
-# Tyfapi (Test Your Fucking Api!)
+
+![](logo.jpg)
+# Foxify (Test Your Fucking Api!)
 
 > **Define API scenarios once. Run them anywhere. Let any AI agent generate them.**
 
-Tyfapi is a **Git-native, declarative API scenario runner** designed to make realistic backend verification easy to define, reproduce, automate, and execute across environments.
+Foxify is a **Git-native, declarative API scenario runner** designed to make realistic backend verification easy to define, reproduce, automate, and execute across environments.
 
-Tyfapi is **AI-friendly, not AI-powered**.
+Foxify is **AI-friendly, not AI-powered**.
 
-It does not contain an AI model, does not require an AI provider, and does not lock users into a specific LLM. Developers can use any LLM or coding agent they prefer — or no AI at all — to create and modify Tyfapi YAML files.
+It does not contain an AI model, does not require an AI provider, and does not lock users into a specific LLM. Developers can use any LLM or coding agent they prefer — or no AI at all — to create and modify Foxify YAML files.
 
 The core product is a deterministic execution engine and a simple, machine-readable scenario format.
 
@@ -38,7 +40,7 @@ Verify order
 
 These scenarios contain state, dependencies, extracted values, authentication, ordering, delays, and environment-specific configuration.
 
-Tyfapi aims to make these scenarios **first-class, version-controlled artifacts**.
+Foxify aims to make these scenarios **first-class, version-controlled artifacts**.
 
 The long-term vision is:
 
@@ -93,7 +95,7 @@ login → token → cart → checkout
 
 works as a complete user journey.
 
-Tyfapi focuses on that missing layer:
+Foxify focuses on that missing layer:
 
 > **Scenario-level API verification.**
 
@@ -101,7 +103,7 @@ Tyfapi focuses on that missing layer:
 
 # 3. The Core Idea
 
-Tyfapi is built around three concepts.
+Foxify is built around three concepts.
 
 ## Function
 
@@ -139,10 +141,10 @@ workflow:
 The same scenario can run against different targets without changing the scenario itself.
 
 ```bash
-tyfapi run checkout.yaml --env local
-tyfapi run checkout.yaml --env dev
-tyfapi run checkout.yaml --env staging
-tyfapi run checkout.yaml --env prod
+Foxify run checkout.yaml --env local
+Foxify run checkout.yaml --env dev
+Foxify run checkout.yaml --env staging
+Foxify run checkout.yaml --env prod
 ```
 
 The scenario describes **behavior**.
@@ -151,9 +153,9 @@ The environment describes **where that behavior is executed**.
 
 ---
 
-# 4. What Tyfapi Is
+# 4. What Foxify Is
 
-Tyfapi is:
+Foxify is:
 
 - **Declarative** — scenarios are described as YAML rather than imperative test code.
 - **Git-native** — scenarios are ordinary text files that can be versioned, reviewed, diffed, and shared.
@@ -168,9 +170,9 @@ Tyfapi is:
 
 ---
 
-# 5. What Tyfapi Is NOT
+# 5. What Foxify Is NOT
 
-Tyfapi is deliberately **not**:
+Foxify is deliberately **not**:
 
 - an AI assistant;
 - an LLM provider;
@@ -181,12 +183,12 @@ Tyfapi is deliberately **not**:
 - a replacement for every load-testing platform;
 - a proprietary API testing format that requires a hosted service.
 
-Tyfapi should work completely locally.
+Foxify should work completely locally.
 
 A developer should be able to clone a repository, install the CLI, and run:
 
 ```bash
-tyfapi run ./flows/checkout.yaml --env local
+Foxify run ./flows/checkout.yaml --env local
 ```
 
 without creating an account.
@@ -197,7 +199,7 @@ without creating an account.
 
 This is a fundamental product principle.
 
-Tyfapi does **not** include an AI model.
+Foxify does **not** include an AI model.
 
 The user chooses their own AI tooling.
 
@@ -212,18 +214,18 @@ Local LLM
 Future AI Agent
         │
         ▼
-   Tyfapi YAML
+   Foxify YAML
         │
         ▼
-   Tyfapi CLI
+   Foxify CLI
         │
         ▼
        API
 ```
 
-The AI is simply a **consumer and producer of the Tyfapi format**.
+The AI is simply a **consumer and producer of the Foxify format**.
 
-This means Tyfapi does not need to:
+This means Foxify does not need to:
 
 - host models;
 - pay model providers;
@@ -233,7 +235,7 @@ This means Tyfapi does not need to:
 - compete directly with AI companies;
 - change whenever a new LLM becomes popular.
 
-Tyfapi remains useful with zero AI involvement.
+Foxify remains useful with zero AI involvement.
 
 ---
 
@@ -241,12 +243,12 @@ Tyfapi remains useful with zero AI involvement.
 
 Modern coding agents are increasingly capable of reading repositories, modifying files, executing commands, and iterating based on command results.
 
-Tyfapi should make that workflow particularly easy.
+Foxify should make that workflow particularly easy.
 
 An agent should be able to:
 
 1. Read an OpenAPI specification or existing backend code.
-2. Understand the Tyfapi schema.
+2. Understand the Foxify schema.
 3. Generate a scenario.
 4. Run validation.
 5. Execute the scenario.
@@ -263,13 +265,13 @@ Developer intent
    AI Agent
        │
        ▼
-Tyfapi YAML
+Foxify YAML
        │
        ▼
-tyfapi validate
+Foxify validate
        │
        ▼
-tyfapi run
+Foxify run
        │
        ▼
      API
@@ -285,13 +287,13 @@ Structured result
 
 The important point is:
 
-> **Tyfapi itself remains deterministic.**
+> **Foxify itself remains deterministic.**
 
 ---
 
 # 8. YAML as the Source of Truth
 
-The Tyfapi YAML file is the canonical representation of a scenario.
+The Foxify YAML file is the canonical representation of a scenario.
 
 It should be:
 
@@ -309,7 +311,7 @@ A visual editor, if introduced later, must operate **around the YAML**, not repl
 The intended relationship is:
 
 ```text
-             Tyfapi YAML
+             Foxify YAML
                   │
         ┌─────────┴─────────┐
         ▼                   ▼
@@ -381,8 +383,8 @@ settings:
 Run it:
 
 ```bash
-tyfapi validate ./login.yaml
-tyfapi run ./login.yaml --env dev
+Foxify validate ./login.yaml
+Foxify run ./login.yaml --env dev
 ```
 
 ---
@@ -526,7 +528,7 @@ Total: 225ms
 Machine-readable output:
 
 ```bash
-tyfapi run checkout.yaml --format json
+Foxify run checkout.yaml --format json
 ```
 
 could produce:
@@ -570,31 +572,31 @@ Initial commands:
 ## Validate
 
 ```bash
-tyfapi validate ./flows/checkout.yaml
+Foxify validate ./flows/checkout.yaml
 ```
 
 ## Run
 
 ```bash
-tyfapi run ./flows/checkout.yaml --env dev
+Foxify run ./flows/checkout.yaml --env dev
 ```
 
 ## Machine-readable run
 
 ```bash
-tyfapi run ./flows/checkout.yaml --env dev --format json
+Foxify run ./flows/checkout.yaml --env dev --format json
 ```
 
 Future capability:
 
 ```bash
-tyfapi run ./flows --env staging
+Foxify run ./flows --env staging
 ```
 
 Future load testing:
 
 ```bash
-tyfapi load ./flows/checkout.yaml --bots 1000
+Foxify load ./flows/checkout.yaml --bots 1000
 ```
 
 The CLI must provide real value even if the user never installs a VS Code extension or uses the cloud platform.
@@ -634,7 +636,7 @@ The value proposition is:
 
 The first release must be deliberately small.
 
-The goal is **not** to build the complete Tyfapi platform.
+The goal is **not** to build the complete Foxify platform.
 
 The goal is to validate one hypothesis:
 
@@ -645,9 +647,9 @@ The first MVP is therefore a:
 ## Scenario Runner
 
 ```text
-Tyfapi YAML
+Foxify YAML
      ↓
-Tyfapi CLI
+Foxify CLI
      ↓
 Real API
      ↓
@@ -722,13 +724,13 @@ Separate environment files.
 ### Validation
 
 ```bash
-tyfapi validate scenario.yaml
+Foxify validate scenario.yaml
 ```
 
 ### Execution
 
 ```bash
-tyfapi run scenario.yaml --env dev
+Foxify run scenario.yaml --env dev
 ```
 
 ### Exit codes
@@ -826,7 +828,7 @@ Checkout
 Verify order
 ```
 
-This is the most important example because it demonstrates why Tyfapi exists.
+This is the most important example because it demonstrates why Foxify exists.
 
 The goal is to show **behavior**, not simply endpoint testing.
 
@@ -836,7 +838,7 @@ The goal is to show **behavior**, not simply endpoint testing.
 
 Even though the MVP contains no AI, AI compatibility should be tested manually.
 
-Take an OpenAPI specification and ask several different AI agents to generate Tyfapi YAML.
+Take an OpenAPI specification and ask several different AI agents to generate Foxify YAML.
 
 For example:
 
@@ -845,7 +847,7 @@ OpenAPI
    ↓
 Claude
    ↓
-Tyfapi YAML
+Foxify YAML
 ```
 
 Then repeat with other agents such as Codex or Gemini.
@@ -854,7 +856,7 @@ No custom integration is required.
 
 The experiment is simply:
 
-> **Can general-purpose AI agents understand the Tyfapi format and produce valid, useful scenarios?**
+> **Can general-purpose AI agents understand the Foxify format and produce valid, useful scenarios?**
 
 If the answer is yes, the AI-friendly design hypothesis becomes much stronger.
 
@@ -901,12 +903,12 @@ It is **continued usage**.
 
 ## Primary metric — Second-use rate
 
-How many users who try Tyfapi once use it again for a second scenario?
+How many users who try Foxify once use it again for a second scenario?
 
 For example:
 
 ```text
-10 people try Tyfapi
+10 people try Foxify
   ↓
 8 create first scenario
   ↓
@@ -914,7 +916,7 @@ For example:
   ↓
 4 commit scenarios to a repository
   ↓
-3 use Tyfapi in CI
+3 use Foxify in CI
 ```
 
 That would be a strong signal.
@@ -922,7 +924,7 @@ That would be a strong signal.
 A weaker signal would be:
 
 ```text
-100 people try Tyfapi
+100 people try Foxify
   ↓
 90 say "cool"
   ↓
@@ -939,7 +941,7 @@ The objective is **workflow adoption**.
 
 The strongest early signal would be:
 
-> **A developer puts a Tyfapi YAML file into a real repository and keeps using it without being asked.**
+> **A developer puts a Foxify YAML file into a real repository and keeps using it without being asked.**
 
 Even better:
 
@@ -955,7 +957,7 @@ Developer changes scenario
 CI runs again
 ```
 
-At that point Tyfapi has moved from "interesting tool" to "part of a development workflow."
+At that point Foxify has moved from "interesting tool" to "part of a development workflow."
 
 ---
 
@@ -964,10 +966,10 @@ At that point Tyfapi has moved from "interesting tool" to "part of a development
 The initial repository can remain very small:
 
 ```text
-tyfapi/
+Foxify/
 │
 ├── src/
-│   └── Tyfapi.Cli/
+│   └── Foxify.Cli/
 │
 ├── examples/
 │   ├── authentication.yaml
@@ -979,7 +981,7 @@ tyfapi/
 │   └── example.yaml
 │
 ├── schema/
-│   └── tyfapi.schema.json
+│   └── Foxify.schema.json
 │
 ├── README.md
 ├── LICENSE
@@ -1023,14 +1025,14 @@ Potential capabilities:
 Example:
 
 ```bash
-tyfapi run ./flows --env staging --fail-fast
+Foxify run ./flows --env staging --fail-fast
 ```
 
 A failed scenario should be able to fail the deployment pipeline.
 
 ## Milestone 3 — Agent-Friendly Tooling
 
-Make Tyfapi exceptionally easy for AI coding agents to operate.
+Make Foxify exceptionally easy for AI coding agents to operate.
 
 Potential capabilities:
 
@@ -1060,7 +1062,7 @@ Run again
 
 Still:
 
-> **No AI model inside Tyfapi.**
+> **No AI model inside Foxify.**
 
 ## Milestone 4 — VS Code Extension
 
@@ -1087,7 +1089,7 @@ Reuse the same scenarios for traffic simulation.
 Example:
 
 ```bash
-tyfapi load ./flows/checkout.yaml --bots 1000
+Foxify load ./flows/checkout.yaml --bots 1000
 ```
 
 Potential capabilities:
@@ -1139,7 +1141,7 @@ This is a natural candidate for a paid service because it consumes infrastructur
 
 # 26. Open Source Strategy
 
-Open source can be particularly valuable for Tyfapi because the project introduces a new scenario format.
+Open source can be particularly valuable for Foxify because the project introduces a new scenario format.
 
 The core idea is:
 
@@ -1212,7 +1214,7 @@ The project should not depend on charging users for basic local execution.
 A potential model:
 
 ```text
-                 Tyfapi
+                 Foxify
                     │
           ┌─────────┴─────────┐
           │                   │
@@ -1258,7 +1260,7 @@ The infrastructure cost of the paid feature directly corresponds to its value.
 
 # 29. Competitive Positioning
 
-Tyfapi should not attempt to win by becoming "another Postman."
+Foxify should not attempt to win by becoming "another Postman."
 
 Established API clients are already excellent at:
 
@@ -1269,7 +1271,7 @@ Established API clients are already excellent at:
 
 The intended positioning is different:
 
-> **Tyfapi is a Git-native scenario engine for realistic API behavior.**
+> **Foxify is a Git-native scenario engine for realistic API behavior.**
 
 The core differentiation is the combination of:
 
@@ -1322,7 +1324,7 @@ Everything else is built around the scenario file.
 
 ## 2. AI is optional
 
-Tyfapi works perfectly without AI.
+Foxify works perfectly without AI.
 
 ## 3. Deterministic execution
 
@@ -1346,7 +1348,7 @@ Everything important should be scriptable.
 
 ## 8. Machine-readable by design
 
-Tools and AI agents should be able to consume Tyfapi results directly.
+Tools and AI agents should be able to consume Foxify results directly.
 
 ## 9. Environment-independent scenarios
 
@@ -1370,7 +1372,7 @@ The ideal workflow is:
                  DEFINE ONCE
                       │
                       ▼
-                Tyfapi YAML
+                Foxify YAML
                       │
           ┌───────────┼───────────┐
           ▼           ▼           ▼
@@ -1389,22 +1391,22 @@ And with an AI coding agent:
           Any AI Agent
               │
               ▼
-         Tyfapi YAML
+         Foxify YAML
               │
               ▼
-         Tyfapi CLI
+         Foxify CLI
               │
               ▼
              API
 ```
 
-Tyfapi should be the **deterministic layer between developer/agent intent and API execution**.
+Foxify should be the **deterministic layer between developer/agent intent and API execution**.
 
 ---
 
 # 33. Final Product Statement
 
-> **Tyfapi is a Git-native, declarative API scenario runner. Define realistic backend workflows once in simple YAML, run them against any environment, execute them locally or in CI, and let any AI coding agent generate or modify the scenarios without making AI a dependency of the product.**
+> **Foxify is a Git-native, declarative API scenario runner. Define realistic backend workflows once in simple YAML, run them against any environment, execute them locally or in CI, and let any AI coding agent generate or modify the scenarios without making AI a dependency of the product.**
 
 The product is not the AI.
 

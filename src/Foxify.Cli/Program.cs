@@ -1,11 +1,11 @@
-using Tyfapi.Core.Execution;
-using Tyfapi.Core.Parsing;
+using Foxify.Core.Execution;
+using Foxify.Core.Parsing;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 if (args.Length == 0)
 {
-    Console.WriteLine("Usage: tyfapi <path-to-flow.yaml> [path-to-environment.yaml]");
+    Console.WriteLine("Usage: Foxify <path-to-flow.yaml> [path-to-environment.yaml]");
     return;
 }
 

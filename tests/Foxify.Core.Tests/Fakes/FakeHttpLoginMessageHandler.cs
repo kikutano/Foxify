@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Text.Json;
 
-namespace Tyfapi.Core.Tests.Fakes;
+namespace Foxify.Core.Tests.Fakes;
 
 public record LoginRequest(string username, string password);
 

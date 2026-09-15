@@ -1,10 +1,10 @@
 # Variable Extraction Guide
 
-This guide explains how to extract variables from API responses and use them in subsequent requests within the Tyfapi workflow engine.
+This guide explains how to extract variables from API responses and use them in subsequent requests within the Foxify workflow engine.
 
 ## Overview
 
-The Tyfapi engine supports extracting values from API responses using JSONPath expressions. This allows you to:
+The Foxify engine supports extracting values from API responses using JSONPath expressions. This allows you to:
 - Extract authentication tokens, IDs, or other data from one request
 - Use that extracted data in subsequent requests through variable substitution
 - Create dynamic workflows that depend on previous API responses

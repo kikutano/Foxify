@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/Foxify.Core/Foxify.Core.csproj" />
+  <Project Path="src/Foxify.Cli/Foxify.Cli.csproj" />
+  <Project Path="tests/Foxify.Core.Tests/Foxify.Core.Tests.csproj" />
+</Solution>

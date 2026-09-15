@@ -33,7 +33,7 @@
 ## Technical Guidelines
 
 1. **Working Directory**:
-   - Always operate within the current working directory: c:\Users\Tano\source\repos\kikutano\tyfapi
+   - Always operate within the current working directory: c:\Users\Tano\source\repos\kikutano\Foxify
    - Do not attempt to change directories or access files outside this scope
 
 2. **Tool Usage**:
