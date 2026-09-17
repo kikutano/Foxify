@@ -36,6 +36,11 @@ public class WorkflowEngineIntegrationTests
             }'
             excepted:
               status_code: 200 # Expected HTTP status code for successful login.
+            asserts:
+              token != """" # Asserts that the token is not empty.
+              user_id > 0 # Asserts that the user ID is greater than 0.
+              username == ""test_user"" # Asserts that the username matches the expected value.
+              expires_at > 0 # Asserts that the expiration timestamp is greater than 0.              
             extract:
               token: $.token # Saves the bearer token into a variable accessible by name.
               user_id: $.user.id # Saves the user ID into a variable accessible by name.

@@ -1,7 +1,7 @@
-﻿using System.Net;
+﻿using Foxify.Core.Models;
+using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Foxify.Core.Models;
 
 namespace Foxify.Core.Execution;
 
@@ -187,6 +187,33 @@ public class WorkflowEngine : IDisposable
                             }
                         }
                     }
+                }
+            }
+
+            if (function.Asserts.Any())
+            {
+                try
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var jsonDocument = JsonDocument.Parse(responseContent);
+
+                    foreach (var assert in function.Asserts)
+                    {
+                        var actualValue = ExtractValueFromJson(jsonDocument, assert.VariableName);
+                        if (!assert.Evaluate(actualValue.ToString()))
+                        {
+                            Console.WriteLine($"Assertion failed for {assert.VariableName}");
+                            return new StepReport
+                            {
+                                StepName = step.Name,
+                                IsSuccess = false
+                            };
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error evaluating assertions: {ex.Message}");
                 }
             }
 

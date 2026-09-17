@@ -5,7 +5,6 @@ namespace Foxify.Core.Models;
 public class StepReport
 {
     public string StepName { get; set; } = string.Empty;
-    //public HttpResponseMessage Response { get; set; } = new HttpResponseMessage();
     public HttpStatusCode ExceptedStatusCode { get; set; } = HttpStatusCode.OK;
     public bool IsSuccess { get; set; } = true;
 }
