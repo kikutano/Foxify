@@ -9,37 +9,83 @@ public class FunctionDefinition
     public Dictionary<string, string> Headers { get; set; } = new();
     public string Body { get; set; } = string.Empty;
     public Dictionary<string, string> Extract { get; set; } = new();
-    public Dictionary<string, string> Excepted { get; set; } = new();
-    public List<ResponseAssert> Asserts { get; set; } = new();
+    public Dictionary<string, string> Expected { get; set; } = new();
+    public Dictionary<string, string> Asserts { get; set; } = new();
 }
 
-public class ResponseAssert
+public static class AssertEvaluator
 {
-    /* We supporting only basic operators, we need to expand 
-     * this in the future to support complex jsonpath expressions */
-    public string VariableName { get; set; } = string.Empty;
-    public string Operator { get; set; } = string.Empty;
-    public string ExceptedValue { get; set; } = string.Empty;
-
-    public bool Evaluate(string actualValue)
+    public static bool Evaluate(string actualValue, string assertionExpression)
     {
-        return Operator switch
+        if (string.IsNullOrWhiteSpace(assertionExpression))
+            return true;
+
+        // Gestione dell'operatore logico OR (||)
+        if (assertionExpression.Contains("||"))
         {
-            "==" => actualValue == ExceptedValue,
-            "!=" => actualValue != ExceptedValue,
-            ">" => double.TryParse(actualValue, out var actualNum) &&
-                   double.TryParse(ExceptedValue, out var expectedNum) &&
-                   actualNum > expectedNum,
-            "<" => double.TryParse(actualValue, out var actualNum) &&
-                   double.TryParse(ExceptedValue, out var expectedNum) &&
-                   actualNum < expectedNum,
-            ">=" => double.TryParse(actualValue, out var actualNum) &&
-                    double.TryParse(ExceptedValue, out var expectedNum) &&
-                    actualNum >= expectedNum,
-            "<=" => double.TryParse(actualValue, out var actualNum) &&
-                    double.TryParse(ExceptedValue, out var expectedNum) &&
-                    actualNum <= expectedNum,
-            _ => throw new InvalidOperationException($"Unsupported operator: {Operator}")
-        };
+            var orParts = assertionExpression.Split("||");
+            foreach (var part in orParts)
+            {
+                if (EvaluateSingleOrAnd(actualValue, part.Trim()))
+                    return true;
+            }
+            return false;
+        }
+
+        return EvaluateSingleOrAnd(actualValue, assertionExpression);
+    }
+
+    private static bool EvaluateSingleOrAnd(string actualValue, string assertionExpression)
+    {
+        if (assertionExpression.Contains("&&"))
+        {
+            var andParts = assertionExpression.Split("&&");
+            foreach (var part in andParts)
+            {
+                if (!EvaluateSingleComparison(actualValue, part.Trim()))
+                    return false;
+            }
+            return true;
+        }
+
+        return EvaluateSingleComparison(actualValue, assertionExpression);
+    }
+
+    private static bool EvaluateSingleComparison(string actualValue, string expression)
+    {
+        expression = expression.Trim();
+
+        if (expression.StartsWith("!="))
+        {
+            var expected = expression[2..].Trim(' ', '\'', '"');
+            return actualValue != expected;
+        }
+        if (expression.StartsWith(">="))
+        {
+            return double.TryParse(actualValue, out var act) &&
+                   double.TryParse(expression[2..].Trim(), out var exp) && act >= exp;
+        }
+        if (expression.StartsWith(">"))
+        {
+            return double.TryParse(actualValue, out var act) &&
+                   double.TryParse(expression[1..].Trim(), out var exp) && act > exp;
+        }
+        if (expression.StartsWith("<="))
+        {
+            return double.TryParse(actualValue, out var act) &&
+                   double.TryParse(expression[2..].Trim(), out var exp) && act <= exp;
+        }
+        if (expression.StartsWith("<"))
+        {
+            return double.TryParse(actualValue, out var act) &&
+                   double.TryParse(expression[1..].Trim(), out var exp) && act < exp;
+        }
+        if (expression.StartsWith("=="))
+        {
+            var expected = expression[2..].Trim(' ', '\'', '"');
+            return actualValue == expected;
+        }
+
+        return actualValue == expression.Trim(' ', '\'', '"');
     }
 }

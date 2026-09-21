@@ -10,8 +10,9 @@ public class FakeHttpAuthScenarioHandler : HttpMessageHandler
     public const string UserName = "test_user";
     public const string Password = "test_password";
     public const string Token = "fake_token_123";
-    public const string Email = "user@@test.com";
+    public const string Email = "user@test.com";
     public const string Name = "John Matrix";
+    public const int UserId = 123;
 
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
@@ -57,6 +58,7 @@ public class FakeHttpAuthScenarioHandler : HttpMessageHandler
 
         var userInfo = new
         {
+            userid = UserId,
             username = UserName,
             email = Email
         };
@@ -78,6 +80,7 @@ public class FakeHttpAuthScenarioHandler : HttpMessageHandler
 
         var userDetails = new
         {
+            userid = UserId,
             username = UserName,
             email = Email,
             Name = Name

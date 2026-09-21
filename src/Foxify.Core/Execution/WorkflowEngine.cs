@@ -167,9 +167,9 @@ public class WorkflowEngine : IDisposable
                 }
             }
 
-            if (function.Excepted.Any())
+            if (function.Expected.Any())
             {
-                foreach (var excepted in function.Excepted)
+                foreach (var excepted in function.Expected)
                 {
                     if (excepted.Key.Equals("status_code", StringComparison.OrdinalIgnoreCase))
                     {
@@ -190,34 +190,23 @@ public class WorkflowEngine : IDisposable
                 }
             }
 
-            if (function.Asserts.Any())
+            foreach (var (variableName, expression) in function.Asserts)
             {
-                try
-                {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    var jsonDocument = JsonDocument.Parse(responseContent);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var jsonDocument = JsonDocument.Parse(responseContent);
 
-                    foreach (var assert in function.Asserts)
-                    {
-                        var actualValue = ExtractValueFromJson(jsonDocument, assert.VariableName);
-                        if (!assert.Evaluate(actualValue.ToString()))
-                        {
-                            Console.WriteLine($"Assertion failed for {assert.VariableName}");
-                            return new StepReport
-                            {
-                                StepName = step.Name,
-                                IsSuccess = false
-                            };
-                        }
-                    }
-                }
-                catch (Exception ex)
+                function.Extract.TryGetValue(variableName, out var keyName);
+                var realValue = ExtractValueFromJson(jsonDocument, keyName);
+
+                bool isSuccess = AssertEvaluator.Evaluate(realValue.ToString(), expression);
+
+                if (!isSuccess)
                 {
-                    Console.WriteLine($"Error evaluating assertions: {ex.Message}");
+                    throw new Exception(
+                        $"Assert fallito per la variabile '{variableName}': valore attuale '{keyName}', atteso '{expression}'");
                 }
             }
 
-            // Mark this function as executed
             _executedFunctions.Add(step.FunctionName);
         }
         catch (Exception ex)

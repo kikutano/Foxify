@@ -1,8 +1,6 @@
+using Foxify.Core.Models;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
-using System.Text.Json;
-
-using Foxify.Core.Models;
 
 namespace Foxify.Core.Parsing;
 

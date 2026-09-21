@@ -10,14 +10,14 @@ namespace Foxify.Core.Tests.Execution;
 
 public class WorkflowEngineIntegrationTests
 {
-    private const string WorkFlowYamlSource = @"
+    private const string WorkFlowYamlSource = """
         # Final Demo Workflow: Complete Variable Extraction Example
         # -----------------------------------------
         # Metadata provides global info for tracking, reporting, and AI context.
         metadata:
-          name: ""Final Demo Workflow"" # Human-readable name of the flow/test.
-          description: ""Complete demonstration of variable extraction from API responses and usage in subsequent requests.""
-          api_version: ""v1""                           # Explicit versioning for schema tracking.
+          name: "Final Demo Workflow" # Human-readable name of the flow/test.
+          description: "Complete demonstration of variable extraction from API responses and usage in subsequent requests."
+          api_version: "v1"                           # Explicit versioning for schema tracking.
 
         # -----------------------------------------
         # Functions/Templates Library: Reusable API Blocks
@@ -27,56 +27,59 @@ public class WorkflowEngineIntegrationTests
             type: HTTP_REQUEST
             method: POST
             baseurl: ${baseUrlDev}
-            endpoint: ""login""
+            endpoint: "login"
             headers:
               Content-Type: application/json
             body: '{
-              ""username"": ""test_user"",
-              ""password"": ""test_password""
+              "username": "test_user",
+              "password": "test_password"
             }'
-            excepted:
+            expected:
               status_code: 200 # Expected HTTP status code for successful login.
             asserts:
-              token != """" # Asserts that the token is not empty.
-              user_id > 0 # Asserts that the user ID is greater than 0.
-              username == ""test_user"" # Asserts that the username matches the expected value.
-              expires_at > 0 # Asserts that the expiration timestamp is greater than 0.              
+              token: "!= ''"
             extract:
               token: $.token # Saves the bearer token into a variable accessible by name.
-              user_id: $.user.id # Saves the user ID into a variable accessible by name.
+              userid: $.user.id # Saves the user ID into a variable accessible by name.
               username: $.user.username # Saves the username into a variable accessible by name.
               expires_at: $.expires_at # Saves expiration timestamp
+
           # Function 2: Get Protected Resource (GET Request using Bearer Token)
           GetProtectedResource:
             type: HTTP_REQUEST
             method: GET
             baseurl: ${baseUrlDev}
-            endpoint: ""me""
+            endpoint: "me"
             headers:
               Content-Type: application/json
-              Authorization: ""Bearer ${token}""     # Uses the token from login step.
-            body: """"
+              Authorization: "Bearer ${token}"     # Uses the token from login step.
+            body: ""
+            expected:
+              status_code: 200 # Expected HTTP status code for successful resource access.
+            asserts:
+              userid: "> 0" # Asserts that the user ID is greater than 0, indicating a valid user.
             extract:
-              resource_data: $.data # Saves protected resource data into a variable accessible by name.
+              userid: $.userid # Extracts the user ID from the response for use in subsequent calls.
 
           # Function 3: Get User Details using extracted user_id
           GetUserDetails:
             type: HTTP_REQUEST
             method: GET
             baseurl: ${baseUrlDev}
-            endpoint: ""user/${user_id}"" # Uses the user_id from login step
+            endpoint: "user/${user_id}" # Uses the user_id from login step
             headers:
               Content-Type: application/json
-              Authorization: ""Bearer ${token}""     # Uses the token from login step.
-            body: """"
-            extract:
-              user_details: $.data # Saves user details into a variable accessible by name.
+              Authorization: "Bearer ${token}"     # Uses the token from login step.
+            body: ""
+            expected:
+              status_code: 200 # Expected HTTP status code for successful resource access.
+            
 
         # -----------------------------------------
         # Workflow Definition (The Execution Sequence)
         workflow:
           - type: function
-            function_name: LoginUser # Calls the defined ""LoginUser"" block to authenticate.
+            function_name: LoginUser # Calls the defined "LoginUser" block to authenticate.
 
           # Optional delay between login and subsequent call
           - name: FlowDelay1
@@ -95,7 +98,8 @@ public class WorkflowEngineIntegrationTests
 
         settings:
           timeout: 10     # Global timeout (seconds) for any single API call.
-          max_retries: 3   # Number of times to retry transient failures.";
+          max_retries: 3   # Number of times to retry transient failures.
+        """;
 
     [Fact]
     public async Task ExecuteWorkflowAsync_WithFakeHttpMessageHandler_ShouldExecuteWithoutException()
