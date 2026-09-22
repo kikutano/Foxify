@@ -83,7 +83,7 @@ public class FakeHttpAuthScenarioHandler : HttpMessageHandler
             userid = UserId,
             username = UserName,
             email = Email,
-            Name = Name
+            name = Name
         };
 
         return new HttpResponseMessage(HttpStatusCode.OK)

@@ -58,9 +58,12 @@ public class WorkflowEngineIntegrationTests
               status_code: 200 # Expected HTTP status code for successful resource access.
             asserts:
               userid: "> 0" # Asserts that the user ID is greater than 0, indicating a valid user.
+              username: "== 'test_user'" # Asserts that the username matches the expected value.
+              email: "== 'user@test.com'" # Asserts that the email matches the expected value.
             extract:
               userid: $.userid # Extracts the user ID from the response for use in subsequent calls.
-
+              username: $.username # Extracts the username from the response for use in subsequent calls.
+              email: $.email # Extracts the email from the response for use in subsequent calls.
           # Function 3: Get User Details using extracted user_id
           GetUserDetails:
             type: HTTP_REQUEST
@@ -73,8 +76,16 @@ public class WorkflowEngineIntegrationTests
             body: ""
             expected:
               status_code: 200 # Expected HTTP status code for successful resource access.
-            
-
+            asserts:
+              userid: "> 0" # Asserts that the user ID is greater than 0, indicating a valid user.
+              username: "== 'test_user'" # Asserts that the username matches the expected value.
+              email: "== 'user@test.com'" # Asserts that the email matches the expected value.
+              name: "== 'John Matrix'" # Asserts that the name matches the expected value.
+            extract:
+              userid: $.userid # Extracts the user ID from the response for use in subsequent calls.
+              username: $.username # Extracts the username from the response for use in subsequent calls.
+              email: $.email # Extracts the email from the response for use in subsequent calls.
+              name: $.name # Extracts the name from the response for use in subsequent calls.
         # -----------------------------------------
         # Workflow Definition (The Execution Sequence)
         workflow:
