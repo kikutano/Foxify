@@ -1,0 +1,38 @@
+# https://app.reqres.in/playground?path=/api/users&method=GET
+# free_user_3Jia6vmNMqQZQBgYN7Tj6sqeRhp
+# Complete Workflow YAML for API Testing
+# -----------------------------------------
+# Metadata provides global info for tracking, reporting, and AI context.
+metadata:
+  name: "Complete Workflow API Testing" # Human-readable name of the flow/test.
+  description: "Complete demonstration of API testing workflow with variable extraction, assertions, and dependency management."
+  api_version: "v1"                           
+
+# -----------------------------------------
+# Functions/Templates Library: Reusable API Blocks
+functions:
+  GetUserDetails:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "api/users?&method=GET" # Uses the user_id from login step
+    headers:
+      x-api-key: ${apiKey}
+      # Content-Type: application/json
+      # Authorization: "Bearer ${token}"     # Uses the token from login step.
+    body: ""
+    expected:
+      status_code: 200 # Expected HTTP status code for successful resource access.
+    extract:
+      page: $.page # Saves the page number into a variable accessible by name.
+    asserts:
+      page: "== 1" # Asserts that the page number is equal to 1.
+# -----------------------------------------
+# Workflow Definition (The Execution Sequence)
+workflow:
+  - type: function
+    function_name: GetUserDetails
+    
+settings:
+  timeout: 10     # Global timeout (seconds) for any single API call.
+  max_retries: 3   # Number of times to retry transient failures.

@@ -3,13 +3,16 @@ using Foxify.Core.Parsing;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-if (args.Length == 0)
-{
-    Console.WriteLine("Usage: Foxify <path-to-flow.yaml> [path-to-environment.yaml]");
-    return;
-}
+//if (args.Length == 0)
+//{
+//    Console.WriteLine("Usage: Foxify <path-to-flow.yaml> [path-to-environment.yaml]");
+//    return;
+//}
 
-string filePath = args[0];
+//string filePath = args[0];
+
+string filePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\complete_workflow.yaml";
+string envFilePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\environment.yaml";
 
 if (!File.Exists(filePath))
 {
@@ -24,23 +27,23 @@ try
 
     // Load environment variables from an optional environment YAML file passed as the second argument.
     Dictionary<string, object> environmentVariables = new();
-    if (args.Length > 1)
+    //if (args.Length > 1)
+    //{
+    //string envFilePath = args[1];
+    if (File.Exists(envFilePath))
     {
-        string envFilePath = args[1];
-        if (File.Exists(envFilePath))
-        {
-            var envDeserializer = new DeserializerBuilder()
-                .WithNamingConvention(UnderscoredNamingConvention.Instance)
-                .Build();
+        var envDeserializer = new DeserializerBuilder()
+            .WithNamingConvention(UnderscoredNamingConvention.Instance)
+            .Build();
 
-            var envContent = File.ReadAllText(envFilePath);
-            environmentVariables = envDeserializer.Deserialize<Dictionary<string, object>>(envContent) ?? new();
-        }
-        else
-        {
-            Console.WriteLine($"Environment file not found: {envFilePath}");
-        }
+        var envContent = File.ReadAllText(envFilePath);
+        environmentVariables = envDeserializer.Deserialize<Dictionary<string, object>>(envContent) ?? new();
     }
+    else
+    {
+        Console.WriteLine($"Environment file not found: {envFilePath}");
+    }
+    //}
 
     var parser = new WorkflowParser();
     var workflow = parser.Parse(yamlContent, environmentVariables);
@@ -70,12 +73,7 @@ try
 
     Console.WriteLine("\nExecuting workflow...");
 
-    //Todo: Use the injection and not create a new HttpClient here, but for now, let's keep it simple.
-    HttpClient httpClient = new HttpClient()
-    {
-        BaseAddress = new Uri("http://localhost")
-    };
-
+    HttpClient httpClient = new HttpClient();
     using var engine = new WorkflowEngine(httpClient);
     await engine.ExecuteWorkflowAsync(workflow);
 

@@ -1,1 +1,2 @@
-baseUrlDev: "https://localhost:7018"
+baseUrl: "https://reqres.in/"
+apiKey: "free_user_3Jia6vmNMqQZQBgYN7Tj6sqeRhp"

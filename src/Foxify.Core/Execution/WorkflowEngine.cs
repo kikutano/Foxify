@@ -26,6 +26,11 @@ public class WorkflowEngine : IDisposable
             WorkflowName = workflow.Metadata.Name
         };
 
+        foreach (var envVar in workflow.EnvironmentVariables)
+        {
+            _variables[envVar.Key] = envVar.Value;
+        }
+
         // Initialize variables with any initial values from the workflow template
         foreach (var variable in workflow.Variables)
         {
@@ -35,10 +40,10 @@ public class WorkflowEngine : IDisposable
         // Set base URL from environment variables if available
         //TODO: Variables should be resolved from the workflow's environment variables, not from the system environment variables.
         ///PERO' giustamente lui non sa che quella variabile è una baseurl come fa a saperlo?
-        if (workflow.EnvironmentVariables.TryGetValue("baseUrlDev", out var baseUrl))
-        {
-            _httpClient.BaseAddress = new Uri(baseUrl.ToString());
-        }
+        //if (workflow.EnvironmentVariables.TryGetValue("baseUrl", out var baseUrl))
+        //{
+        //    _httpClient.BaseAddress = new Uri(baseUrl.ToString());
+        //}
 
         Console.WriteLine($"Executing workflow: {workflow.Metadata.Name}");
 
@@ -91,12 +96,23 @@ public class WorkflowEngine : IDisposable
 
         try
         {
+            workflow.EnvironmentVariables.TryGetValue("baseUrl", out var fullBaseUrl);
+            string fullEndpoint = ResolveVariables(function.Endpoint);
+
             var httpMethod = ParseHttpMethod(function);
 
-            var request = new HttpRequestMessage(
-                httpMethod,
-                ResolveVariables(function.Endpoint)
-            );
+            Uri requestUri;
+            if (!string.IsNullOrEmpty(fullBaseUrl.ToString()))
+            {
+                var baseUri = new Uri(fullBaseUrl.ToString());
+                requestUri = new Uri(baseUri, fullEndpoint);
+            }
+            else
+            {
+                requestUri = new Uri(fullEndpoint, UriKind.RelativeOrAbsolute);
+            }
+
+            var request = new HttpRequestMessage(httpMethod, requestUri);
 
             // Set body if present
             if (!string.IsNullOrEmpty(function.Body))
@@ -124,12 +140,16 @@ public class WorkflowEngine : IDisposable
             }
             else
             {
-                // Add regular headers if no body
-                foreach (var header in function.Headers)
+                if (function.Headers is not null)
                 {
-                    if (!header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                    foreach (var header in function.Headers)
                     {
-                        request.Headers.Add(header.Key, ResolveVariables(header.Value));
+                        string resolvedHeaderValue = ResolveVariables(header.Value);
+
+                        if (!header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+                        {
+                            request.Headers.TryAddWithoutValidation(header.Key, resolvedHeaderValue);
+                        }
                     }
                 }
             }
