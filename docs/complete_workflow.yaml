@@ -25,8 +25,13 @@ functions:
       status_code: 200 # Expected HTTP status code for successful resource access.
     extract:
       page: $.page # Saves the page number into a variable accessible by name.
+      data_id_0: $.data[0].id # Saves the first user's ID into a variable.
+      date_email: $.data[0].email # Saves the first user's email into a variable.
     asserts:
       page: "== 1" # Asserts that the page number is equal to 1.
+      data_id_0: "== 1" # Asserts that the extracted ID matches the expected user ID.
+      date_email: "== 'george.bluth@reqres.in'" # Asserts that the extracted email matches the expected user email.
+
 # -----------------------------------------
 # Workflow Definition (The Execution Sequence)
 workflow:
