@@ -1,4 +1,5 @@
 ﻿using Foxify.Core.Models;
+using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -10,6 +11,7 @@ public class WorkflowEngine : IDisposable
     private readonly HttpClient _httpClient;
     private readonly Dictionary<string, object> _variables;
     private readonly HashSet<string> _executedFunctions;
+    private readonly Regex _arrayRegex = new Regex(@"^([^\[\]]+)\[(\d+)\]$", RegexOptions.Compiled);
 
     public WorkflowEngine(HttpClient httpClient)
     {
@@ -59,6 +61,10 @@ public class WorkflowEngine : IDisposable
                     Console.WriteLine($"Step '{step.Name}' failed. Stopping workflow execution.");
                     break; // Stop executing further steps if a step fails
                 }
+                else
+                {
+                    Console.WriteLine($"Step '{step.Name}' executed successfully.");
+                }
             }
             else if (step.Type == "DELAY")
             {
@@ -83,6 +89,7 @@ public class WorkflowEngine : IDisposable
         }
 
         HttpResponseMessage? response = null;
+        var stopwatch = new Stopwatch();
 
         // Check dependencies
         foreach (var dependency in step.DependsOn ?? [])
@@ -156,9 +163,12 @@ public class WorkflowEngine : IDisposable
 
             Console.WriteLine($"Executing {function.Method} {function.Endpoint}");
 
+            stopwatch.Start();
             response = await _httpClient.SendAsync(request);
+            stopwatch.Stop();
 
             Console.WriteLine($"Response Status: {response.StatusCode}");
+            Console.WriteLine($"Execution Time: {stopwatch.ElapsedMilliseconds} ms");
 
             // Extract variables if defined
             if (function.Extract.Any())
@@ -238,7 +248,8 @@ public class WorkflowEngine : IDisposable
         {
             StepName = step.Name,
             ExceptedStatusCode = response!.StatusCode,
-            IsSuccess = true
+            IsSuccess = true,
+            ExecutionTimeMilliseconds = stopwatch.ElapsedMilliseconds
         };
     }
 
@@ -289,40 +300,43 @@ public class WorkflowEngine : IDisposable
         });
     }
 
-    private object ExtractValueFromJson(JsonDocument jsonDocument, string jsonPath)
+    private object? ExtractValueFromJson(JsonDocument jsonDocument, string jsonPath)
     {
-        // Simple JSONPath implementation for basic extraction
-        // This handles simple paths like $.token or $.data.id
-
-        if (string.IsNullOrEmpty(jsonPath))
+        if (string.IsNullOrWhiteSpace(jsonPath) || !jsonPath.StartsWith("$."))
             return null;
 
-        if (!jsonPath.StartsWith("$."))
-            return null;
-
-        var pathParts = jsonPath.Substring(2).Split('.');
+        var path = jsonPath.Substring(2);
+        var pathParts = path.Split('.');
         var currentElement = jsonDocument.RootElement;
 
         try
         {
             foreach (var part in pathParts)
             {
-                if (currentElement.ValueKind == JsonValueKind.Object)
+                var match = _arrayRegex.Match(part);
+
+                if (match.Success)
                 {
-                    if (currentElement.TryGetProperty(part, out var property))
+                    // È un accesso con array, es. "data[0]"
+                    string propertyName = match.Groups[1].Value;
+                    int arrayIndex = int.Parse(match.Groups[2].Value);
+
+                    // 1. Accediamo alla proprietà dell'oggetto (es: "data")
+                    if (currentElement.ValueKind == JsonValueKind.Object &&
+                        currentElement.TryGetProperty(propertyName, out var arrayProperty))
                     {
-                        currentElement = property;
+                        currentElement = arrayProperty;
                     }
                     else
                     {
                         return null;
                     }
-                }
-                else if (currentElement.ValueKind == JsonValueKind.Array && int.TryParse(part, out var index))
-                {
-                    if (index >= 0 && index < currentElement.GetArrayLength())
+
+                    // 2. Accediamo all'elemento dell'array all'indice specificato (es: [0])
+                    if (currentElement.ValueKind == JsonValueKind.Array &&
+                        arrayIndex >= 0 && arrayIndex < currentElement.GetArrayLength())
                     {
-                        currentElement = currentElement[index];
+                        currentElement = currentElement[arrayIndex];
                     }
                     else
                     {
@@ -331,11 +345,27 @@ public class WorkflowEngine : IDisposable
                 }
                 else
                 {
-                    return null;
+                    // È un accesso a proprietà standard (es: "page", "email", "username")
+                    if (currentElement.ValueKind == JsonValueKind.Object &&
+                        currentElement.TryGetProperty(part, out var property))
+                    {
+                        currentElement = property;
+                    }
+                    else
+                    {
+                        return null;
+                    }
                 }
             }
 
-            return currentElement.ValueKind == JsonValueKind.Null ? null : currentElement.ToString();
+            return currentElement.ValueKind switch
+            {
+                JsonValueKind.Null or JsonValueKind.Undefined => null,
+                JsonValueKind.Number => currentElement.GetRawText(), // Mantiene la rappresentazione numerica precisa
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => currentElement.ToString()
+            };
         }
         catch
         {

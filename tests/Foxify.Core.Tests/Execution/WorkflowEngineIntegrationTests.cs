@@ -10,6 +10,10 @@ namespace Foxify.Core.Tests.Execution;
 
 public class WorkflowEngineIntegrationTests
 {
+    private const string EnvYamlSource = """
+        baseUrl: "https://fakeapi.com/"
+        """;
+
     private const string WorkFlowYamlSource = """
         # Final Demo Workflow: Complete Variable Extraction Example
         # -----------------------------------------
@@ -81,11 +85,13 @@ public class WorkflowEngineIntegrationTests
               username: "== 'test_user'" # Asserts that the username matches the expected value.
               email: "== 'user@test.com'" # Asserts that the email matches the expected value.
               name: "== 'John Matrix'" # Asserts that the name matches the expected value.
+              array_data_0: "== 'item1'" # Asserts that the first element of an array is not empty.
             extract:
               userid: $.userid # Extracts the user ID from the response for use in subsequent calls.
-              username: $.username # Extracts the username from the response for use in subsequent calls.
-              email: $.email # Extracts the email from the response for use in subsequent calls.
-              name: $.name # Extracts the name from the response for use in subsequent calls.
+              username: $.details.username # Extracts the username from the response for use in subsequent calls.
+              email: $.details.email # Extracts the email from the response for use in subsequent calls.
+              name: $.details.name # Extracts the name from the response for use in subsequent calls.
+              array_data_0: $.details.array_data[0] # Extracts the first element of an array from the response for use in subsequent calls.
         # -----------------------------------------
         # Workflow Definition (The Execution Sequence)
         workflow:
@@ -127,7 +133,7 @@ public class WorkflowEngineIntegrationTests
             .Build();
 
         var environmentVariables = envDeserializer
-            .Deserialize<Dictionary<string, object>>(WorkFlowYamlSource) ?? new();
+            .Deserialize<Dictionary<string, object>>(EnvYamlSource) ?? new();
 
         var parser = new WorkflowParser();
         var workflow = parser.Parse(WorkFlowYamlSource, environmentVariables);

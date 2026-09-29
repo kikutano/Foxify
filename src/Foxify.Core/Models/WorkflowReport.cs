@@ -7,6 +7,7 @@ public class StepReport
     public string StepName { get; set; } = string.Empty;
     public HttpStatusCode ExceptedStatusCode { get; set; } = HttpStatusCode.OK;
     public bool IsSuccess { get; set; } = true;
+    public long ExecutionTimeMilliseconds { get; set; } = 0;
 }
 
 public class WorkflowReport
