@@ -232,8 +232,14 @@ public class WorkflowEngine : IDisposable
 
                 if (!isSuccess)
                 {
-                    throw new Exception(
+                    Console.WriteLine(
                         $"Assert fallito per la variabile '{variableName}': valore attuale '{keyName}', atteso '{expression}'");
+                    return new StepReport
+                    {
+                        StepName = step.Name,
+                        ExceptedStatusCode = response.StatusCode,
+                        IsSuccess = false
+                    };
                 }
             }
 
