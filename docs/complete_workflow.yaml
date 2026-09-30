@@ -27,12 +27,12 @@ functions:
       page: $.page # Saves the page number into a variable accessible by name.
       data_id_0: $.data[0].id # Saves the first user's ID into a variable.
       date_email: $.data[0].email # Saves the first user's email into a variable.
-      support_url: $.support.url # Saves the support URL into a variable.
+      support_text: $.support.text # Saves the support text into a variable.
     asserts:
       page: "== 1" # Asserts that the page number is equal to 1.
       data_id_0: "== 1" # Asserts that the extracted ID matches the expected user ID.
       date_email: "== 'george.bluth@reqres.in'" # Asserts that the extracted email matches the expected user email.
-      support_url: "== 'https://benhowdle.im/first-cto-playbook?utm_source=reqres&utm_medium=json&utm_campaign=referral'" # Asserts that the extracted support URL matches the expected value.
+      support_text: "== 'Become a better CTO. A playbook of painful stories and practical advice from a two-time startup CTO.'" # Asserts that the extracted support text matches the expected value.
 
 # -----------------------------------------
 # Workflow Definition (The Execution Sequence)
