@@ -12,6 +12,7 @@ public class WorkflowEngineIntegrationTests
 {
     private const string EnvYamlSource = """
         baseUrl: "https://fakeapi.com/"
+        apiKey: "fake_api_key_123"
         """;
 
     private const string WorkFlowYamlSource = """
@@ -34,6 +35,7 @@ public class WorkflowEngineIntegrationTests
             endpoint: "login"
             headers:
               Content-Type: application/json
+              x-api-key: ${apiKey}
             body: '{
               "username": "test_user",
               "password": "test_password"
@@ -91,7 +93,7 @@ public class WorkflowEngineIntegrationTests
               username: $.details.username # Extracts the username from the response for use in subsequent calls.
               email: $.details.email # Extracts the email from the response for use in subsequent calls.
               name: $.details.name # Extracts the name from the response for use in subsequent calls.
-              array_data_0: $.details.array_data[0] # Extracts the first element of an array from the response for use in subsequent calls.
+              array_data_0: $.details.arrayData[0] # Extracts the first element of an array from the response for use in subsequent calls.
         # -----------------------------------------
         # Workflow Definition (The Execution Sequence)
         workflow:

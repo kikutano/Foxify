@@ -85,9 +85,9 @@ public class FakeHttpAuthScenarioHandler : HttpMessageHandler
             {
                 username = UserName,
                 email = Email,
-                name = Name
+                name = Name,
+                arrayData = new[] { "item1", "item2", "item3" }
             },
-            arrayData = new[] { "item1", "item2", "item3" }
         };
 
         return new HttpResponseMessage(HttpStatusCode.OK)
