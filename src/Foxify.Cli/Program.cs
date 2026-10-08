@@ -11,10 +11,10 @@ using YamlDotNet.Serialization.NamingConventions;
 
 //string filePath = args[0];
 
-string filePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\complete_workflow.yaml";
+string filePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\sample_get.yaml";
 string envFilePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\environment.yaml";
 
-//string filePath = "/home/tano/Desktop/tyfapi/docs/complete_workflow.yaml";
+//string filePath = "/home/tano/Desktop/tyfapi/docs/sample_get.yaml";
 //string envFilePath = "/home/tano/Desktop/tyfapi/docs/environment.yaml";
 
 if (!File.Exists(filePath))
