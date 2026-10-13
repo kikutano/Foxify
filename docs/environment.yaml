@@ -1,2 +1,2 @@
-baseUrl: "https://reqres.in/"
-apiKey: "free_user_3Jia6vmNMqQZQBgYN7Tj6sqeRhp"
+baseUrl: "http://localhost:5122/"
+apiKey: "foxify-test-api-key"

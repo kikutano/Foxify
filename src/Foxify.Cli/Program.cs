@@ -10,8 +10,9 @@ using YamlDotNet.Serialization.NamingConventions;
 //}
 
 //string filePath = args[0];
+//string envFilePath = args.Length > 1 ? args[1] : "environment.yaml";
 
-string filePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\sample_get.yaml";
+string filePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\full_example.yaml";
 string envFilePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\environment.yaml";
 
 //string filePath = "/home/tano/Desktop/tyfapi/docs/sample_get.yaml";

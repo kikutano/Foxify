@@ -1,0 +1,616 @@
+# tyfapi Test Server - Complete API Workflow
+# Assumes the .NET test server is running on http://localhost:5000
+
+metadata:
+  name: "Tyfapi Test Server - Complete Workflow"
+  description: "Integration workflow covering authentication, CRUD, nested JSON, headers, query parameters, status codes and delays."
+  api_version: "v1"
+
+functions:
+  GetPublic:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/public"
+    headers:
+      Content-Type: application/json
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      public_message: $.message
+      authenticated: $.authenticated
+    asserts:
+      public_message: "== 'This endpoint is public.'"
+      authenticated: "== false"
+
+  Login:
+    type: HTTP_REQUEST
+    method: POST
+    baseurl: ${baseUrl}
+    endpoint: "/api/login"
+    headers:
+      Content-Type: application/json
+    body: |
+      {
+        "username": "admin",
+        "password": "password"
+      }
+    expected:
+      status_code: 200
+    extract:
+      token: $.access_token
+      token_type: $.token_type
+      expires_in: $.expires_in
+      refresh_token: $.refresh_token
+      username: $.user.username
+      user_id: $.user.id
+    asserts:
+      token: "== 'tyfapi-test-token'"
+      token_type: "== 'Bearer'"
+      expires_in: "== 3600"
+      username: "== 'admin'"
+
+  LoginInvalid:
+    type: HTTP_REQUEST
+    method: POST
+    baseurl: ${baseUrl}
+    endpoint: "/api/login"
+    headers:
+      Content-Type: application/json
+    body: |
+      {
+        "username": "admin",
+        "password": "wrong-password"
+      }
+    expected:
+      status_code: 401
+    extract:
+      error: $.error
+    asserts:
+      error: "== 'invalid_credentials'"
+
+  TestBearerAuthentication:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/auth/bearer"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      authenticated: $.authenticated
+      authentication: $.authentication
+    asserts:
+      authenticated: "== true"
+      authentication: "== 'bearer'"
+
+  TestInvalidBearer:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/auth/bearer"
+    headers:
+      Authorization: "Bearer invalid-token"
+    body: ""
+    expected:
+      status_code: 401
+    extract:
+      error: $.error
+    asserts:
+      error: "== 'unauthorized'"
+
+  TestApiKey:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/auth/apikey"
+    headers:
+      X-API-Key: ${apiKey}
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      authenticated: $.authenticated
+      authentication: $.authentication
+    asserts:
+      authenticated: "== true"
+      authentication: "== 'api-key'"
+
+  TestBothAuthentication:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/auth/both"
+    headers:
+      Authorization: "Bearer ${token}"
+      X-API-Key: ${apiKey}
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      authenticated: $.authenticated
+    asserts:
+      authenticated: "== true"
+
+  GetUsers:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/users?page=1&pageSize=2"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      total: $.pagination.total
+      page: $.pagination.page
+      page_size: $.pagination.page_size
+      first_user_id: $.data[0].id
+      first_user_email: $.data[0].email
+      second_user_id: $.data[1].id
+    asserts:
+      total: ">= 3"
+      page: "== 1"
+      page_size: "== 2"
+      first_user_id: "== 1"
+      first_user_email: "== 'gaetano@example.com'"
+      second_user_id: "== 2"
+
+  GetActiveUsers:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/users?active=true"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      total: $.pagination.total
+      first_user_active: $.data[0].active
+    asserts:
+      total: ">= 2"
+      first_user_active: "== true"
+
+  SearchUsers:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/users?search=mario"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      total: $.pagination.total
+      found_email: $.data[0].email
+    asserts:
+      total: "== 1"
+      found_email: "== 'mario@example.com'"
+
+  GetUserById:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/users/1"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      user_id: $.id
+      first_name: $.firstName
+      email: $.email
+      city: $.address.city
+      country: $.address.country
+    asserts:
+      user_id: "== 1"
+      email: "== 'gaetano@example.com'"
+      city: "== 'Cerignola'"
+      country: "== 'Italy'"
+
+  CreateUser:
+    type: HTTP_REQUEST
+    method: POST
+    baseurl: ${baseUrl}
+    endpoint: "/api/users"
+    headers:
+      Authorization: "Bearer ${token}"
+      Content-Type: application/json
+    body: |
+      {
+        "firstName": "Test",
+        "lastName": "User",
+        "email": "test.user@example.com",
+        "address": {
+          "street": "Test Street 10",
+          "city": "Bari",
+          "zipCode": "70100",
+          "country": "Italy"
+        }
+      }
+    expected:
+      status_code: 201
+    extract:
+      created_user_id: $.id
+      created_user_email: $.email
+      created_user_city: $.address.city
+    asserts:
+      created_user_email: "== 'test.user@example.com'"
+      created_user_city: "== 'Bari'"
+
+  CreateUserInvalid:
+    type: HTTP_REQUEST
+    method: POST
+    baseurl: ${baseUrl}
+    endpoint: "/api/users"
+    headers:
+      Authorization: "Bearer ${token}"
+      Content-Type: application/json
+    body: |
+      {
+        "firstName": "Invalid",
+        "lastName": "User",
+        "email": "",
+        "address": {
+          "street": "Test Street",
+          "city": "Bari",
+          "zipCode": "70100",
+          "country": "Italy"
+        }
+      }
+    expected:
+      status_code: 400
+    extract:
+      error: $.error
+      field: $.field
+    asserts:
+      error: "== 'validation_error'"
+      field: "== 'email'"
+
+  UpdateUser:
+    type: HTTP_REQUEST
+    method: PUT
+    baseurl: ${baseUrl}
+    endpoint: "/api/users/2"
+    headers:
+      Authorization: "Bearer ${token}"
+      Content-Type: application/json
+    body: |
+      {
+        "firstName": "Mario",
+        "lastName": "Updated",
+        "email": "mario.updated@example.com",
+        "active": true,
+        "address": {
+          "street": "Updated Street 20",
+          "city": "Rome",
+          "zipCode": "00100",
+          "country": "Italy"
+        }
+      }
+    expected:
+      status_code: 200
+    extract:
+      updated_email: $.email
+      updated_city: $.address.city
+    asserts:
+      updated_email: "== 'mario.updated@example.com'"
+      updated_city: "== 'Rome'"
+
+  PatchUser:
+    type: HTTP_REQUEST
+    method: PATCH
+    baseurl: ${baseUrl}
+    endpoint: "/api/users/2"
+    headers:
+      Authorization: "Bearer ${token}"
+      Content-Type: application/json
+    body: |
+      {
+        "firstName": "MarioPatched",
+        "active": false
+      }
+    expected:
+      status_code: 200
+    extract:
+      first_name: $.firstName
+      email: $.email
+      active: $.active
+    asserts:
+      first_name: "== 'MarioPatched'"
+      email: "== 'mario.updated@example.com'"
+      active: "== false"
+
+  DeleteUser:
+    type: HTTP_REQUEST
+    method: DELETE
+    baseurl: ${baseUrl}
+    endpoint: "/api/users/2"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 204
+
+  GetDeletedUser:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/users/2"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 404
+    extract:
+      error: $.error
+    asserts:
+      error: "== 'user_not_found'"
+
+  GetCatalog:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/catalog"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      catalog_name: $.catalog.name
+      creator: $.catalog.metadata.created_by.username
+      first_category: $.catalog.categories[0].name
+      first_product: $.catalog.categories[0].products[0].name
+      first_product_price: $.catalog.categories[0].products[0].price
+      first_feature: $.catalog.categories[0].products[0].specifications.features[0]
+      second_category: $.catalog.categories[1].name
+      software_platform: $.catalog.categories[1].products[0].specifications.platforms[0]
+    asserts:
+      catalog_name: "== 'Tyfapi Test Catalog'"
+      creator: "== 'admin'"
+      first_category: "== 'Hardware'"
+      first_product: "== 'Keyboard'"
+      first_product_price: "== 99.99"
+      first_feature: "== 'mechanical'"
+      second_category: "== 'Software'"
+      software_platform: "== 'windows'"
+
+  GetNestedUsers:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/users/list"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      success: $.success
+      user_count: $.result.summary.count
+      active_count: $.result.summary.active
+      first_user_email: $.result.users[0].email
+      first_user_city: $.result.users[0].profile.location.city
+    asserts:
+      success: "== true"
+      user_count: ">= 3"
+      first_user_email: "== 'gaetano@example.com'"
+      first_user_city: "== 'Cerignola'"
+
+  EchoRequest:
+    type: HTTP_REQUEST
+    method: POST
+    baseurl: ${baseUrl}
+    endpoint: "/api/echo?source=tyfapi&mode=test"
+    headers:
+      Authorization: "Bearer ${token}"
+      Content-Type: application/json
+      X-Custom-Header: "custom-value"
+      X-Correlation-Id: "tyfapi-test-001"
+    body: |
+      {
+        "message": "Hello from tyfapi",
+        "nested": {
+          "enabled": true,
+          "values": [1, 2, 3]
+        }
+      }
+    expected:
+      status_code: 200
+    extract:
+      method: $.method
+      source: $.query.source
+      custom_header: $.headers.X-Custom-Header
+      correlation_id: $.headers.X-Correlation-Id
+      message: $.body
+    asserts:
+      method: "== 'POST'"
+      source: "== 'tyfapi'"
+      custom_header: "== 'custom-value'"
+      correlation_id: "== 'tyfapi-test-001'"
+
+  GetCustomHeaders:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/headers"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      message: $.message
+    asserts:
+      message: "== 'Response contains custom headers.'"
+
+  TestStatus200:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/status/200"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      status: $.status
+    asserts:
+      status: "== 200"
+
+  TestStatus400:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/status/400"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 400
+
+  TestStatus403:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/status/403"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 403
+
+  TestStatus500:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/status/500"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 500
+
+  TestStatus503:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/status/503"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 503
+
+  TestDelay:
+    type: HTTP_REQUEST
+    method: GET
+    baseurl: ${baseUrl}
+    endpoint: "/api/delay/500"
+    headers:
+      Authorization: "Bearer ${token}"
+    body: ""
+    expected:
+      status_code: 200
+    extract:
+      delayed: $.delayed
+      milliseconds: $.milliseconds
+    asserts:
+      delayed: "== true"
+      milliseconds: "== 500"
+
+workflow:
+  - type: function
+    function_name: GetPublic
+
+  - type: function
+    function_name: Login
+
+  - type: function
+    function_name: LoginInvalid
+
+  - type: function
+    function_name: TestBearerAuthentication
+
+  - type: function
+    function_name: TestInvalidBearer
+
+  - type: function
+    function_name: TestApiKey
+
+  - type: function
+    function_name: TestBothAuthentication
+
+  - type: function
+    function_name: GetUsers
+
+  - type: function
+    function_name: GetActiveUsers
+
+  - type: function
+    function_name: SearchUsers
+
+  - type: function
+    function_name: GetUserById
+
+  - type: function
+    function_name: CreateUser
+
+  - type: function
+    function_name: CreateUserInvalid
+
+  - type: function
+    function_name: UpdateUser
+
+  - type: function
+    function_name: PatchUser
+
+  - type: function
+    function_name: DeleteUser
+
+  - type: function
+    function_name: GetDeletedUser
+
+  - type: function
+    function_name: GetCatalog
+
+  - type: function
+    function_name: GetNestedUsers
+
+  - type: function
+    function_name: EchoRequest
+
+  - type: function
+    function_name: GetCustomHeaders
+
+  - type: function
+    function_name: TestStatus200
+
+  - type: function
+    function_name: TestStatus400
+
+  - type: function
+    function_name: TestStatus403
+
+  - type: function
+    function_name: TestStatus500
+
+  - type: function
+    function_name: TestStatus503
+
+  - type: function
+    function_name: TestDelay
+
+settings:
+  timeout: 10
+  max_retries: 0

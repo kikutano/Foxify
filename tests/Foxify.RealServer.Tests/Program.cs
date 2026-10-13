@@ -11,7 +11,7 @@ var app = builder.Build();
 // ============================================================================
 //
 
-const string ApiKey = "tyfapi-test-api-key";
+const string ApiKey = "foxify-test-api-key";
 const string BearerToken = "tyfapi-test-token";
 
 //
@@ -32,7 +32,6 @@ var users = new ConcurrentDictionary<int, User>(
             new Address(
                 "Via Roma 1",
                 "Cerignola",
-                "71042",
                 "Italy"
             )
         ),
@@ -46,7 +45,6 @@ var users = new ConcurrentDictionary<int, User>(
             new Address(
                 "Via Milano 25",
                 "Milano",
-                "20100",
                 "Italy"
             )
         ),
@@ -60,7 +58,6 @@ var users = new ConcurrentDictionary<int, User>(
             new Address(
                 "1 Main Street",
                 "London",
-                "SW1A 1AA",
                 "United Kingdom"
             )
         )
@@ -604,10 +601,9 @@ app.MapGet("/api/users/list", (HttpRequest request) =>
 
                     location = new
                     {
-                        user.address.street,
-                        user.address.city,
-                        user.address.zip_code,
-                        user.address.country
+                        user.address.Street,
+                        user.address.City,
+                        user.address.Country
                     }
                 }
             })
@@ -776,24 +772,10 @@ record PatchUserRequest(
     bool? Active = null,
     Address? Address = null);
 
-record Address(
+public sealed record Address(
     string Street,
     string City,
-    string ZipCode,
-    string Country)
-{
-    [JsonPropertyName("street")]
-    public string street => Street;
-
-    [JsonPropertyName("city")]
-    public string city => City;
-
-    [JsonPropertyName("zip_code")]
-    public string zip_code => ZipCode;
-
-    [JsonPropertyName("country")]
-    public string country => Country;
-}
+    string Country);
 
 record User(
     int Id,
