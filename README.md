@@ -8,6 +8,10 @@
 
 API testing from the command line. Describe HTTP calls, variable extraction and assertions in a YAML file, and run them with one command. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
 
+<p align="center">
+  <img src="screen.png" alt="foxify run output in the terminal" width="640">
+</p>
+
 ## Install
 
 **Linux / macOS**
@@ -29,6 +33,14 @@ Check that it works:
 ```bash
 foxify --version
 ```
+
+### Update
+
+```bash
+foxify update
+```
+
+It downloads the latest release for your platform, verifies its SHA-256 checksum and replaces the binary in place. `foxify update --check` only tells you whether a newer version exists. Re-running the install script works too, and `FOXIFY_VERSION=0.1.0` pins a specific version.
 
 ## Quick start
 
@@ -120,17 +132,23 @@ When a step fails, every assert of that step is listed with the actual value, an
 
 ```text
 foxify run <workflow.yaml> [options]
+foxify update [--check] [--force]
 foxify --help
 foxify --version
 
-Options:
+Options for 'run':
   -e, --env <file>   Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
   -v, --verbose      Print variables, requests and responses while running.
   --no-color         Disable colors (also honored: the NO_COLOR environment variable).
+
+Options for 'update':
+  --check            Only tell whether a newer version is available.
+  --force            Reinstall the latest version, also over a development build.
+
   -h, --help         Show this help.
   --version          Show the version.
 
-Exit codes:
+Exit codes ('run'):
   0  all steps passed
   1  at least one step failed
   2  invalid arguments or file not found

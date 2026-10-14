@@ -70,6 +70,7 @@ mv "$tmp/foxify" "$INSTALL_DIR/foxify"
 chmod +x "$INSTALL_DIR/foxify"
 
 echo "Installed $("$INSTALL_DIR/foxify" --version) to $INSTALL_DIR/foxify"
+echo "Update later with: foxify update"
 
 case ":$PATH:" in
   *":$INSTALL_DIR:"*) ;;

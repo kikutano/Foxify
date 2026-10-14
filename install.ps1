@@ -50,3 +50,4 @@ if (($userPath -split ';') -notcontains $installDir) {
 }
 
 Write-Host "Installed $(& (Join-Path $installDir 'foxify.exe') --version) to $installDir"
+Write-Host 'Update later with: foxify update'
