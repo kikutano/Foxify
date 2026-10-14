@@ -86,10 +86,34 @@ foxify run hello.yaml -e env.yaml
 ```
 
 ```text
-Workflow: Hello Foxify
-  PASS  201  CreatePost (467 ms)
-  PASS  200  GetUser (45 ms)
-2 passed, 0 failed, 512 ms
+  ⚡ foxify 0.1.0
+
+  workflow : Hello Foxify
+  file     : hello.yaml
+  env      : env.yaml
+  base url : https://jsonplaceholder.typicode.com
+  steps    : 2
+
+  ✓ CreatePost  POST   201   658.74ms  /posts
+  ✓ GetUser     GET    200    41.52ms  /users/1
+
+  checks..............: 100.00%  ✓ 4  ✗ 0
+  steps...............: 2/2 passed
+  http_reqs...........: 2  2.61/s
+  http_req_duration...: avg=350.13ms min=41.52ms med=350.13ms max=658.74ms p(90)=597.02ms p(95)=627.88ms
+  data_received.......: 579 B
+  data_sent...........: 52 B
+  workflow_duration...: 767.26ms
+
+   PASSED   2 steps
+```
+
+When a step fails, every assert of that step is listed with the actual value, and the steps after it are not run:
+
+```text
+  ✗ GetUser     GET    200   227.05ms  /users/1
+      ✗ email == 'nobody@example.com'  actual 'Sincere@april.biz'
+      ✓ city == 'Gwenborough'
 ```
 
 ## Usage
@@ -101,7 +125,8 @@ foxify --version
 
 Options:
   -e, --env <file>   Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
-  -v, --verbose      Print the variables loaded before execution.
+  -v, --verbose      Print variables, requests and responses while running.
+  --no-color         Disable colors (also honored: the NO_COLOR environment variable).
   -h, --help         Show this help.
   --version          Show the version.
 
@@ -111,7 +136,7 @@ Exit codes:
   2  invalid arguments or file not found
 ```
 
-Execution stops at the first failing step. The exit code makes Foxify easy to use in CI.
+Execution stops at the first failing step. The exit code makes Foxify easy to use in CI. When the output is not a terminal (CI logs, pipes) the spinner is turned off and each step is printed on its own line.
 
 ## Workflow file
 
