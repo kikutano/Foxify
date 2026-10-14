@@ -8,7 +8,9 @@
 
 API testing from the command line. Describe HTTP calls, variable extraction and assertions in a YAML file, and run them with one command. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
 
-![](screen.png)
+<p align="center">
+  <img src="screen.png" alt="foxify run output in the terminal" width="640">
+</p>
 
 ## Install
 
