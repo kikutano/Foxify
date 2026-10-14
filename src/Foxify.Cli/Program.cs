@@ -102,7 +102,7 @@ try
     if (workflow.Settings?.Timeout > 0)
         httpClient.Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout);
 
-    using var engine = new WorkflowEngine(httpClient);
+    var engine = new WorkflowEngine(httpClient);
     var report = await engine.ExecuteWorkflowAsync(workflow);
 
     return PrintSummary(report);
@@ -125,7 +125,8 @@ static int PrintSummary(WorkflowReport report)
     Console.WriteLine($"Workflow: {report.WorkflowName}");
     foreach (var step in report.StepReports)
     {
-        Console.WriteLine($"  {(step.IsSuccess ? "PASS" : "FAIL")}  {step.StepName} ({step.ExecutionTimeMilliseconds} ms)");
+        var status = step.StatusCode is null ? "---" : ((int)step.StatusCode).ToString();
+        Console.WriteLine($"  {(step.IsSuccess ? "PASS" : "FAIL")}  {status}  {step.StepName} ({step.ExecutionTimeMilliseconds} ms)");
     }
     Console.WriteLine($"{passed} passed, {failed} failed, {totalMs} ms");
 

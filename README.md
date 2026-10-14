@@ -87,8 +87,8 @@ foxify run hello.yaml -e env.yaml
 
 ```text
 Workflow: Hello Foxify
-  PASS  CreatePost (467 ms)
-  PASS  GetUser (45 ms)
+  PASS  201  CreatePost (467 ms)
+  PASS  200  GetUser (45 ms)
 2 passed, 0 failed, 512 ms
 ```
 
@@ -123,8 +123,11 @@ Execution stops at the first failing step. The exit code makes Foxify easy to us
 | `extract` | `variable: <JSONPath>` pairs, e.g. `$.token`, `$.data[0].id`, `$.user.address.city`. |
 | `asserts` | Checks on extracted variables: `==`, `!=`, `>`, `>=`, `<`, `<=`, combinable with `&&` and `\|\|`. |
 | `workflow` | Steps run in order: `type: function` with `function_name` (and optional `depends_on`), or `type: DELAY` with `duration_seconds`. |
+| `variables`, `metadata.variables` | Default variables. Values in the env file override them. |
+| `settings.timeout` | Timeout of each HTTP request, in seconds (default 30). |
+| `settings.max_retries` | Retries on network errors and timeouts (default 3). HTTP error status codes are never retried. |
 
-Use `${name}` anywhere in `baseurl`, `endpoint`, `headers` or `body` to reference variables from the env file or values extracted by earlier steps, e.g. `Authorization: "Bearer ${token}"`.
+Use `${name}` anywhere in `baseurl`, `endpoint`, `headers` or `body` to reference variables from the env file, the workflow defaults or values extracted by earlier steps, e.g. `Authorization: "Bearer ${token}"`. Referencing a variable that is not defined fails the step.
 
 More details: [docs/variable_extraction_guide.md](docs/variable_extraction_guide.md).
 

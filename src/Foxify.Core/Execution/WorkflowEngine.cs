@@ -1,292 +1,200 @@
-﻿using Foxify.Core.Models;
+using Foxify.Core.Models;
 using System.Diagnostics;
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Foxify.Core.Execution;
 
-public class WorkflowEngine : IDisposable
+/// <summary>
+/// Runs a parsed workflow: executes the steps in order, carries extracted variables
+/// from one HTTP call to the next and stops at the first failing step.
+/// The <see cref="HttpClient"/> is owned by the caller and is not disposed by the engine.
+/// </summary>
+public partial class WorkflowEngine
 {
-    private readonly HttpClient _httpClient;
-    private readonly Dictionary<string, object> _variables;
-    private readonly HashSet<string> _executedFunctions;
-    private readonly Regex _arrayRegex = new Regex(@"^([^\[\]]+)\[(\d+)\]$", RegexOptions.Compiled);
+    private const string BaseUrlVariable = "baseUrl";
+    private static readonly TimeSpan RetryBaseDelay = TimeSpan.FromMilliseconds(250);
 
-    public WorkflowEngine(HttpClient httpClient)
+    private readonly HttpClient _httpClient;
+    private readonly TextWriter _log;
+    private readonly Dictionary<string, object> _variables = new();
+    private readonly HashSet<string> _executedFunctions = new();
+
+    [GeneratedRegex(@"\$\{([^}]+)\}")]
+    private static partial Regex VariablePlaceholder();
+
+    public WorkflowEngine(HttpClient httpClient, TextWriter? log = null)
     {
         _httpClient = httpClient;
-        // Read base URL from environment variables (will be set during workflow execution)
-        _variables = new Dictionary<string, object>();
-        _executedFunctions = new HashSet<string>();
+        _log = log ?? Console.Out;
     }
 
     public async Task<WorkflowReport> ExecuteWorkflowAsync(WorkflowTemplate workflow)
     {
-        var workflowReport = new WorkflowReport
-        {
-            WorkflowName = workflow.Metadata.Name
-        };
+        var report = new WorkflowReport { WorkflowName = workflow.Metadata.Name };
 
-        foreach (var envVar in workflow.EnvironmentVariables)
-        {
-            _variables[envVar.Key] = envVar.Value;
-        }
+        // Variables declared in the workflow are defaults; the environment file overrides them,
+        // so the same workflow can run against different environments.
+        SetVariables(workflow.Metadata.Variables);
+        SetVariables(workflow.Variables);
+        SetVariables(workflow.EnvironmentVariables);
 
-        // Initialize variables with any initial values from the workflow template
-        foreach (var variable in workflow.Variables)
-        {
-            _variables[variable.Key] = variable.Value;
-        }
-
-        // Set base URL from environment variables if available
-        //TODO: Variables should be resolved from the workflow's environment variables, not from the system environment variables.
-        ///PERO' giustamente lui non sa che quella variabile è una baseurl come fa a saperlo?
-        //if (workflow.EnvironmentVariables.TryGetValue("baseUrl", out var baseUrl))
-        //{
-        //    _httpClient.BaseAddress = new Uri(baseUrl.ToString());
-        //}
-
-        Console.WriteLine($"Executing workflow: {workflow.Metadata.Name}");
+        _log.WriteLine($"Executing workflow: {workflow.Metadata.Name}");
 
         foreach (var step in workflow.Workflow)
         {
-            if (step.Type == "function")
-            {
-                var stepReport = await ExecuteFunctionStepAsync(workflow, step);
-                workflowReport.StepReports.Add(stepReport);
-
-                if (!stepReport.IsSuccess)
-                {
-                    Console.WriteLine($"Step '{stepReport.StepName}' failed. Stopping workflow execution.");
-                    break; // Stop executing further steps if a step fails
-                }
-                else
-                {
-                    Console.WriteLine($"Step '{stepReport.StepName}' executed successfully.");
-                }
-            }
-            else if (step.Type == "DELAY")
+            if (IsStepType(step, "DELAY"))
             {
                 await ExecuteDelayStepAsync(step);
+                continue;
             }
+
+            var stepReport = IsStepType(step, "function")
+                ? await ExecuteFunctionStepAsync(workflow, step)
+                : Fail(GetStepName(step), $"Unknown step type '{step.Type}'");
+
+            report.StepReports.Add(stepReport);
+
+            if (!stepReport.IsSuccess)
+            {
+                _log.WriteLine($"Step '{stepReport.StepName}' failed. Stopping workflow execution.");
+                break;
+            }
+
+            _log.WriteLine($"Step '{stepReport.StepName}' executed successfully.");
         }
 
-        return workflowReport;
+        return report;
     }
 
-    // Removed the GetBaseAddressFromEnvironment method since we'll use environment variables from YAML
+    public void SetVariable(string name, object value)
+    {
+        _variables[name] = value;
+    }
+
+    private void SetVariables(Dictionary<string, object> variables)
+    {
+        foreach (var (name, value) in variables)
+            _variables[name] = value;
+    }
 
     private async Task<StepReport> ExecuteFunctionStepAsync(WorkflowTemplate workflow, WorkflowStep step)
     {
-        var stepName = string.IsNullOrEmpty(step.Name) ? step.FunctionName ?? string.Empty : step.Name;
+        var stepName = GetStepName(step);
 
         if (string.IsNullOrEmpty(step.FunctionName))
-        {
-            Console.WriteLine($"Step '{stepName}' has no function_name");
-            return new StepReport { StepName = stepName, IsSuccess = false };
-        }
+            return Fail(stepName, $"Step '{stepName}' has no function_name");
 
         if (!workflow.Functions.TryGetValue(step.FunctionName, out var function))
-        {
-            Console.WriteLine($"Function '{step.FunctionName}' not found");
-            return new StepReport { StepName = stepName, IsSuccess = false };
-        }
+            return Fail(stepName, $"Function '{step.FunctionName}' not found");
 
-        HttpResponseMessage? response = null;
+        var missingDependency = step.DependsOn?.FirstOrDefault(d => !_executedFunctions.Contains(d));
+        if (missingDependency is not null)
+            return Fail(stepName, $"Dependency '{missingDependency}' not available");
+
         var stopwatch = new Stopwatch();
-
-        // Check dependencies
-        foreach (var dependency in step.DependsOn ?? [])
-        {
-            if (!_executedFunctions.Contains(dependency))
-            {
-                Console.WriteLine($"Dependency '{dependency}' not available");
-                return new StepReport { StepName = stepName, IsSuccess = false };
-            }
-        }
-
         try
         {
-            var httpMethod = ParseHttpMethod(function);
-            var requestUri = BuildRequestUri(workflow, function);
+            var maxRetries = Math.Max(0, workflow.Settings?.MaxRetries ?? 0);
+            using var response = await SendWithRetriesAsync(function, maxRetries, stopwatch);
 
-            var request = new HttpRequestMessage(httpMethod, requestUri);
+            _log.WriteLine($"Response Status: {response.StatusCode}");
+            _log.WriteLine($"Execution Time: {stopwatch.ElapsedMilliseconds} ms");
 
-            // Set body if present
-            if (!string.IsNullOrEmpty(function.Body))
-            {
-                request.Content = new StringContent(ResolveVariables(function.Body));
-
-                // Add content headers if they exist - but don't add Content-Type here as it's set by StringContent
-                foreach (var header in function.Headers)
-                {
-                    if (!header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
-                    {
-                        request.Headers.Add(header.Key, ResolveVariables(header.Value));
-                    }
-                    else
-                    {
-                        // If Content-Type is explicitly provided in headers, we should set it on the Content object itself
-                        // This ensures that even when StringContent is used, the correct content type is preserved
-                        request.Content = new StringContent(
-                            ResolveVariables(function.Body),
-                            System.Text.Encoding.UTF8,
-                            header.Value
-                        );
-                    }
-                }
-            }
-            else
-            {
-                if (function.Headers is not null)
-                {
-                    foreach (var header in function.Headers)
-                    {
-                        string resolvedHeaderValue = ResolveVariables(header.Value);
-
-                        if (!header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
-                        {
-                            request.Headers.TryAddWithoutValidation(header.Key, resolvedHeaderValue);
-                        }
-                    }
-                }
-            }
-
-            Console.WriteLine($"Executing {function.Method} {function.Endpoint}");
-
-            stopwatch.Start();
-            response = await _httpClient.SendAsync(request);
-            stopwatch.Stop();
-
-            Console.WriteLine($"Response Status: {response.StatusCode}");
-            Console.WriteLine($"Execution Time: {stopwatch.ElapsedMilliseconds} ms");
-
-            // Extract variables if defined
-            if (function.Extract.Any())
-            {
-                try
-                {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"Response Content: {responseContent}");
-
-                    var jsonDocument = JsonDocument.Parse(responseContent);
-
-                    foreach (var extract in function.Extract)
-                    {
-                        var value = ExtractValueFromJson(jsonDocument, extract.Value);
-
-                        if (value != null)
-                        {
-                            _variables[extract.Key] = value;
-                            Console.WriteLine($"Extracted {extract.Key}: {value}");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error extracting variables: {ex.Message}");
-                }
-            }
-
-            if (function.Expected.Any())
-            {
-                foreach (var excepted in function.Expected)
-                {
-                    if (excepted.Key.Equals("status_code", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (Enum.TryParse<HttpStatusCode>(excepted.Value, out var expectedStatusCode))
-                        {
-                            if (response.StatusCode != expectedStatusCode)
-                            {
-                                Console.WriteLine($"Expected status code {expectedStatusCode}, but got {response.StatusCode}!");
-                                return new StepReport
-                                {
-                                    StepName = stepName,
-                                    ExceptedStatusCode = response.StatusCode,
-                                    IsSuccess = false
-                                };
-                            }
-                        }
-                    }
-                }
-            }
-
-            foreach (var (variableName, expression) in function.Asserts)
-            {
-                var responseContent = await response.Content.ReadAsStringAsync();
-                var jsonDocument = JsonDocument.Parse(responseContent);
-
-                function.Extract.TryGetValue(variableName, out var keyName);
-                var realValue = keyName is null ? null : ExtractValueFromJson(jsonDocument, keyName);
-                var actualValue = realValue?.ToString() ?? "null";
-
-                bool isSuccess = AssertEvaluator.Evaluate(actualValue, expression);
-
-                if (!isSuccess)
-                {
-                    Console.WriteLine(
-                        $"Assert failed for '{variableName}': actual '{actualValue}', expected '{expression}'");
-                    return new StepReport
-                    {
-                        StepName = stepName,
-                        ExceptedStatusCode = response.StatusCode,
-                        IsSuccess = false
-                    };
-                }
-            }
+            var failure = await CheckResponseAsync(function, response);
+            if (failure is not null)
+                return Fail(stepName, failure, response.StatusCode, stopwatch.ElapsedMilliseconds);
 
             _executedFunctions.Add(step.FunctionName);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error executing function {step.FunctionName}: {ex.Message}");
+
             return new StepReport
             {
                 StepName = stepName,
-                IsSuccess = false,
+                StatusCode = response.StatusCode,
+                IsSuccess = true,
                 ExecutionTimeMilliseconds = stopwatch.ElapsedMilliseconds
             };
         }
-
-        return new StepReport
+        catch (Exception ex)
         {
-            StepName = stepName,
-            ExceptedStatusCode = response.StatusCode,
-            IsSuccess = true,
-            ExecutionTimeMilliseconds = stopwatch.ElapsedMilliseconds
-        };
+            return Fail(stepName, $"Error executing function {step.FunctionName}: {ex.Message}",
+                elapsedMilliseconds: stopwatch.ElapsedMilliseconds);
+        }
     }
 
-    private static HttpMethod ParseHttpMethod(FunctionDefinition function)
+    /// <summary>
+    /// Sends the request, retrying up to <paramref name="maxRetries"/> times on transient
+    /// failures (network errors, timeouts). HTTP error status codes are never retried:
+    /// they are a valid response, checked against <c>expected</c>.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendWithRetriesAsync(
+        FunctionDefinition function, int maxRetries, Stopwatch stopwatch)
     {
-        // Supports any verb (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS...); defaults to GET.
-        return string.IsNullOrWhiteSpace(function.Method)
-            ? HttpMethod.Get
-            : new HttpMethod(function.Method.Trim().ToUpperInvariant());
+        for (int attempt = 0; ; attempt++)
+        {
+            // A request message can be sent only once, so it is rebuilt on every attempt.
+            using var request = BuildRequest(function);
+            if (attempt == 0)
+                _log.WriteLine($"Executing {request.Method} {request.RequestUri}");
+
+            try
+            {
+                stopwatch.Restart();
+                var response = await _httpClient.SendAsync(request);
+                stopwatch.Stop();
+                return response;
+            }
+            catch (Exception ex) when (attempt < maxRetries && ex is HttpRequestException or TaskCanceledException)
+            {
+                stopwatch.Stop();
+                var delay = RetryBaseDelay * (attempt + 1);
+                _log.WriteLine($"{ex.Message} Retrying in {delay.TotalMilliseconds} ms ({attempt + 1}/{maxRetries})");
+                await Task.Delay(delay);
+            }
+        }
     }
 
-    private Uri BuildRequestUri(WorkflowTemplate workflow, FunctionDefinition function)
+    private HttpRequestMessage BuildRequest(FunctionDefinition function)
     {
-        string endpoint = ResolveVariables(function.Endpoint);
+        var request = new HttpRequestMessage(ParseHttpMethod(function.Method), BuildRequestUri(function));
 
-        // The function's own baseurl wins; otherwise fall back to the environment's baseUrl.
-        string baseUrl = ResolveVariables(function.Baseurl);
-        if (string.IsNullOrWhiteSpace(baseUrl)
-            && workflow.EnvironmentVariables.TryGetValue("baseUrl", out var envBaseUrl))
+        if (!string.IsNullOrEmpty(function.Body))
+            request.Content = new StringContent(ResolveVariables(function.Body), Encoding.UTF8);
+
+        foreach (var (name, value) in function.Headers)
         {
-            baseUrl = envBaseUrl?.ToString() ?? string.Empty;
+            var resolvedValue = ResolveVariables(value);
+            if (request.Headers.TryAddWithoutValidation(name, resolvedValue))
+                continue;
+
+            // Content headers (Content-Type, Content-Language...) belong to the body
+            // and are ignored when the request has none.
+            if (request.Content is not null)
+            {
+                request.Content.Headers.Remove(name);
+                request.Content.Headers.TryAddWithoutValidation(name, resolvedValue);
+            }
         }
 
-        var unresolved = Regex.Match($"{baseUrl} {endpoint}", @"\$\{([^}]+)\}");
-        if (unresolved.Success)
-            throw new InvalidOperationException($"Variable '{unresolved.Groups[1].Value}' is not defined.");
+        return request;
+    }
+
+    private Uri BuildRequestUri(FunctionDefinition function)
+    {
+        var endpoint = ResolveVariables(function.Endpoint);
 
         if (Uri.TryCreate(endpoint, UriKind.Absolute, out var absoluteUri)
             && (absoluteUri.Scheme == Uri.UriSchemeHttp || absoluteUri.Scheme == Uri.UriSchemeHttps))
         {
             return absoluteUri;
         }
+
+        // The function's own baseurl wins; otherwise fall back to the baseUrl variable.
+        var baseUrl = ResolveVariables(function.Baseurl);
+        if (string.IsNullOrWhiteSpace(baseUrl) && _variables.TryGetValue(BaseUrlVariable, out var fallback))
+            baseUrl = fallback?.ToString() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
@@ -299,113 +207,111 @@ public class WorkflowEngine : IDisposable
         return new Uri($"{baseUrl.TrimEnd('/')}/{endpoint.TrimStart('/')}");
     }
 
-    private async Task ExecuteDelayStepAsync(WorkflowStep step)
+    /// <summary>
+    /// Checks the expected status code, extracts variables and evaluates the asserts.
+    /// Returns null when the response is valid, otherwise the reason of the failure.
+    /// </summary>
+    private async Task<string?> CheckResponseAsync(FunctionDefinition function, HttpResponseMessage response)
     {
-        if (step.DurationSeconds.HasValue)
+        var expectedStatus = function.Expected
+            .FirstOrDefault(e => e.Key.Equals("status_code", StringComparison.OrdinalIgnoreCase)).Value;
+
+        if (expectedStatus is not null)
         {
-            Console.WriteLine($"Waiting for {step.DurationSeconds.Value} seconds");
-            await Task.Delay(TimeSpan.FromSeconds(step.DurationSeconds.Value));
+            if (!Enum.TryParse<HttpStatusCode>(expectedStatus, out var expectedStatusCode))
+                return $"Invalid expected status_code '{expectedStatus}'";
+
+            if (response.StatusCode != expectedStatusCode)
+                return $"Expected status code {expectedStatusCode}, but got {response.StatusCode}!";
         }
+
+        var extracted = new Dictionary<string, string?>();
+        if (function.Extract.Count > 0)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            _log.WriteLine($"Response Content: {body}");
+
+            JsonDocument json;
+            try
+            {
+                json = JsonDocument.Parse(body);
+            }
+            catch (JsonException ex)
+            {
+                return $"Response is not valid JSON, cannot extract variables: {ex.Message}";
+            }
+
+            using (json)
+            {
+                foreach (var (name, path) in function.Extract)
+                {
+                    var value = JsonPath.Select(json.RootElement, path);
+                    extracted[name] = value;
+
+                    if (value is not null)
+                    {
+                        _variables[name] = value;
+                        _log.WriteLine($"Extracted {name}: {value}");
+                    }
+                }
+            }
+        }
+
+        foreach (var (name, expression) in function.Asserts)
+        {
+            var actualValue = extracted.GetValueOrDefault(name) ?? "null";
+            if (!AssertEvaluator.Evaluate(actualValue, expression))
+                return $"Assert failed for '{name}': actual '{actualValue}', expected '{expression}'";
+        }
+
+        return null;
     }
 
+    private async Task ExecuteDelayStepAsync(WorkflowStep step)
+    {
+        if (step.DurationSeconds is not > 0)
+            return;
+
+        _log.WriteLine($"Waiting for {step.DurationSeconds} seconds");
+        await Task.Delay(TimeSpan.FromSeconds(step.DurationSeconds.Value));
+    }
+
+    /// <summary>Replaces every <c>${name}</c> with its value; unknown variables are an error.</summary>
     private string ResolveVariables(string input)
     {
         if (string.IsNullOrEmpty(input))
             return input;
 
-        // Simple variable replacement - in a real implementation this would be more sophisticated
-        var pattern = @"\$\{([^}]+)\}";
-        return Regex.Replace(input, pattern, match =>
+        return VariablePlaceholder().Replace(input, match =>
         {
-            var variableName = match.Groups[1].Value;
-            if (_variables.TryGetValue(variableName, out var value))
-            {
-                return value.ToString() ?? string.Empty;
-            }
-            return match.Value; // Return original if not found
+            var name = match.Groups[1].Value;
+            return _variables.TryGetValue(name, out var value)
+                ? value?.ToString() ?? string.Empty
+                : throw new InvalidOperationException($"Variable '{name}' is not defined.");
         });
     }
 
-    private object? ExtractValueFromJson(JsonDocument jsonDocument, string jsonPath)
+    private StepReport Fail(string stepName, string reason,
+        HttpStatusCode? statusCode = null, long elapsedMilliseconds = 0)
     {
-        if (string.IsNullOrWhiteSpace(jsonPath) || !jsonPath.StartsWith("$."))
-            return null;
+        _log.WriteLine(reason);
 
-        var path = jsonPath.Substring(2);
-        var pathParts = path.Split('.');
-        var currentElement = jsonDocument.RootElement;
-
-        try
+        return new StepReport
         {
-            foreach (var part in pathParts)
-            {
-                var match = _arrayRegex.Match(part);
-
-                if (match.Success)
-                {
-                    // È un accesso con array, es. "data[0]"
-                    string propertyName = match.Groups[1].Value;
-                    int arrayIndex = int.Parse(match.Groups[2].Value);
-
-                    // 1. Accediamo alla proprietà dell'oggetto (es: "data")
-                    if (currentElement.ValueKind == JsonValueKind.Object &&
-                        currentElement.TryGetProperty(propertyName, out var arrayProperty))
-                    {
-                        currentElement = arrayProperty;
-                    }
-                    else
-                    {
-                        return null;
-                    }
-
-                    // 2. Accediamo all'elemento dell'array all'indice specificato (es: [0])
-                    if (currentElement.ValueKind == JsonValueKind.Array &&
-                        arrayIndex >= 0 && arrayIndex < currentElement.GetArrayLength())
-                    {
-                        currentElement = currentElement[arrayIndex];
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-                else
-                {
-                    // È un accesso a proprietà standard (es: "page", "email", "username")
-                    if (currentElement.ValueKind == JsonValueKind.Object &&
-                        currentElement.TryGetProperty(part, out var property))
-                    {
-                        currentElement = property;
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-            }
-
-            return currentElement.ValueKind switch
-            {
-                JsonValueKind.Null or JsonValueKind.Undefined => null,
-                JsonValueKind.Number => currentElement.GetRawText(), // Mantiene la rappresentazione numerica precisa
-                JsonValueKind.True => "true",
-                JsonValueKind.False => "false",
-                _ => currentElement.ToString()
-            };
-        }
-        catch
-        {
-            return null;
-        }
+            StepName = stepName,
+            StatusCode = statusCode,
+            IsSuccess = false,
+            ExecutionTimeMilliseconds = elapsedMilliseconds
+        };
     }
 
-    public void SetVariable(string name, object value)
-    {
-        _variables[name] = value;
-    }
+    private static bool IsStepType(WorkflowStep step, string type) =>
+        string.Equals(step.Type, type, StringComparison.OrdinalIgnoreCase);
 
-    public void Dispose()
-    {
-        _httpClient?.Dispose();
-    }
+    private static string GetStepName(WorkflowStep step) =>
+        !string.IsNullOrEmpty(step.Name) ? step.Name : step.FunctionName ?? step.Type;
+
+    // Any verb works (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS...); defaults to GET.
+    private static HttpMethod ParseHttpMethod(string method) =>
+        string.IsNullOrWhiteSpace(method) ? HttpMethod.Get : new HttpMethod(method.Trim().ToUpperInvariant());
 }
