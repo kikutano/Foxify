@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using Foxify.Core.Execution;
 using Foxify.Core.Models;
@@ -135,6 +136,92 @@ public class WorkflowEngineBehaviorTests
         var step = report.StepReports.Single();
         Assert.False(step.IsSuccess);
         Assert.Equal(HttpStatusCode.NotFound, step.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, step.ExpectedStatusCode);
+        Assert.Contains("404", step.FailureReason);
+    }
+
+    [Fact]
+    public async Task Report_DescribesTheRequestAndResponse()
+    {
+        var (engine, _) = CreateEngine(responseBody: """{ "id": 1 }""", status: HttpStatusCode.Created);
+
+        var report = await engine.ExecuteWorkflowAsync(SingleFunction(new FunctionDefinition
+        {
+            Method = "POST",
+            Endpoint = "/users?notify=true",
+            Body = """{ "name": "ada" }""",
+            Expected = new() { ["status_code"] = "201" }
+        }));
+
+        var step = report.StepReports.Single();
+        Assert.True(step.IsSuccess);
+        Assert.Equal("Call", step.StepName);
+        Assert.Equal("POST", step.Method);
+        Assert.Equal("https://api.test/users?notify=true", step.Url?.ToString());
+        Assert.Equal(HttpStatusCode.Created, step.StatusCode);
+        Assert.Equal(17, step.BytesSent);
+        Assert.Equal(11, step.BytesReceived);
+        Assert.True(step.Duration > TimeSpan.Zero);
+        Assert.Null(step.FailureReason);
+    }
+
+    [Fact]
+    public async Task AllAssertions_AreEvaluatedAndReported()
+    {
+        var (engine, _) = CreateEngine(responseBody: """{ "a": 1, "b": 2, "c": 3 }""");
+
+        var report = await engine.ExecuteWorkflowAsync(SingleFunction(new FunctionDefinition
+        {
+            Endpoint = "/data",
+            Extract = new() { ["a"] = "$.a", ["b"] = "$.b", ["c"] = "$.c" },
+            Asserts = new() { ["a"] = "== 1", ["b"] = "== 99", ["c"] = "== 3" }
+        }));
+
+        var step = report.StepReports.Single();
+        Assert.False(step.IsSuccess);
+        Assert.Collection(step.Assertions,
+            a => Assert.True(a.Passed),
+            b => { Assert.False(b.Passed); Assert.Equal("2", b.ActualValue); Assert.Equal("== 99", b.Expression); },
+            c => Assert.True(c.Passed));
+    }
+
+    [Fact]
+    public async Task NumericVariables_AreFormattedIndependentlyOfTheCulture()
+    {
+        var previous = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("it-IT");
+        try
+        {
+            var (engine, handler) = CreateEngine();
+            engine.SetVariable("price", 9.9);
+
+            await engine.ExecuteWorkflowAsync(SingleFunction(new FunctionDefinition { Endpoint = "/items?max=${price}" }));
+
+            Assert.Equal("https://api.test/items?max=9.9", handler.Requests.Single().Uri?.ToString());
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
+    }
+
+    [Fact]
+    public async Task Events_AreRaisedForEveryStep()
+    {
+        var (engine, _) = CreateEngine();
+        var workflow = SingleFunction(new FunctionDefinition { Endpoint = "/a" });
+        workflow.Workflow.Insert(0, new WorkflowStep { Type = "DELAY", DurationSeconds = 0.01 });
+        workflow.Workflow.Add(new WorkflowStep { Type = "function", FunctionName = "Call", Name = "Again" });
+
+        var started = new List<string>();
+        var completed = new List<string>();
+        engine.StepStarted += started.Add;
+        engine.StepCompleted += r => completed.Add(r.StepName);
+
+        await engine.ExecuteWorkflowAsync(workflow);
+
+        Assert.Equal(["delay 0.01s", "Call", "Again"], started);
+        Assert.Equal(["Call", "Again"], completed);
     }
 
     [Fact]

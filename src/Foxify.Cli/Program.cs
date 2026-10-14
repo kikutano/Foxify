@@ -1,7 +1,11 @@
+using System.Diagnostics;
 using System.Reflection;
+using System.Text;
+using Foxify.Cli;
 using Foxify.Core.Execution;
-using Foxify.Core.Models;
 using Foxify.Core.Parsing;
+using Foxify.Core.Reporting;
+using Spectre.Console;
 
 const int ExitSuccess = 0;
 const int ExitWorkflowFailed = 1;
@@ -15,7 +19,8 @@ const string Usage = """
 
     Options:
       -e, --env <file>   Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
-      -v, --verbose      Print the variables loaded before execution.
+      -v, --verbose      Print variables, requests and responses while running.
+      --no-color         Disable colors (also honored: the NO_COLOR environment variable).
       -h, --help         Show this help.
       --version          Show the version.
 
@@ -45,6 +50,7 @@ if (args[0] != "run")
 string? workflowPath = null;
 string? envFilePath = null;
 bool verbose = false;
+bool noColor = false;
 
 for (int i = 1; i < args.Length; i++)
 {
@@ -57,6 +63,9 @@ for (int i = 1; i < args.Length; i++)
             break;
         case "-v" or "--verbose":
             verbose = true;
+            break;
+        case "--no-color":
+            noColor = true;
             break;
         case "-h" or "--help":
             Console.WriteLine(Usage);
@@ -82,8 +91,24 @@ if (envFilePath is not null && !File.Exists(envFilePath))
 
 try
 {
-    Console.WriteLine($"Loading workflow from: {workflowPath}");
+    // Needed on Windows for ✓ ✗ ⚡; the reporter falls back to ASCII when Unicode is unavailable.
+    Console.OutputEncoding = Encoding.UTF8;
+}
+catch (IOException)
+{
+}
 
+var console = AnsiConsole.Create(new AnsiConsoleSettings
+{
+    ColorSystem = noColor ? ColorSystemSupport.NoColors : ColorSystemSupport.Detect
+});
+
+// Without a terminal (CI logs, pipes) Spectre assumes 80 columns and wraps long lines.
+if (Console.IsOutputRedirected)
+    console.Profile.Width = 240;
+
+try
+{
     var parser = new WorkflowParser();
     var environmentVariables = envFilePath is null
         ? new Dictionary<string, object>()
@@ -102,10 +127,19 @@ try
     if (workflow.Settings?.Timeout > 0)
         httpClient.Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout);
 
-    var engine = new WorkflowEngine(httpClient);
-    var report = await engine.ExecuteWorkflowAsync(workflow);
+    // In verbose mode the engine's request/response log is printed and the spinner is
+    // disabled, since it would interleave with that log.
+    var engine = new WorkflowEngine(httpClient, verbose ? Console.Out : TextWriter.Null);
+    var reporter = new ConsoleReporter(console, live: !verbose);
 
-    return PrintSummary(report);
+    reporter.WriteHeader(GetVersion(), workflowPath, envFilePath, workflow);
+
+    var stopwatch = Stopwatch.StartNew();
+    var report = await reporter.RunAsync(engine, workflow);
+    var summary = WorkflowSummary.Create(workflow, report);
+    reporter.WriteSummary(summary, stopwatch.Elapsed);
+
+    return summary.IsSuccess ? ExitSuccess : ExitWorkflowFailed;
 }
 catch (Exception ex)
 {
@@ -113,24 +147,6 @@ catch (Exception ex)
     if (verbose)
         Console.Error.WriteLine(ex.StackTrace);
     return ExitWorkflowFailed;
-}
-
-static int PrintSummary(WorkflowReport report)
-{
-    int failed = report.StepReports.Count(s => !s.IsSuccess);
-    int passed = report.StepReports.Count - failed;
-    long totalMs = report.StepReports.Sum(s => s.ExecutionTimeMilliseconds);
-
-    Console.WriteLine();
-    Console.WriteLine($"Workflow: {report.WorkflowName}");
-    foreach (var step in report.StepReports)
-    {
-        var status = step.StatusCode is null ? "---" : ((int)step.StatusCode).ToString();
-        Console.WriteLine($"  {(step.IsSuccess ? "PASS" : "FAIL")}  {status}  {step.StepName} ({step.ExecutionTimeMilliseconds} ms)");
-    }
-    Console.WriteLine($"{passed} passed, {failed} failed, {totalMs} ms");
-
-    return failed == 0 ? ExitSuccess : ExitWorkflowFailed;
 }
 
 static void PrintVariables(string title, Dictionary<string, object> variables)

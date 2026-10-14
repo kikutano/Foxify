@@ -1,5 +1,6 @@
 using Foxify.Core.Models;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -25,6 +26,12 @@ public partial class WorkflowEngine
     [GeneratedRegex(@"\$\{([^}]+)\}")]
     private static partial Regex VariablePlaceholder();
 
+    /// <summary>Raised before each step runs, with a short description of the step.</summary>
+    public event Action<string>? StepStarted;
+
+    /// <summary>Raised after each function step, successful or not.</summary>
+    public event Action<StepReport>? StepCompleted;
+
     public WorkflowEngine(HttpClient httpClient, TextWriter? log = null)
     {
         _httpClient = httpClient;
@@ -45,17 +52,22 @@ public partial class WorkflowEngine
 
         foreach (var step in workflow.Workflow)
         {
-            if (IsStepType(step, "DELAY"))
+            if (IsDelayStep(step))
             {
                 await ExecuteDelayStepAsync(step);
                 continue;
             }
 
-            var stepReport = IsStepType(step, "function")
-                ? await ExecuteFunctionStepAsync(workflow, step)
-                : Fail(GetStepName(step), $"Unknown step type '{step.Type}'");
+            var stepReport = new StepReport { StepName = GetStepName(step) };
+            StepStarted?.Invoke(stepReport.StepName);
+
+            if (IsStepType(step, "function"))
+                await ExecuteFunctionStepAsync(workflow, step, stepReport);
+            else
+                Fail(stepReport, $"Unknown step type '{step.Type}'");
 
             report.StepReports.Add(stepReport);
+            StepCompleted?.Invoke(stepReport);
 
             if (!stepReport.IsSuccess)
             {
@@ -74,53 +86,55 @@ public partial class WorkflowEngine
         _variables[name] = value;
     }
 
+    /// <summary>The name shown for a step: its <c>name</c>, else its function name, else its type.</summary>
+    public static string GetStepName(WorkflowStep step) =>
+        !string.IsNullOrEmpty(step.Name) ? step.Name : step.FunctionName ?? step.Type;
+
+    public static bool IsDelayStep(WorkflowStep step) => IsStepType(step, "DELAY");
+
     private void SetVariables(Dictionary<string, object> variables)
     {
         foreach (var (name, value) in variables)
             _variables[name] = value;
     }
 
-    private async Task<StepReport> ExecuteFunctionStepAsync(WorkflowTemplate workflow, WorkflowStep step)
+    private async Task ExecuteFunctionStepAsync(WorkflowTemplate workflow, WorkflowStep step, StepReport report)
     {
-        var stepName = GetStepName(step);
-
         if (string.IsNullOrEmpty(step.FunctionName))
-            return Fail(stepName, $"Step '{stepName}' has no function_name");
+        {
+            Fail(report, $"Step '{report.StepName}' has no function_name");
+            return;
+        }
 
         if (!workflow.Functions.TryGetValue(step.FunctionName, out var function))
-            return Fail(stepName, $"Function '{step.FunctionName}' not found");
+        {
+            Fail(report, $"Function '{step.FunctionName}' not found");
+            return;
+        }
 
         var missingDependency = step.DependsOn?.FirstOrDefault(d => !_executedFunctions.Contains(d));
         if (missingDependency is not null)
-            return Fail(stepName, $"Dependency '{missingDependency}' not available");
+        {
+            Fail(report, $"Dependency '{missingDependency}' not available");
+            return;
+        }
 
-        var stopwatch = new Stopwatch();
         try
         {
             var maxRetries = Math.Max(0, workflow.Settings?.MaxRetries ?? 0);
-            using var response = await SendWithRetriesAsync(function, maxRetries, stopwatch);
+            using var response = await SendWithRetriesAsync(function, maxRetries, report);
 
             _log.WriteLine($"Response Status: {response.StatusCode}");
-            _log.WriteLine($"Execution Time: {stopwatch.ElapsedMilliseconds} ms");
+            _log.WriteLine($"Execution Time: {report.ExecutionTimeMilliseconds} ms");
 
-            var failure = await CheckResponseAsync(function, response);
-            if (failure is not null)
-                return Fail(stepName, failure, response.StatusCode, stopwatch.ElapsedMilliseconds);
+            await CheckResponseAsync(function, response, report);
 
-            _executedFunctions.Add(step.FunctionName);
-
-            return new StepReport
-            {
-                StepName = stepName,
-                StatusCode = response.StatusCode,
-                IsSuccess = true,
-                ExecutionTimeMilliseconds = stopwatch.ElapsedMilliseconds
-            };
+            if (report.IsSuccess)
+                _executedFunctions.Add(step.FunctionName);
         }
         catch (Exception ex)
         {
-            return Fail(stepName, $"Error executing function {step.FunctionName}: {ex.Message}",
-                elapsedMilliseconds: stopwatch.ElapsedMilliseconds);
+            Fail(report, $"Error executing function {step.FunctionName}: {ex.Message}");
         }
     }
 
@@ -130,29 +144,42 @@ public partial class WorkflowEngine
     /// they are a valid response, checked against <c>expected</c>.
     /// </summary>
     private async Task<HttpResponseMessage> SendWithRetriesAsync(
-        FunctionDefinition function, int maxRetries, Stopwatch stopwatch)
+        FunctionDefinition function, int maxRetries, StepReport report)
     {
         for (int attempt = 0; ; attempt++)
         {
             // A request message can be sent only once, so it is rebuilt on every attempt.
             using var request = BuildRequest(function);
+            report.Method = request.Method.Method;
+            report.Url = request.RequestUri;
+            report.BytesSent = request.Content?.Headers.ContentLength ?? 0;
+
             if (attempt == 0)
                 _log.WriteLine($"Executing {request.Method} {request.RequestUri}");
 
             try
             {
-                stopwatch.Restart();
-                var response = await _httpClient.SendAsync(request);
-                stopwatch.Stop();
-                return response;
+                return await SendTimedAsync(request, report);
             }
             catch (Exception ex) when (attempt < maxRetries && ex is HttpRequestException or TaskCanceledException)
             {
-                stopwatch.Stop();
                 var delay = RetryBaseDelay * (attempt + 1);
                 _log.WriteLine($"{ex.Message} Retrying in {delay.TotalMilliseconds} ms ({attempt + 1}/{maxRetries})");
                 await Task.Delay(delay);
             }
+        }
+    }
+
+    private async Task<HttpResponseMessage> SendTimedAsync(HttpRequestMessage request, StepReport report)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            return await _httpClient.SendAsync(request);
+        }
+        finally
+        {
+            report.Duration = stopwatch.Elapsed;
         }
     }
 
@@ -194,7 +221,7 @@ public partial class WorkflowEngine
         // The function's own baseurl wins; otherwise fall back to the baseUrl variable.
         var baseUrl = ResolveVariables(function.Baseurl);
         if (string.IsNullOrWhiteSpace(baseUrl) && _variables.TryGetValue(BaseUrlVariable, out var fallback))
-            baseUrl = fallback?.ToString() ?? string.Empty;
+            baseUrl = ToInvariantString(fallback);
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
@@ -208,29 +235,41 @@ public partial class WorkflowEngine
     }
 
     /// <summary>
-    /// Checks the expected status code, extracts variables and evaluates the asserts.
-    /// Returns null when the response is valid, otherwise the reason of the failure.
+    /// Checks the expected status code, extracts variables and evaluates every assert,
+    /// recording the outcome in <paramref name="report"/>.
     /// </summary>
-    private async Task<string?> CheckResponseAsync(FunctionDefinition function, HttpResponseMessage response)
+    private async Task CheckResponseAsync(FunctionDefinition function, HttpResponseMessage response, StepReport report)
     {
+        report.StatusCode = response.StatusCode;
+
+        // JSON is UTF-8 by definition (RFC 8259), so the body is decoded as UTF-8.
+        var bodyBytes = await response.Content.ReadAsByteArrayAsync();
+        report.BytesReceived = bodyBytes.Length;
+        var body = Encoding.UTF8.GetString(bodyBytes);
+        _log.WriteLine($"Response Content: {body}");
+
         var expectedStatus = function.Expected
             .FirstOrDefault(e => e.Key.Equals("status_code", StringComparison.OrdinalIgnoreCase)).Value;
 
         if (expectedStatus is not null)
         {
             if (!Enum.TryParse<HttpStatusCode>(expectedStatus, out var expectedStatusCode))
-                return $"Invalid expected status_code '{expectedStatus}'";
+            {
+                Fail(report, $"Invalid expected status_code '{expectedStatus}'");
+                return;
+            }
 
+            report.ExpectedStatusCode = expectedStatusCode;
             if (response.StatusCode != expectedStatusCode)
-                return $"Expected status code {expectedStatusCode}, but got {response.StatusCode}!";
+            {
+                Fail(report, $"Expected status code {(int)expectedStatusCode}, but got {(int)response.StatusCode}");
+                return;
+            }
         }
 
         var extracted = new Dictionary<string, string?>();
         if (function.Extract.Count > 0)
         {
-            var body = await response.Content.ReadAsStringAsync();
-            _log.WriteLine($"Response Content: {body}");
-
             JsonDocument json;
             try
             {
@@ -238,7 +277,8 @@ public partial class WorkflowEngine
             }
             catch (JsonException ex)
             {
-                return $"Response is not valid JSON, cannot extract variables: {ex.Message}";
+                Fail(report, $"Response is not valid JSON, cannot extract variables: {ex.Message}");
+                return;
             }
 
             using (json)
@@ -257,14 +297,25 @@ public partial class WorkflowEngine
             }
         }
 
+        // Every assert is evaluated, so a report shows all of them and not only the first failure.
         foreach (var (name, expression) in function.Asserts)
         {
             var actualValue = extracted.GetValueOrDefault(name) ?? "null";
-            if (!AssertEvaluator.Evaluate(actualValue, expression))
-                return $"Assert failed for '{name}': actual '{actualValue}', expected '{expression}'";
-        }
+            var passed = AssertEvaluator.Evaluate(actualValue, expression);
+            report.Assertions.Add(new AssertionResult
+            {
+                Variable = name,
+                Expression = expression,
+                ActualValue = actualValue,
+                Passed = passed
+            });
 
-        return null;
+            if (!passed)
+            {
+                report.IsSuccess = false;
+                _log.WriteLine($"Assert failed for '{name}': actual '{actualValue}', expected '{expression}'");
+            }
+        }
     }
 
     private async Task ExecuteDelayStepAsync(WorkflowStep step)
@@ -272,7 +323,8 @@ public partial class WorkflowEngine
         if (step.DurationSeconds is not > 0)
             return;
 
-        _log.WriteLine($"Waiting for {step.DurationSeconds} seconds");
+        StepStarted?.Invoke(FormattableString.Invariant($"delay {step.DurationSeconds}s"));
+        _log.WriteLine(FormattableString.Invariant($"Waiting for {step.DurationSeconds} seconds"));
         await Task.Delay(TimeSpan.FromSeconds(step.DurationSeconds.Value));
     }
 
@@ -286,30 +338,24 @@ public partial class WorkflowEngine
         {
             var name = match.Groups[1].Value;
             return _variables.TryGetValue(name, out var value)
-                ? value?.ToString() ?? string.Empty
+                ? ToInvariantString(value)
                 : throw new InvalidOperationException($"Variable '{name}' is not defined.");
         });
     }
 
-    private StepReport Fail(string stepName, string reason,
-        HttpStatusCode? statusCode = null, long elapsedMilliseconds = 0)
+    private void Fail(StepReport report, string reason)
     {
         _log.WriteLine(reason);
-
-        return new StepReport
-        {
-            StepName = stepName,
-            StatusCode = statusCode,
-            IsSuccess = false,
-            ExecutionTimeMilliseconds = elapsedMilliseconds
-        };
+        report.IsSuccess = false;
+        report.FailureReason = reason;
     }
+
+    // Variables end up in URLs and bodies: numbers must not depend on the machine's culture (9.9, not 9,9).
+    private static string ToInvariantString(object? value) =>
+        Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
 
     private static bool IsStepType(WorkflowStep step, string type) =>
         string.Equals(step.Type, type, StringComparison.OrdinalIgnoreCase);
-
-    private static string GetStepName(WorkflowStep step) =>
-        !string.IsNullOrEmpty(step.Name) ? step.Name : step.FunctionName ?? step.Type;
 
     // Any verb works (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS...); defaults to GET.
     private static HttpMethod ParseHttpMethod(string method) =>
