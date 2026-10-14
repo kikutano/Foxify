@@ -1,4 +1,4 @@
-[](logo.jpg)
+![](logo.jpg)
 # ⚡ Foxify
 
 > A lightweight, high-performance, CLI-first API testing and traffic simulation tool built with C# and .NET Native AOT.
