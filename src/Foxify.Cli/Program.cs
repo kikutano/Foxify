@@ -14,21 +14,29 @@ const int ExitUsageError = 2;
 const string Usage = """
     Usage:
       foxify run <workflow.yaml> [options]
+      foxify update [--check] [--force]
       foxify --help
       foxify --version
 
-    Options:
+    Options for 'run':
       -e, --env <file>   Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
       -v, --verbose      Print variables, requests and responses while running.
       --no-color         Disable colors (also honored: the NO_COLOR environment variable).
+
+    Options for 'update':
+      --check            Only tell whether a newer version is available.
+      --force            Reinstall the latest version, also over a development build.
+
       -h, --help         Show this help.
       --version          Show the version.
 
-    Exit codes:
+    Exit codes ('run'):
       0  all steps passed
       1  at least one step failed
       2  invalid arguments or file not found
     """;
+
+UpdateCommand.CleanupPreviousVersion();
 
 if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
 {
@@ -40,6 +48,23 @@ if (args[0] is "--version")
 {
     Console.WriteLine(GetVersion());
     return ExitSuccess;
+}
+
+if (args[0] == "update")
+{
+    bool checkOnly = false, force = false, updateNoColor = false;
+    foreach (var option in args.Skip(1))
+    {
+        switch (option)
+        {
+            case "--check": checkOnly = true; break;
+            case "--force": force = true; break;
+            case "--no-color": updateNoColor = true; break;
+            default: return UsageError($"Unknown option '{option}'.");
+        }
+    }
+
+    return await UpdateCommand.RunAsync(CreateConsole(updateNoColor), GetVersion(), checkOnly, force);
 }
 
 if (args[0] != "run")
@@ -89,23 +114,7 @@ if (!File.Exists(workflowPath))
 if (envFilePath is not null && !File.Exists(envFilePath))
     return UsageError($"Environment file not found: {envFilePath}");
 
-try
-{
-    // Needed on Windows for ✓ ✗ ⚡; the reporter falls back to ASCII when Unicode is unavailable.
-    Console.OutputEncoding = Encoding.UTF8;
-}
-catch (IOException)
-{
-}
-
-var console = AnsiConsole.Create(new AnsiConsoleSettings
-{
-    ColorSystem = noColor ? ColorSystemSupport.NoColors : ColorSystemSupport.Detect
-});
-
-// Without a terminal (CI logs, pipes) Spectre assumes 80 columns and wraps long lines.
-if (Console.IsOutputRedirected)
-    console.Profile.Width = 240;
+var console = CreateConsole(noColor);
 
 try
 {
@@ -156,6 +165,29 @@ static void PrintVariables(string title, Dictionary<string, object> variables)
     {
         Console.WriteLine($"  {variable.Key}: {variable.Value}");
     }
+}
+
+static IAnsiConsole CreateConsole(bool noColor)
+{
+    try
+    {
+        // Needed on Windows for ✓ ✗ ⚡; the reporter falls back to ASCII when Unicode is unavailable.
+        Console.OutputEncoding = Encoding.UTF8;
+    }
+    catch (IOException)
+    {
+    }
+
+    var console = AnsiConsole.Create(new AnsiConsoleSettings
+    {
+        ColorSystem = noColor ? ColorSystemSupport.NoColors : ColorSystemSupport.Detect
+    });
+
+    // Without a terminal (CI logs, pipes) Spectre assumes 80 columns and wraps long lines.
+    if (Console.IsOutputRedirected)
+        console.Profile.Width = 240;
+
+    return console;
 }
 
 static int UsageError(string message)
