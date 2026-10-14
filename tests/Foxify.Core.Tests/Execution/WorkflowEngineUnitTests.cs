@@ -88,12 +88,12 @@ public class WorkflowEngineUnitTests
         };
 
         // Act & Assert
-        var startTime = DateTime.Now;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         await _engine.ExecuteWorkflowAsync(workflow);
-        var endTime = DateTime.Now;
+        stopwatch.Stop();
 
-        // Should have waited at least 1 second (allowing for some variance)
-        Assert.True((endTime - startTime).TotalSeconds >= 0.1);
+        // Should have waited ~100 ms (small tolerance for OS timer resolution)
+        Assert.True(stopwatch.Elapsed.TotalSeconds >= 0.09);
     }
 
     [Fact]

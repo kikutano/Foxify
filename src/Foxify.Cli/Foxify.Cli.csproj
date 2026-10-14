@@ -4,7 +4,9 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Foxify.Cli</RootNamespace>
-    <AssemblyName>Foxify</AssemblyName>
+    <AssemblyName>foxify</AssemblyName>
+    <!-- Overridden by the release workflow with the version from the git tag. -->
+    <Version>0.0.0-dev</Version>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PublishAot>true</PublishAot>

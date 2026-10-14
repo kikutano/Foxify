@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build, test & end-to-end
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Foxify.slnx
+
+      - name: Build
+        run: dotnet build Foxify.slnx -c Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test Foxify.slnx -c Release --no-build
+
+      # Publish the same Native AOT binary users get from a release, then run the
+      # full example workflow with it against the local test server.
+      - name: Install Native AOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Publish Native AOT CLI
+        run: dotnet publish src/Foxify.Cli/Foxify.Cli.csproj -c Release -r linux-x64 -o publish
+
+      - name: Start test server
+        run: |
+          dotnet run --project tests/Foxify.RealServer.Tests -c Release --no-build --urls http://localhost:5122 > server.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:5122/api/public && exit 0
+            sleep 1
+          done
+          echo "Test server did not start"; cat server.log; exit 1
+
+      - name: End-to-end (docs/full_example.yaml)
+        run: ./publish/foxify run docs/full_example.yaml -e docs/environment.yaml
+
+      - name: Test server log
+        if: failure()
+        run: cat server.log || true

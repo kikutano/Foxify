@@ -58,12 +58,12 @@ public class WorkflowEngine : IDisposable
 
                 if (!stepReport.IsSuccess)
                 {
-                    Console.WriteLine($"Step '{step.Name}' failed. Stopping workflow execution.");
+                    Console.WriteLine($"Step '{stepReport.StepName}' failed. Stopping workflow execution.");
                     break; // Stop executing further steps if a step fails
                 }
                 else
                 {
-                    Console.WriteLine($"Step '{step.Name}' executed successfully.");
+                    Console.WriteLine($"Step '{stepReport.StepName}' executed successfully.");
                 }
             }
             else if (step.Type == "DELAY")
@@ -79,13 +79,18 @@ public class WorkflowEngine : IDisposable
 
     private async Task<StepReport> ExecuteFunctionStepAsync(WorkflowTemplate workflow, WorkflowStep step)
     {
+        var stepName = string.IsNullOrEmpty(step.Name) ? step.FunctionName ?? string.Empty : step.Name;
+
         if (string.IsNullOrEmpty(step.FunctionName))
-            return new StepReport { StepName = step.Name };
+        {
+            Console.WriteLine($"Step '{stepName}' has no function_name");
+            return new StepReport { StepName = stepName, IsSuccess = false };
+        }
 
         if (!workflow.Functions.TryGetValue(step.FunctionName, out var function))
         {
             Console.WriteLine($"Function '{step.FunctionName}' not found");
-            return new StepReport { StepName = step.Name };
+            return new StepReport { StepName = stepName, IsSuccess = false };
         }
 
         HttpResponseMessage? response = null;
@@ -97,27 +102,14 @@ public class WorkflowEngine : IDisposable
             if (!_executedFunctions.Contains(dependency))
             {
                 Console.WriteLine($"Dependency '{dependency}' not available");
-                return new StepReport { StepName = step.Name };
+                return new StepReport { StepName = stepName, IsSuccess = false };
             }
         }
 
         try
         {
-            workflow.EnvironmentVariables.TryGetValue("baseUrl", out var fullBaseUrl);
-            string fullEndpoint = ResolveVariables(function.Endpoint);
-
             var httpMethod = ParseHttpMethod(function);
-
-            Uri requestUri;
-            if (!string.IsNullOrEmpty(fullBaseUrl.ToString()))
-            {
-                var baseUri = new Uri(fullBaseUrl.ToString());
-                requestUri = new Uri(baseUri, fullEndpoint);
-            }
-            else
-            {
-                requestUri = new Uri(fullEndpoint, UriKind.RelativeOrAbsolute);
-            }
+            var requestUri = BuildRequestUri(workflow, function);
 
             var request = new HttpRequestMessage(httpMethod, requestUri);
 
@@ -210,7 +202,7 @@ public class WorkflowEngine : IDisposable
                                 Console.WriteLine($"Expected status code {expectedStatusCode}, but got {response.StatusCode}!");
                                 return new StepReport
                                 {
-                                    StepName = step.Name,
+                                    StepName = stepName,
                                     ExceptedStatusCode = response.StatusCode,
                                     IsSuccess = false
                                 };
@@ -226,17 +218,18 @@ public class WorkflowEngine : IDisposable
                 var jsonDocument = JsonDocument.Parse(responseContent);
 
                 function.Extract.TryGetValue(variableName, out var keyName);
-                var realValue = ExtractValueFromJson(jsonDocument, keyName);
+                var realValue = keyName is null ? null : ExtractValueFromJson(jsonDocument, keyName);
+                var actualValue = realValue?.ToString() ?? "null";
 
-                bool isSuccess = AssertEvaluator.Evaluate(realValue.ToString(), expression);
+                bool isSuccess = AssertEvaluator.Evaluate(actualValue, expression);
 
                 if (!isSuccess)
                 {
                     Console.WriteLine(
-                        $"Assert fallito per la variabile '{variableName}': valore attuale '{keyName}', atteso '{expression}'");
+                        $"Assert failed for '{variableName}': actual '{actualValue}', expected '{expression}'");
                     return new StepReport
                     {
-                        StepName = step.Name,
+                        StepName = stepName,
                         ExceptedStatusCode = response.StatusCode,
                         IsSuccess = false
                     };
@@ -248,12 +241,18 @@ public class WorkflowEngine : IDisposable
         catch (Exception ex)
         {
             Console.WriteLine($"Error executing function {step.FunctionName}: {ex.Message}");
+            return new StepReport
+            {
+                StepName = stepName,
+                IsSuccess = false,
+                ExecutionTimeMilliseconds = stopwatch.ElapsedMilliseconds
+            };
         }
 
         return new StepReport
         {
-            StepName = step.Name,
-            ExceptedStatusCode = response!.StatusCode,
+            StepName = stepName,
+            ExceptedStatusCode = response.StatusCode,
             IsSuccess = true,
             ExecutionTimeMilliseconds = stopwatch.ElapsedMilliseconds
         };
@@ -261,22 +260,43 @@ public class WorkflowEngine : IDisposable
 
     private static HttpMethod ParseHttpMethod(FunctionDefinition function)
     {
-        // Parse HTTP method from function definition
-        HttpMethod httpMethod = HttpMethod.Get;
-        if (function.Method.ToLower().Equals("post", StringComparison.OrdinalIgnoreCase))
+        // Supports any verb (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS...); defaults to GET.
+        return string.IsNullOrWhiteSpace(function.Method)
+            ? HttpMethod.Get
+            : new HttpMethod(function.Method.Trim().ToUpperInvariant());
+    }
+
+    private Uri BuildRequestUri(WorkflowTemplate workflow, FunctionDefinition function)
+    {
+        string endpoint = ResolveVariables(function.Endpoint);
+
+        // The function's own baseurl wins; otherwise fall back to the environment's baseUrl.
+        string baseUrl = ResolveVariables(function.Baseurl);
+        if (string.IsNullOrWhiteSpace(baseUrl)
+            && workflow.EnvironmentVariables.TryGetValue("baseUrl", out var envBaseUrl))
         {
-            httpMethod = HttpMethod.Post;
-        }
-        else if (function.Method.ToLower().Equals("put", StringComparison.OrdinalIgnoreCase))
-        {
-            httpMethod = HttpMethod.Put;
-        }
-        else if (function.Method.ToLower().Equals("delete", StringComparison.OrdinalIgnoreCase))
-        {
-            httpMethod = HttpMethod.Delete;
+            baseUrl = envBaseUrl?.ToString() ?? string.Empty;
         }
 
-        return httpMethod;
+        var unresolved = Regex.Match($"{baseUrl} {endpoint}", @"\$\{([^}]+)\}");
+        if (unresolved.Success)
+            throw new InvalidOperationException($"Variable '{unresolved.Groups[1].Value}' is not defined.");
+
+        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var absoluteUri)
+            && (absoluteUri.Scheme == Uri.UriSchemeHttp || absoluteUri.Scheme == Uri.UriSchemeHttps))
+        {
+            return absoluteUri;
+        }
+
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            // Relative to HttpClient.BaseAddress, if any.
+            return new Uri(endpoint, UriKind.RelativeOrAbsolute);
+        }
+
+        // Plain concatenation so a base path (e.g. https://host/v1/) is preserved
+        // regardless of leading/trailing slashes.
+        return new Uri($"{baseUrl.TrimEnd('/')}/{endpoint.TrimStart('/')}");
     }
 
     private async Task ExecuteDelayStepAsync(WorkflowStep step)

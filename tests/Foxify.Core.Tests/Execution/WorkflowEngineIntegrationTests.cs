@@ -31,7 +31,7 @@ public class WorkflowEngineIntegrationTests
           LoginUser:
             type: HTTP_REQUEST
             method: POST
-            baseurl: ${baseUrlDev}
+            baseurl: ${baseUrl}
             endpoint: "login"
             headers:
               Content-Type: application/json
@@ -54,7 +54,7 @@ public class WorkflowEngineIntegrationTests
           GetProtectedResource:
             type: HTTP_REQUEST
             method: GET
-            baseurl: ${baseUrlDev}
+            baseurl: ${baseUrl}
             endpoint: "me"
             headers:
               Content-Type: application/json
@@ -74,8 +74,8 @@ public class WorkflowEngineIntegrationTests
           GetUserDetails:
             type: HTTP_REQUEST
             method: GET
-            baseurl: ${baseUrlDev}
-            endpoint: "user/${user_id}" # Uses the user_id from login step
+            baseurl: ${baseUrl}
+            endpoint: "user/${userid}" # Uses the user_id from login step
             headers:
               Content-Type: application/json
               Authorization: "Bearer ${token}"     # Uses the token from login step.
@@ -304,11 +304,11 @@ public class WorkflowEngineIntegrationTests
         };
 
         // Act & Assert - This should execute without throwing exceptions and should wait
-        var startTime = DateTime.Now;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         await engine.ExecuteWorkflowAsync(workflow);
-        var endTime = DateTime.Now;
+        stopwatch.Stop();
 
-        // Should have waited at least 0.5 seconds (allowing for some variance)
-        Assert.True((endTime - startTime).TotalSeconds >= 0.5);
+        // Should have waited ~0.5 seconds (small tolerance for OS timer resolution)
+        Assert.True(stopwatch.Elapsed.TotalSeconds >= 0.45);
     }
 }

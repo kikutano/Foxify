@@ -1,57 +1,94 @@
-name: Release CLI
+name: Release
 
+# Push a SemVer tag to publish a release, e.g.:
+#   git tag v0.1.0 && git push origin v0.1.0
+# Tags with a suffix (v0.2.0-beta.1) are published as pre-releases.
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
 
 jobs:
-  build-and-release:
-    name: Build & Release (${{ matrix.os }})
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test Foxify.slnx -c Release
+
+  build:
+    name: Build (${{ matrix.rid }})
+    needs: test
     runs-on: ${{ matrix.os }}
-    
     strategy:
+      fail-fast: true
       matrix:
         include:
-          - os: ubuntu-latest
-            dotnet_rid: linux-x64
-            artifact_name: foxify-linux-x64
-            extension: ""
-          - os: windows-latest
-            dotnet_rid: win-x64
-            artifact_name: foxify-win-x64.exe
-            extension: ".exe"
+          - { rid: win-x64,     os: windows-latest }
+          - { rid: linux-x64,   os: ubuntu-latest }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm }
+          - { rid: osx-arm64,   os: macos-latest }
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
+
+      - name: Install Native AOT prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
 
       - name: Publish Native AOT
-        run: |
-          dotnet publish -c Release -r ${{ matrix.dotnet_rid }} --self-contained true /p:PublishAot=true /p:Version=${{ github.ref_name }}
-
-      - name: Package binary
         shell: bash
         run: |
-          mkdir -p dist
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            mv src/TuoProgetto.Cli/bin/Release/net8.0/${{ matrix.dotnet_rid }}/publish/foxify.exe dist/foxify.exe
-            cd dist && zip foxify-win-x64.zip foxify.exe
-          else
-            mv src/TuoProgetto.Cli/bin/Release/net8.0/${{ matrix.dotnet_rid }}/publish/foxify dist/foxify
-            cd dist && tar -czf foxify-linux-x64.tar.gz foxify
-          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          dotnet publish src/Foxify.Cli/Foxify.Cli.csproj -c Release -r ${{ matrix.rid }} -o publish -p:Version="$VERSION"
 
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v2
+      - name: Smoke test
+        shell: bash
+        run: ./publish/foxify --version
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path publish/foxify.exe -DestinationPath dist/foxify-${{ matrix.rid }}.zip
+
+      - name: Package (Linux / macOS)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          tar -czf dist/foxify-${{ matrix.rid }}.tar.gz -C publish foxify
+
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
-            dist/*.zip
-            dist/*.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: foxify-${{ matrix.rid }}
+          path: dist/*
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum foxify-* > SHA256SUMS && cat SHA256SUMS
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

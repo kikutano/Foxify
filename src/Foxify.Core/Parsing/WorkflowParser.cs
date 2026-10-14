@@ -10,12 +10,12 @@ public class WorkflowParser
 
     public WorkflowParser()
     {
-        _deserializer = new DeserializerBuilder()
+        _deserializer = new StaticDeserializerBuilder(new FoxifyYamlContext())
             .WithNamingConvention(UnderscoredNamingConvention.Instance)
             .Build();
     }
 
-    public WorkflowTemplate Parse(string yamlContent, Dictionary<string, object> environmentVariables = null)
+    public WorkflowTemplate Parse(string yamlContent, Dictionary<string, object>? environmentVariables = null)
     {
         if (string.IsNullOrWhiteSpace(yamlContent))
         {
@@ -39,5 +39,16 @@ public class WorkflowParser
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Parses an environment file: a flat YAML map of variable names to values (e.g. baseUrl, apiKey).
+    /// </summary>
+    public Dictionary<string, object> ParseEnvironment(string yamlContent)
+    {
+        if (string.IsNullOrWhiteSpace(yamlContent))
+            return new();
+
+        return _deserializer.Deserialize<Dictionary<string, object>>(yamlContent) ?? new();
     }
 }

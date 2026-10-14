@@ -1,184 +1,180 @@
 ![](logo.jpg)
+
 # ⚡ Foxify
 
-> A lightweight, high-performance, CLI-first API testing and traffic simulation tool built with C# and .NET Native AOT.
+[![CI](https://github.com/kikutano/foxify/actions/workflows/ci.yml/badge.svg)](https://github.com/kikutano/foxify/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/kikutano/foxify?include_prereleases)](https://github.com/kikutano/foxify/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](License.md)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![.NET Native AOT](https://img.shields.io/badge/.NET-Native%20AOT-purple.svg)](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/)
+API testing from the command line. Describe HTTP calls, variable extraction and assertions in a YAML file, and run them with one command. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
 
----
+## Install
 
-## 📌 Overview
+**Linux / macOS**
 
-**foxify** is a developer-centric alternative to heavy API clients like Postman and code-heavy load testing frameworks like k6. Designed for speed and automation, foxify uses a **declarative YAML/JSON schema** to execute sequential HTTP workflows, extract dynamic state variables in real-time, and run automated assertion checks.
-
-Because it compiles directly to **Native AOT** binaries with zero reflection, foxify boasts sub-10ms startup times, minimal memory consumption, and extreme throughput for local debugging, CI/CD pipelines, and multi-threaded load testing.
-
----
-
-## ✨ Key Features
-
-- **🚀 Native AOT Performance:** Instant startup and minimal footprint using C# .NET Native AOT and source-generated JSON serialization.
-- **📄 Declarative YAML Workflows:** Define reusable request steps (`functions`), dynamic variable extraction (`extract`), and response assertions (`expected` / `asserts`) cleanly in simple YAML or JSON files.
-- **🔄 Dynamic In-Flight State:** Automatically parse response bodies using JSONPath (e.g., `$.token`, `$.data[0].id`) and reuse them seamlessly in subsequent endpoints or authorization headers (`Authorization: Bearer ${token}`).
-- **🌍 Environment Management:** Decouple environment-specific configuration (`baseUrl`, `apiKey`) into dedicated environment files for local, dev, or production environments.
-- **🤖 AI-Friendly Design:** Structured, declarative schemas make it effortless for LLMs to generate, validate, and debug workflows directly from OpenAPI/Swagger specifications.
-- **⚙️ CI/CD & Fail-Fast Support:** Native `--fail-fast` execution flags and low-latency execution make it perfect for GitHub Actions and headless test runners.
-
----
-
-## 🛠️ Installation & Build
-
-### Prerequisites
-
-- [.NET 10.0 SDK](https://dotnet.microsoft.com/download) or higher.
-- C++ Build Tools (required for Native AOT compilation).
-
-### Building from Source
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/kikutano/foxify.git
-   cd foxify
-   ```
-
-2. Restore dependencies and build in Release mode:
-   ```bash
-   dotnet build -c Release
-   ```
-
-3. Publish as a self-contained Native AOT executable:
-   ```bash
-   dotnet publish -c Release -r win-x64 --self-contained # On Windows
-   # dotnet publish -c Release -r linux-x64 --self-contained # On Linux
-   # dotnet publish -c Release -r osx-x64 --self-contained # On macOS
-   ```
-
-The output executable will be available in `./bin/Release/net10.0/<runtime>/publish/`.
-
----
-
-## 🚀 Quick Start
-
-### 1. Define Your Environment (`environment.yaml`)
-
-```yaml
-baseUrl: "https://reqres.in/"
-apiKey: "free_user_3Jia6vmNMqQZQBpYN7Tj2sqeRhp"
+```bash
+curl -fsSL https://raw.githubusercontent.com/kikutano/foxify/main/install.sh | sh
 ```
 
-### 2. Create Your Workflow (`login-flow.yaml`)
+**Windows (PowerShell)**
+
+```powershell
+irm https://raw.githubusercontent.com/kikutano/foxify/main/install.ps1 | iex
+```
+
+Or download the archive for your platform from [Releases](https://github.com/kikutano/foxify/releases) (`win-x64`, `linux-x64`, `linux-arm64`, `osx-arm64`) and put `foxify` on your `PATH`.
+
+Check that it works:
+
+```bash
+foxify --version
+```
+
+## Quick start
+
+`env.yaml`:
+
+```yaml
+baseUrl: "https://jsonplaceholder.typicode.com"
+```
+
+`hello.yaml`:
 
 ```yaml
 metadata:
-  name: "Authentication & Resource Inspection Flow"
-  description: "Authenticates a user, extracts the auth token and ID, and fetches protected resource details."
-  api_version: "v1"
+  name: "Hello Foxify"
 
 functions:
-  LoginUser:
+  CreatePost:
     type: HTTP_REQUEST
     method: POST
-    baseurl: "${baseUrl}"
-    endpoint: "api/login"
+    endpoint: "/posts"
     headers:
       Content-Type: application/json
-      x-api-key: "${apiKey}"
     body: |
-      {
-        "email": "eve.holt@reqres.in",
-        "password": "cityslicka"
-      }
+      { "title": "foxify", "body": "hello", "userId": 1 }
     expected:
-      status_code: 200
+      status_code: 201
     extract:
-      authToken: $.token
+      postId: $.id            # save a value from the JSON response
+    asserts:
+      postId: "== 101"        # check an extracted value
 
-  GetUserDetails:
+  GetUser:
     type: HTTP_REQUEST
     method: GET
-    baseurl: "${baseUrl}"
-    endpoint: "api/users/2"
-    headers:
-      Authorization: "Bearer ${authToken}"
-      x-api-key: "${apiKey}"
+    endpoint: "/users/1"
     expected:
       status_code: 200
     extract:
-      userEmail: $.data.email
-      firstName: $.data.first_name
+      email: $.email
     asserts:
-      userEmail: "== 'janet.weaver@reqres.in'"
+      email: "== 'Sincere@april.biz'"
 
 workflow:
   - type: function
-    function_name: LoginUser
-
-  - name: AuthCoolOff
-    type: DELAY
-    duration_seconds: 0.5
-
+    function_name: CreatePost
   - type: function
-    function_name: GetUserDetails
-    depends_on: [LoginUser]
-
-settings:
-  timeout: 10
-  max_retries: 3
+    function_name: GetUser
+    depends_on: [CreatePost]
 ```
 
-### 3. Run the Workflow via CLI
+Run it:
 
-Validate workflow syntax without executing network calls:
-
-Run the workflow passing the environment file:
 ```bash
-foxify <path-to-flow.yaml> [path-to-environment.yaml]
+foxify run hello.yaml -e env.yaml
 ```
-
----
-
-## 💻 CLI Usage & Commands
 
 ```text
-Usage:
-  foxify [command] [options]
-
-Commands:
-  run <workflow-path>       Executes the specified workflow YAML file.
-  validate <workflow-path>  Validates the workflow YAML schema without running execution.
-
-Options for 'run':
-  -e, --env <path>          Path to environment file (.yaml or .json) with initial variables.
-  --fail-fast               Immediately aborts workflow execution on the first failed assertion or HTTP error.
-  -v, --verbose             Displays detailed request and response headers and payload logs.
-  --timeout <seconds>       Overrides global default timeout per single HTTP request.
+Workflow: Hello Foxify
+  PASS  CreatePost (467 ms)
+  PASS  GetUser (45 ms)
+2 passed, 0 failed, 512 ms
 ```
 
----
+## Usage
 
-## 🗺️ Project Roadmap
+```text
+foxify run <workflow.yaml> [options]
+foxify --help
+foxify --version
 
-- [x] **Fase 1: Core Engine & CLI**
-  - [x] Schema definition (YAML/JSON)
-  - [x] Native AOT compilation & System.Text.Json Source Generation
-  - [x] Variable storage engine & placeholder interpolation (`${var}`)
-  - [x] HTTP request step execution & delay steps
-  - [x] Basic JSONPath response extraction and status assertions
-- [ ] **Fase 2: Developer Experience & VS Code Integration**
-  - [ ] Native VS Code extension wrapper
-  - [ ] Visual UI / Split-screen editor (Monaco + Webview)
-  - [ ] Local AI Agent for workflow creation from OpenAPI specifications
-- [ ] **Fase 3: Load Testing & AI Diagnostics**
-  - [ ] Multi-threaded bot runner (Simultaneous Traffic Generation)
-  - [ ] Official GitHub Action & Distroless Docker Image
-  - [ ] Automated LLM-based failure diagnostic logs
-- [ ] **Fase 4: Cloud & Enterprise**
-  - [ ] Distributed load testing agents
-  - [ ] Cloud reporting dashboard and execution history
+Options:
+  -e, --env <file>   Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
+  -v, --verbose      Print the variables loaded before execution.
+  -h, --help         Show this help.
+  --version          Show the version.
 
----
+Exit codes:
+  0  all steps passed
+  1  at least one step failed
+  2  invalid arguments or file not found
+```
 
-## 📄 License
+Execution stops at the first failing step. The exit code makes Foxify easy to use in CI.
 
-Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.
+## Workflow file
+
+| Key | Description |
+|---|---|
+| `metadata.name` | Name shown in the report. |
+| `functions.<Name>` | A reusable HTTP request: `method`, `baseurl` (optional, defaults to `baseUrl` from the env file), `endpoint`, `headers`, `body`. |
+| `expected.status_code` | Expected HTTP status code. |
+| `extract` | `variable: <JSONPath>` pairs, e.g. `$.token`, `$.data[0].id`, `$.user.address.city`. |
+| `asserts` | Checks on extracted variables: `==`, `!=`, `>`, `>=`, `<`, `<=`, combinable with `&&` and `\|\|`. |
+| `workflow` | Steps run in order: `type: function` with `function_name` (and optional `depends_on`), or `type: DELAY` with `duration_seconds`. |
+
+Use `${name}` anywhere in `baseurl`, `endpoint`, `headers` or `body` to reference variables from the env file or values extracted by earlier steps, e.g. `Authorization: "Bearer ${token}"`.
+
+More details: [docs/variable_extraction_guide.md](docs/variable_extraction_guide.md).
+
+## Full example
+
+[docs/full_example.yaml](docs/full_example.yaml) covers authentication, CRUD, nested JSON, headers, query strings, status codes and delays against the bundled test server:
+
+```bash
+# terminal 1: start the test server on http://localhost:5122
+dotnet run --project tests/Foxify.RealServer.Tests
+```
+
+```bash
+# terminal 2: run the workflow
+foxify run docs/full_example.yaml -e docs/environment.yaml
+```
+
+The workflow changes the server's in-memory data (it deletes a user), so restart the server before running it again.
+
+## Build from source
+
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download). Native AOT also needs the platform toolchain: the "Desktop development with C++" workload on Windows, `clang` and `zlib1g-dev` on Linux, Xcode command line tools on macOS.
+
+```bash
+git clone https://github.com/kikutano/foxify.git
+cd foxify
+dotnet test Foxify.slnx
+
+# run without installing
+dotnet run --project src/Foxify.Cli -- run docs/full_example.yaml -e docs/environment.yaml
+
+# build the native binary (use your RID: win-x64, linux-x64, linux-arm64, osx-arm64)
+dotnet publish src/Foxify.Cli/Foxify.Cli.csproj -c Release -r linux-x64 -o publish
+```
+
+## Releasing
+
+Push a SemVer tag. The [Release workflow](.github/workflows/release.yml) runs the tests, builds the native binaries for every platform and publishes a GitHub Release with checksums and generated notes:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Tags with a suffix, like `v0.2.0-beta.1`, are published as pre-releases.
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md).
+
+## License
+
+MIT. See [License.md](License.md).

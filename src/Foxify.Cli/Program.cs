@@ -1,90 +1,159 @@
+using System.Reflection;
 using Foxify.Core.Execution;
+using Foxify.Core.Models;
 using Foxify.Core.Parsing;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
 
-//if (args.Length == 0)
-//{
-//    Console.WriteLine("Usage: Foxify <path-to-flow.yaml> [path-to-environment.yaml]");
-//    return;
-//}
+const int ExitSuccess = 0;
+const int ExitWorkflowFailed = 1;
+const int ExitUsageError = 2;
 
-//string filePath = args[0];
-//string envFilePath = args.Length > 1 ? args[1] : "environment.yaml";
+const string Usage = """
+    Usage:
+      foxify run <workflow.yaml> [options]
+      foxify --help
+      foxify --version
 
-string filePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\full_example.yaml";
-string envFilePath = "C:\\Users\\Tano\\source\\repos\\kikutano\\tyfapi\\docs\\environment.yaml";
+    Options:
+      -e, --env <file>   Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
+      -v, --verbose      Print the variables loaded before execution.
+      -h, --help         Show this help.
+      --version          Show the version.
 
-//string filePath = "/home/tano/Desktop/tyfapi/docs/sample_get.yaml";
-//string envFilePath = "/home/tano/Desktop/tyfapi/docs/environment.yaml";
+    Exit codes:
+      0  all steps passed
+      1  at least one step failed
+      2  invalid arguments or file not found
+    """;
 
-if (!File.Exists(filePath))
+if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
 {
-    Console.WriteLine($"File not found: {filePath}");
-    return;
+    Console.WriteLine(Usage);
+    return args.Length == 0 ? ExitUsageError : ExitSuccess;
 }
+
+if (args[0] is "--version")
+{
+    Console.WriteLine(GetVersion());
+    return ExitSuccess;
+}
+
+if (args[0] != "run")
+{
+    return UsageError($"Unknown command '{args[0]}'.");
+}
+
+string? workflowPath = null;
+string? envFilePath = null;
+bool verbose = false;
+
+for (int i = 1; i < args.Length; i++)
+{
+    switch (args[i])
+    {
+        case "-e" or "--env":
+            if (i + 1 >= args.Length)
+                return UsageError($"Option '{args[i]}' requires a file path.");
+            envFilePath = args[++i];
+            break;
+        case "-v" or "--verbose":
+            verbose = true;
+            break;
+        case "-h" or "--help":
+            Console.WriteLine(Usage);
+            return ExitSuccess;
+        default:
+            if (args[i].StartsWith('-'))
+                return UsageError($"Unknown option '{args[i]}'.");
+            if (workflowPath is not null)
+                return UsageError($"Unexpected argument '{args[i]}'.");
+            workflowPath = args[i];
+            break;
+    }
+}
+
+if (workflowPath is null)
+    return UsageError("Missing workflow file.");
+
+if (!File.Exists(workflowPath))
+    return UsageError($"Workflow file not found: {workflowPath}");
+
+if (envFilePath is not null && !File.Exists(envFilePath))
+    return UsageError($"Environment file not found: {envFilePath}");
 
 try
 {
-    var yamlContent = File.ReadAllText(filePath);
-    Console.WriteLine($"Loading workflow from: {filePath}");
-
-    // Load environment variables from an optional environment YAML file passed as the second argument.
-    Dictionary<string, object> environmentVariables = new();
-    //if (args.Length > 1)
-    //{
-    //string envFilePath = args[1];
-    if (File.Exists(envFilePath))
-    {
-        var envDeserializer = new DeserializerBuilder()
-            .WithNamingConvention(UnderscoredNamingConvention.Instance)
-            .Build();
-
-        var envContent = File.ReadAllText(envFilePath);
-        environmentVariables = envDeserializer.Deserialize<Dictionary<string, object>>(envContent) ?? new();
-    }
-    else
-    {
-        Console.WriteLine($"Environment file not found: {envFilePath}");
-    }
-    //}
+    Console.WriteLine($"Loading workflow from: {workflowPath}");
 
     var parser = new WorkflowParser();
-    var workflow = parser.Parse(yamlContent, environmentVariables);
+    var environmentVariables = envFilePath is null
+        ? new Dictionary<string, object>()
+        : parser.ParseEnvironment(File.ReadAllText(envFilePath));
 
-    Console.WriteLine($"Workflow: {workflow.Metadata.Name}");
-    Console.WriteLine($"Metadata Variables count: {workflow.Metadata.Variables.Count}");
-    Console.WriteLine($"Top-level Variables count: {workflow.Variables.Count}");
-    Console.WriteLine($"Environment Variables count: {workflow.EnvironmentVariables.Count}");
+    var workflow = parser.Parse(File.ReadAllText(workflowPath), environmentVariables);
 
-    Console.WriteLine("Metadata Variables:");
-    foreach (var variable in workflow.Metadata.Variables)
+    if (verbose)
     {
-        Console.WriteLine($"  '{variable.Key}': {variable.Value} ({variable.Value?.GetType().Name ?? "null"})");
+        PrintVariables("Metadata variables", workflow.Metadata.Variables);
+        PrintVariables("Workflow variables", workflow.Variables);
+        PrintVariables("Environment variables", workflow.EnvironmentVariables);
     }
 
-    Console.WriteLine("Top-level Variables:");
-    foreach (var variable in workflow.Variables)
-    {
-        Console.WriteLine($"  '{variable.Key}': {variable.Value} ({variable.Value?.GetType().Name ?? "null"})");
-    }
+    using var httpClient = new HttpClient();
+    if (workflow.Settings?.Timeout > 0)
+        httpClient.Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout);
 
-    Console.WriteLine("Environment Variables:");
-    foreach (var variable in workflow.EnvironmentVariables)
-    {
-        Console.WriteLine($"  '{variable.Key}': {variable.Value} ({variable.Value?.GetType().Name ?? "null"})");
-    }
-
-    Console.WriteLine("\nExecuting workflow...");
-
-    HttpClient httpClient = new HttpClient();
     using var engine = new WorkflowEngine(httpClient);
-    await engine.ExecuteWorkflowAsync(workflow);
+    var report = await engine.ExecuteWorkflowAsync(workflow);
 
-    Console.WriteLine("Workflow execution completed!");
+    return PrintSummary(report);
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"Error processing workflow: {ex.Message}");
-    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+    Console.Error.WriteLine($"Error processing workflow: {ex.Message}");
+    if (verbose)
+        Console.Error.WriteLine(ex.StackTrace);
+    return ExitWorkflowFailed;
+}
+
+static int PrintSummary(WorkflowReport report)
+{
+    int failed = report.StepReports.Count(s => !s.IsSuccess);
+    int passed = report.StepReports.Count - failed;
+    long totalMs = report.StepReports.Sum(s => s.ExecutionTimeMilliseconds);
+
+    Console.WriteLine();
+    Console.WriteLine($"Workflow: {report.WorkflowName}");
+    foreach (var step in report.StepReports)
+    {
+        Console.WriteLine($"  {(step.IsSuccess ? "PASS" : "FAIL")}  {step.StepName} ({step.ExecutionTimeMilliseconds} ms)");
+    }
+    Console.WriteLine($"{passed} passed, {failed} failed, {totalMs} ms");
+
+    return failed == 0 ? ExitSuccess : ExitWorkflowFailed;
+}
+
+static void PrintVariables(string title, Dictionary<string, object> variables)
+{
+    Console.WriteLine($"{title}:");
+    foreach (var variable in variables)
+    {
+        Console.WriteLine($"  {variable.Key}: {variable.Value}");
+    }
+}
+
+static int UsageError(string message)
+{
+    Console.Error.WriteLine($"Error: {message}");
+    Console.Error.WriteLine("Run 'foxify --help' for usage.");
+    return ExitUsageError;
+}
+
+static string GetVersion()
+{
+    var informational = typeof(Program).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+        .InformationalVersion;
+
+    // Strip the "+<commit sha>" suffix the SDK appends to the informational version.
+    return informational?.Split('+')[0] ?? "unknown";
 }

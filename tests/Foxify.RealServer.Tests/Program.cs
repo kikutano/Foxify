@@ -548,8 +548,44 @@ app.MapGet("/api/catalog", (HttpRequest request) =>
             },
             categories = new[]
             {
-                new { id = 1, product = "Keyboard", specs = new { id = 101, name = "spec_1" } },
-                new { id = 2, product = "Mouse", specs = new { id = 102, name = "spec_2" } }
+                new
+                {
+                    id = 1,
+                    name = "Hardware",
+                    products = new[]
+                    {
+                        new
+                        {
+                            id = 101,
+                            name = "Keyboard",
+                            price = 99.99,
+                            specifications = new
+                            {
+                                features = new[] { "mechanical", "rgb" },
+                                platforms = new[] { "windows", "linux", "macos" }
+                            }
+                        }
+                    }
+                },
+                new
+                {
+                    id = 2,
+                    name = "Software",
+                    products = new[]
+                    {
+                        new
+                        {
+                            id = 201,
+                            name = "Foxify Pro",
+                            price = 49.0,
+                            specifications = new
+                            {
+                                features = new[] { "cli", "native-aot" },
+                                platforms = new[] { "windows", "linux", "macos" }
+                            }
+                        }
+                    }
+                }
             }
         }
     });
@@ -590,10 +626,10 @@ app.MapGet("/api/users/list", (HttpRequest request) =>
 
             users = users.Values.Select(user => new
             {
-                user.id,
-                user.first_name,
-                user.last_name,
-                user.email,
+                id = user.Id,
+                first_name = user.FirstName,
+                last_name = user.LastName,
+                email = user.Email,
 
                 profile = new
                 {
@@ -601,9 +637,9 @@ app.MapGet("/api/users/list", (HttpRequest request) =>
 
                     location = new
                     {
-                        user.address.Street,
-                        user.address.City,
-                        user.address.Country
+                        user.Address.Street,
+                        user.Address.City,
+                        user.Address.Country
                     }
                 }
             })
@@ -783,23 +819,4 @@ record User(
     string LastName,
     string Email,
     bool Active,
-    Address Address)
-{
-    [JsonPropertyName("id")]
-    public int id => Id;
-
-    [JsonPropertyName("first_name")]
-    public string first_name => FirstName;
-
-    [JsonPropertyName("last_name")]
-    public string last_name => LastName;
-
-    [JsonPropertyName("email")]
-    public string email => Email;
-
-    [JsonPropertyName("active")]
-    public bool active => Active;
-
-    [JsonPropertyName("address")]
-    public Address address => Address;
-}
+    Address Address);
