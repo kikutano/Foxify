@@ -1,0 +1,57 @@
+name: Release CLI
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    name: Build & Release (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            dotnet_rid: linux-x64
+            artifact_name: foxify-linux-x64
+            extension: ""
+          - os: windows-latest
+            dotnet_rid: win-x64
+            artifact_name: foxify-win-x64.exe
+            extension: ".exe"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Native AOT
+        run: |
+          dotnet publish -c Release -r ${{ matrix.dotnet_rid }} --self-contained true /p:PublishAot=true /p:Version=${{ github.ref_name }}
+
+      - name: Package binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            mv src/TuoProgetto.Cli/bin/Release/net8.0/${{ matrix.dotnet_rid }}/publish/foxify.exe dist/foxify.exe
+            cd dist && zip foxify-win-x64.zip foxify.exe
+          else
+            mv src/TuoProgetto.Cli/bin/Release/net8.0/${{ matrix.dotnet_rid }}/publish/foxify dist/foxify
+            cd dist && tar -czf foxify-linux-x64.tar.gz foxify
+          fi
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.zip
+            dist/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
