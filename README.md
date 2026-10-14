@@ -54,7 +54,7 @@ Because it compiles directly to **Native AOT** binaries with zero reflection, fo
    # dotnet publish -c Release -r osx-x64 --self-contained # On macOS
    ```
 
-The output executable will be available in `./bin/Release/net8.0/<runtime>/publish/`.
+The output executable will be available in `./bin/Release/net10.0/<runtime>/publish/`.
 
 ---
 
