@@ -146,10 +146,10 @@ public class WorkflowEngineIntegrationTests
 
         // Assert
         Assert.NotNull(report);
-        Assert.Equal(HttpStatusCode.OK, report.StepReports[0].ExceptedStatusCode);
-        Assert.Equal(HttpStatusCode.OK, report.StepReports[1].ExceptedStatusCode);
-        Assert.Equal(HttpStatusCode.OK, report.StepReports[2].ExceptedStatusCode);
-        Assert.True(report.StepReports.All(status => status.ExceptedStatusCode == HttpStatusCode.OK));
+        Assert.Equal(HttpStatusCode.OK, report.StepReports[0].StatusCode);
+        Assert.Equal(HttpStatusCode.OK, report.StepReports[1].StatusCode);
+        Assert.Equal(HttpStatusCode.OK, report.StepReports[2].StatusCode);
+        Assert.True(report.StepReports.All(status => status.StatusCode == HttpStatusCode.OK));
         Assert.True(report.StepReports.All(step => step.IsSuccess));
     }
 
