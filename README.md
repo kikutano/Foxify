@@ -250,14 +250,27 @@ dotnet publish src/Foxify.Cli/Foxify.Cli.csproj -c Release -r linux-x64 -o publi
 
 ## Releasing
 
-Push a SemVer tag. The [Release workflow](.github/workflows/release.yml) runs the tests, builds the native binaries for every platform and publishes a GitHub Release with checksums and generated notes:
+Push a SemVer tag. The [Release workflow](.github/workflows/release.yml) runs the tests, builds the native binaries for every platform and publishes a GitHub Release with checksums and generated notes.
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
+To put your own notes on top of the generated ones (a breaking change, highlights), write them in an annotated tag. The first line is the title; everything after it goes into the release notes:
+
+```markdown
+Foxify 0.5.0
+
+## Breaking change
+
+Describe what users must change.
 ```
 
-Tags with a suffix, like `v0.2.0-beta.1`, are published as pre-releases.
+```bash
+git tag -a v0.5.0 --cleanup=whitespace -F notes.md
+```
+
+```bash
+git push origin v0.5.0
+```
+
+`--cleanup=whitespace` keeps Markdown headings: by default git drops lines that start with `#`. A plain `git tag v0.5.0` works too and publishes only the generated notes. Tags with a suffix, like `v0.6.0-beta.1`, are published as pre-releases.
 
 ## Roadmap
 
