@@ -323,6 +323,10 @@ public class WorkflowEngineTests
     [InlineData("$.id: { gt: 7 }", false)]
     [InlineData("$.price: { gt: 0, lt: 10 }", true)]
     [InlineData("$.price: { gt: 0, lt: 5 }", false)]
+    [InlineData("$.name: { eq: Ada, contains: d }", true)]     // equality plus another condition
+    [InlineData("$.name: { eq: Ada, contains: z }", false)]
+    [InlineData("$.name: { eq: Bob, contains: d }", false)]
+    [InlineData("$.id: { exists: true, gt: 0, lte: 7 }", true)]
     [InlineData("$.name: { ne: Bob }", true)]
     [InlineData("$.name: { contains: d }", true)]
     [InlineData("$.tags: { contains: admin }", true)]

@@ -148,7 +148,7 @@ expect:
   body:
     $.email: mario@example.com              # equality
     $.pagination.total: { gte: 3 }
-    $.price: { gt: 0, lt: 100 }             # several operators: all must pass
+    $.price: { gt: 0, lt: 100 }             # several operators: all must pass (see below)
     $.deletedAt: null
     $.id: { exists: true }
     $.tags: { contains: admin }             # array element or substring
@@ -165,6 +165,29 @@ expect:
 | `contains` | the array contains the value, or the string contains the text |
 
 Equality is typed: `$.id: 1` matches the number `1`, `$.id: "1"` matches the string `"1"`; numbers compare by value (`9.9` equals `9.90`). Header values are text, so header checks compare text. A mapping is read as operators only when all its keys are operators; mixing operators and fields is an error. Expected values may contain placeholders (`$.id: ${userId}`). Every check of a step is evaluated and reported, not only the first failure.
+
+### Several conditions on one value
+
+Put several operators in the same mapping: **all of them must pass**. Each one is reported on its own line, so a failure shows exactly which condition did not hold.
+
+```yaml
+expect:
+  body:
+    $.count: { gt: 0, lt: 10 }                               # a range: 0 < count < 10
+    $.email: { eq: ada@example.com, contains: "@example.com" } # equality plus another condition
+    $.id: { exists: true, gt: 0 }
+  headers:
+    Content-Type: { contains: json, ne: application/xml }
+  duration: { gte: 10ms, lt: 500ms }
+```
+
+```text
+  ✗ Get user  GET  200  12.4ms  /users/1
+      ✓ $.count > 0
+      ✗ $.count < 10  actual 12
+```
+
+To combine equality with other conditions write it as `eq`: a plain value is a single condition. A JSONPath cannot be repeated as a key (`$.email: …` twice), since YAML does not allow duplicate keys; foxify reports it before running.
 
 ## Validation before running
 

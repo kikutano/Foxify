@@ -198,7 +198,8 @@ steps:
         Content-Type: { contains: json }
       body:
         $.email: gaetano@example.com
-        $.orders: { gte: 1 }
+        $.orders: { gt: 0, lt: 100 }       # several conditions on one value: all must pass
+        $.name: { eq: Gaetano, contains: Gae }
         $.deletedAt: { exists: false }
 
   - sleep: 500ms
@@ -208,7 +209,7 @@ steps:
 |---|---|
 | `call` / `with` | The endpoint to call and its arguments. |
 | `expect.status` | Expected status code; without it any 2xx is accepted. |
-| `expect.body` | Checks by JSONPath: a plain value means equal; operators `ne`, `gt`, `gte`, `lt`, `lte`, `exists`, `contains`. |
+| `expect.body` | Checks by JSONPath: a plain value means equal; operators `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `exists`, `contains`. Combine them on one value, e.g. `{ gt: 0, lt: 10 }`: all must pass. |
 | `expect.headers` | Checks on response headers. |
 | `expect.duration` | Response time, e.g. `{ lt: 500ms }`. |
 | `save` | Values from the response body for the next steps. |
