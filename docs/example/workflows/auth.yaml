@@ -1,0 +1,69 @@
+name: Authentication
+description: Public access, login, bearer token and API key.
+
+import:
+  - ../api/testserver.yaml
+
+steps:
+  - name: Public endpoint needs no auth
+    call: public
+    expect:
+      status: 200
+      body:
+        $.message: This endpoint is public.
+        $.authenticated: false
+
+  - name: Admin logs in
+    call: login
+    with:
+      password: password
+    expect:
+      status: 200
+      body:
+        $.access_token: tyfapi-test-token
+        $.token_type: Bearer
+        $.expires_in: 3600
+        $.user.username: admin
+    save:
+      token: $.access_token
+
+  - name: Wrong password is rejected
+    call: login
+    with:
+      password: wrong-password
+    expect:
+      status: 401
+      body:
+        $.error: invalid_credentials
+
+  - name: Bearer token is accepted
+    call: bearer_check
+    expect:
+      status: 200
+      body:
+        $.authenticated: true
+        $.authentication: bearer
+
+  - name: Invalid bearer token is rejected
+    call: bearer_check
+    with:
+      token: invalid-token        # arguments shadow saved variables for this step only
+    expect:
+      status: 401
+      body:
+        $.error: unauthorized
+
+  - name: API key is accepted
+    call: apikey_check
+    expect:
+      status: 200
+      body:
+        $.authenticated: true
+        $.authentication: api-key
+
+  - name: Bearer token and API key together
+    call: both_check
+    expect:
+      status: 200
+      body:
+        $.authenticated: true

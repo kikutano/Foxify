@@ -1,0 +1,27 @@
+name: Catalog
+description: Assertions on a deeply nested JSON response.
+
+import:
+  - ../api/testserver.yaml
+
+steps:
+  - name: Log in
+    call: login
+    with:
+      password: password
+    save:
+      token: $.access_token
+
+  - name: Catalog structure
+    call: catalog
+    expect:
+      status: 200
+      body:
+        $.catalog.name: Tyfapi Test Catalog
+        $.catalog.metadata.created_by.username: admin
+        $.catalog.categories[0].name: Hardware
+        $.catalog.categories[0].products[0].name: Keyboard
+        $.catalog.categories[0].products[0].price: 99.99
+        $.catalog.categories[0].products[0].specifications.features[0]: mechanical
+        $.catalog.categories[1].name: Software
+        $.catalog.categories[1].products[0].specifications.platforms: { contains: windows }

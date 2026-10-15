@@ -1,0 +1,67 @@
+name: HTTP features
+description: Query strings, request and response headers, status codes and slow responses.
+
+import:
+  - ../api/testserver.yaml
+
+settings:
+  timeout: 10
+  max_retries: 0
+
+steps:
+  - name: Log in
+    call: login
+    with:
+      password: password
+    save:
+      token: $.access_token
+
+  - name: Echo returns what was sent
+    call: echo
+    with:
+      source: foxify
+      mode: test
+      customHeader: custom-value
+      correlationId: foxify-test-001
+      payload:
+        message: Hello from foxify
+        nested:
+          enabled: true
+          values: [1, 2, 3]
+    expect:
+      status: 200
+      body:
+        $.method: POST
+        $.query.source: foxify
+        $.headers.X-Custom-Header: custom-value
+        $.headers.X-Correlation-Id: foxify-test-001
+
+  - name: Response headers
+    call: response_headers
+    expect:
+      status: 200
+      headers:
+        X-Custom-Header: hello-world
+        X-Test-Request-Id: { exists: true }
+      body:
+        $.message: Response contains custom headers.
+
+  # The same endpoint, one step per status code.
+  - { call: status, with: { code: 200 }, expect: { status: 200, body: { $.status: 200 } } }
+  - { call: status, with: { code: 400 }, expect: { status: 400 } }
+  - { call: status, with: { code: 403 }, expect: { status: 403 } }
+  - { call: status, with: { code: 500 }, expect: { status: 500 } }
+  - { call: status, with: { code: 503 }, expect: { status: 503 } }
+
+  - sleep: 200ms
+
+  - name: Slow response
+    call: delay
+    with:
+      milliseconds: 500
+    expect:
+      status: 200
+      duration: { lt: 2s }
+      body:
+        $.delayed: true
+        $.milliseconds: 500

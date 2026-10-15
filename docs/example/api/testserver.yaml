@@ -1,0 +1,134 @@
+# API definition of the bundled test server (tests/Foxify.RealServer.Tests).
+# Endpoints only: no expectations here. Workflows import this file and call
+# the endpoints by name, passing arguments with `with:`.
+
+base_url: ${baseUrl}
+
+# Reusable header sets, picked per endpoint with `auth:`.
+auth:
+  bearer:
+    Authorization: "Bearer ${token}"
+  apikey:
+    X-API-Key: ${apiKey}
+
+endpoints:
+  # --- Authentication -------------------------------------------------------
+
+  public:
+    path: /api/public
+
+  login:
+    method: POST
+    path: /api/login
+    params:
+      username: admin           # default, can be overridden with `with:`
+      password:                 # no default: required
+    body:
+      username: ${username}
+      password: ${password}
+
+  bearer_check:
+    path: /api/auth/bearer
+    auth: bearer
+
+  apikey_check:
+    path: /api/auth/apikey
+    auth: apikey
+
+  both_check:
+    path: /api/auth/both
+    auth: [bearer, apikey]
+
+  # --- Users ----------------------------------------------------------------
+
+  list_users:
+    path: /api/users
+    query: [page, pageSize, active, search]   # each is sent only when passed
+    auth: bearer
+
+  list_users_nested:
+    path: /api/users/list
+    auth: bearer
+
+  get_user:
+    path: /api/users/${id}
+    auth: bearer
+
+  create_user:
+    method: POST
+    path: /api/users
+    auth: bearer
+    params:
+      firstName:
+      lastName:
+      email:
+      city: Bari
+    body:
+      firstName: ${firstName}
+      lastName: ${lastName}
+      email: ${email}
+      address:
+        street: Test Street 10
+        city: ${city}
+        zipCode: "70100"
+        country: Italy
+
+  replace_user:
+    method: PUT
+    path: /api/users/${id}
+    auth: bearer
+    params:
+      id:
+      firstName:
+      lastName:
+      email:
+      active: true
+      city:
+    body:
+      firstName: ${firstName}
+      lastName: ${lastName}
+      email: ${email}
+      active: ${active}          # a lone placeholder keeps the argument's type: true, not "true"
+      address:
+        street: Updated Street 20
+        city: ${city}
+        zipCode: "00100"
+        country: Italy
+
+  patch_user:
+    method: PATCH
+    path: /api/users/${id}
+    auth: bearer
+    body: ${changes}             # the whole body is an argument
+
+  delete_user:
+    method: DELETE
+    path: /api/users/${id}
+    auth: bearer
+
+  # --- Catalog --------------------------------------------------------------
+
+  catalog:
+    path: /api/catalog
+    auth: bearer
+
+  # --- HTTP features --------------------------------------------------------
+
+  echo:
+    method: POST
+    path: /api/echo
+    query: [source, mode]
+    auth: bearer
+    headers:
+      X-Custom-Header: ${customHeader}
+      X-Correlation-Id: ${correlationId}
+    body: ${payload}
+
+  response_headers:
+    path: /api/headers
+
+  status:
+    path: /api/status/${code}
+
+  delay:
+    path: /api/delay/${milliseconds}
