@@ -1,7 +1,10 @@
 name: Release
 
 # Push a SemVer tag to publish a release, e.g.:
-#   git tag v0.1.0 && git push origin v0.1.0
+#   git tag -a v0.5.0 --cleanup=whitespace -F notes.md
+#   git push origin v0.5.0
+# The tag message after its first line is used as the top of the release notes.
+# --cleanup=whitespace keeps Markdown headings: by default git drops lines starting with '#'.
 # Tags with a suffix (v0.2.0-beta.1) are published as pre-releases.
 on:
   push:
@@ -78,6 +81,17 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      # The body of an annotated tag (everything after its first line) goes on top of the
+      # generated notes. A lightweight tag, or one with a single line, adds nothing.
+      - name: Release notes from the tag message
+        run: |
+          # Fetch the tag object itself: a shallow checkout may not carry the annotation.
+          git fetch --force --depth 1 origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}" > "${RUNNER_TEMP}/tag-notes.md"
+          cat "${RUNNER_TEMP}/tag-notes.md"
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -90,5 +104,6 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          body_path: ${{ runner.temp }}/tag-notes.md
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
