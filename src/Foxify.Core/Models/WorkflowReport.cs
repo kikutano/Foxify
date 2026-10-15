@@ -9,8 +9,8 @@ public class StepReport
     public Uri? Url { get; set; }
     /// <summary>Status code received from the server; null when no response was received.</summary>
     public HttpStatusCode? StatusCode { get; set; }
-    /// <summary>The <c>expected.status_code</c> of the function, if any.</summary>
-    public HttpStatusCode? ExpectedStatusCode { get; set; }
+    /// <summary>The status codes accepted by <c>expect.status</c>; empty when the step accepts any 2xx.</summary>
+    public List<HttpStatusCode> ExpectedStatusCodes { get; set; } = new();
     public bool IsSuccess { get; set; } = true;
     /// <summary>Why the step failed when the reason is not a failed assertion (status, error, ...).</summary>
     public string? FailureReason { get; set; }

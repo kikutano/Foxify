@@ -57,7 +57,9 @@ internal sealed partial class Loader
         ["lt"] = Operator.LessThan,
         ["lte"] = Operator.LessOrEqual,
         ["exists"] = Operator.Exists,
-        ["contains"] = Operator.Contains
+        ["contains"] = Operator.Contains,
+        ["in"] = Operator.In,
+        ["any"] = Operator.Any
     };
 
     private static readonly string[] DurationOperators = ["gt", "gte", "lt", "lte"];
@@ -384,13 +386,23 @@ internal sealed partial class Loader
     {
         var entries = Collect(file, node, "expect", ExpectKeys);
 
-        int? status = null;
-        if (entries.TryGetValue("status", out var statusNode) && Scalar(file, statusNode, "status") is { } statusText)
+        // `status: 200` or `status: [200, 204]`: any of the listed codes is accepted.
+        var status = new List<int>();
+        if (entries.TryGetValue("status", out var statusNode))
         {
-            if (int.TryParse(statusText, out var code) && code is >= 100 and <= 599)
-                status = code;
-            else
-                Error(file, statusNode, $"invalid status code '{statusText}'");
+            var codes = statusNode is YamlSequenceNode ? Items(file, statusNode, "status").ToList() : [statusNode];
+            if (codes.Count == 0)
+                Error(file, statusNode, "status needs at least one code");
+
+            foreach (var codeNode in codes)
+            {
+                if (Scalar(file, codeNode, "a status code") is not { } statusText)
+                    continue;
+                if (int.TryParse(statusText, out var code) && code is >= 100 and <= 599)
+                    status.Add(code);
+                else
+                    Error(file, codeNode, $"invalid status code '{statusText}'");
+            }
         }
 
         var headers = new List<Check>();
@@ -439,17 +451,33 @@ internal sealed partial class Loader
                 foreach (var (key, value) in mapping.Children)
                 {
                     var op = Operators[((YamlScalarNode)key).Value!];
-                    if (op != Operator.Exists)
+                    switch (op)
                     {
-                        conditions.Add(new Condition { Operator = op, Value = Template(file, value) });
-                    }
-                    else if (value is YamlScalarNode { Value: "true" or "false" } flag)
-                    {
-                        conditions.Add(new Condition { Operator = op, Exists = flag.Value == "true" });
-                    }
-                    else
-                    {
-                        Error(file, value, "exists must be true or false");
+                        case Operator.Exists:
+                            if (value is YamlScalarNode { Value: "true" or "false" } flag)
+                                conditions.Add(new Condition { Operator = op, Exists = flag.Value == "true" });
+                            else
+                                Error(file, value, "exists must be true or false");
+                            break;
+
+                        case Operator.In:
+                            if (value is YamlSequenceNode { Children.Count: > 0 })
+                                conditions.Add(new Condition { Operator = op, Value = Template(file, value) });
+                            else
+                                Error(file, value, "in needs a list of values, e.g. { in: [active, pending] }");
+                            break;
+
+                        case Operator.Any:
+                            // Each alternative is a value (equality) or a mapping of operators (all must hold).
+                            if (value is YamlSequenceNode { Children.Count: > 0 } alternatives)
+                                conditions.Add(new Condition { Operator = op, Alternatives = alternatives.Children.Select(a => ParseConditions(file, a)).ToList() });
+                            else
+                                Error(file, value, "any needs a list of conditions, e.g. { any: [ { lt: 0 }, { gt: 100 } ] }");
+                            break;
+
+                        default:
+                            conditions.Add(new Condition { Operator = op, Value = Template(file, value) });
+                            break;
                     }
                 }
                 return conditions;

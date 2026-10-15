@@ -112,7 +112,7 @@ steps:
 | `call` | Name of the endpoint. |
 | `name` | Shown in the report. Without it the step is shown as the call plus its path and query arguments, e.g. `status code=200`; body and header arguments are left out, since they may be secrets. |
 | `with` | Arguments for the endpoint's placeholders. They may reference variables (`id: ${userId}`). |
-| `expect.status` | Expected status code. Without it any 2xx status is accepted and anything else fails the step. |
+| `expect.status` | Expected status code, or a list of accepted ones (`[200, 204]`). Without it any 2xx status is accepted and anything else fails the step. |
 | `expect.headers` | Checks on response headers (case-insensitive names). |
 | `expect.body` | Checks on the JSON body, keyed by JSONPath. |
 | `expect.duration` | Check on the response time, e.g. `{ lt: 500ms }`. |
@@ -148,7 +148,7 @@ expect:
   body:
     $.email: mario@example.com              # equality
     $.pagination.total: { gte: 3 }
-    $.price: { gt: 0, lt: 100 }             # several operators: all must pass
+    $.price: { gt: 0, lt: 100 }             # several operators: all must pass (see below)
     $.deletedAt: null
     $.id: { exists: true }
     $.tags: { contains: admin }             # array element or substring
@@ -163,8 +163,58 @@ expect:
 | `gt`, `gte`, `lt`, `lte` | numeric comparison; for `duration` the values are times (`500ms`, `2s`, `1m`) |
 | `exists` | the path exists (`true`) or not (`false`) |
 | `contains` | the array contains the value, or the string contains the text |
+| `in` | equal to one of the values of a list: `{ in: [active, pending] }` |
+| `any` | at least one of a list of conditions holds: `{ any: [ { lt: 0 }, { gt: 100 } ] }` |
 
 Equality is typed: `$.id: 1` matches the number `1`, `$.id: "1"` matches the string `"1"`; numbers compare by value (`9.9` equals `9.90`). Header values are text, so header checks compare text. A mapping is read as operators only when all its keys are operators; mixing operators and fields is an error. Expected values may contain placeholders (`$.id: ${userId}`). Every check of a step is evaluated and reported, not only the first failure.
+
+### Several conditions on one value
+
+Put several operators in the same mapping: **all of them must pass**. Each one is reported on its own line, so a failure shows exactly which condition did not hold.
+
+```yaml
+expect:
+  body:
+    $.count: { gt: 0, lt: 10 }                               # a range: 0 < count < 10
+    $.email: { eq: ada@example.com, contains: "@example.com" } # equality plus another condition
+    $.id: { exists: true, gt: 0 }
+  headers:
+    Content-Type: { contains: json, ne: application/xml }
+  duration: { gte: 10ms, lt: 500ms }
+```
+
+```text
+  ✗ Get user  GET  200  12.4ms  /users/1
+      ✓ $.count > 0
+      ✗ $.count < 10  actual 12
+```
+
+To combine equality with other conditions write it as `eq`: a plain value is a single condition. A JSONPath cannot be repeated as a key (`$.email: …` twice), since YAML does not allow duplicate keys; foxify reports it before running.
+
+### Alternatives (OR)
+
+The operators of a mapping are combined with AND. For OR there are three tools:
+
+```yaml
+expect:
+  status: [200, 204]                                  # any of these status codes
+  body:
+    $.status: { in: [active, pending] }               # one of these values
+    $.count: { any: [ { lt: 0 }, { gt: 100 } ] }      # one of these conditions
+    $.deletedAt: { any: [ null, { exists: false } ] } # null, or not there at all
+```
+
+- **`in`** takes a list of values and passes when the actual value equals one of them; equality is typed, as for plain values.
+- **`any`** takes a list of alternatives and passes when at least one holds. An alternative is a value (equality) or a mapping of operators, which must all hold: `{ any: [ 0, { gte: 10, lte: 20 } ] }` means "0, or between 10 and 20".
+- **`status`** accepts a list of codes.
+
+`in` and `any` work on headers too, and combine with the other operators of the same mapping: `{ in: [admin, owner], ne: guest }`. In the report each one is a single line:
+
+```text
+  ✗ get_user id=3  GET  200  352.78ms  /users/3
+      ✗ $.id < 2 or (> 5 and < 10)  actual 3
+      ✗ $.username in ["Bret","Antonette"]  actual "Samantha"
+```
 
 ## Validation before running
 

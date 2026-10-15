@@ -33,9 +33,9 @@ public sealed class WorkflowSummary
         int checksPassed = 0, checksFailed = 0;
         foreach (var step in report.StepReports)
         {
-            if (step.ExpectedStatusCode is not null && step.StatusCode is not null)
+            if (step.ExpectedStatusCodes.Count > 0 && step.StatusCode is { } status)
             {
-                if (step.StatusCode == step.ExpectedStatusCode) checksPassed++;
+                if (step.ExpectedStatusCodes.Contains(status)) checksPassed++;
                 else checksFailed++;
             }
 

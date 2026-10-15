@@ -152,12 +152,12 @@ public sealed class WorkflowEngine
         _log.WriteLine($"Response Content: {Encoding.UTF8.GetString(bodyBytes)}");
 
         int status = (int)response.StatusCode;
-        if (expect.Status is { } expectedStatus)
+        if (expect.Status.Count > 0)
         {
-            report.ExpectedStatusCode = (HttpStatusCode)expectedStatus;
-            if (status != expectedStatus)
+            report.ExpectedStatusCodes.AddRange(expect.Status.Select(code => (HttpStatusCode)code));
+            if (!expect.Status.Contains(status))
             {
-                Fail(report, $"Expected status {expectedStatus}, got {status}");
+                Fail(report, $"Expected status {string.Join(" or ", expect.Status)}, got {status}");
                 return;
             }
         }

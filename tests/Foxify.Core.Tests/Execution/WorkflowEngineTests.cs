@@ -274,6 +274,9 @@ public class WorkflowEngineTests
     [InlineData(HttpStatusCode.NotFound, "", false)]           // without expect.status any 2xx is required
     [InlineData(HttpStatusCode.NotFound, "status: 404", true)]
     [InlineData(HttpStatusCode.OK, "status: 201", false)]
+    [InlineData(HttpStatusCode.NoContent, "status: [200, 204]", true)]
+    [InlineData(HttpStatusCode.NotFound, "status: [404, 410]", true)]
+    [InlineData(HttpStatusCode.InternalServerError, "status: [200, 204]", false)]
     public async Task Status_IsChecked(HttpStatusCode actual, string expect, bool success)
     {
         var (report, _) = await Run.Workflow($$"""
@@ -323,6 +326,21 @@ public class WorkflowEngineTests
     [InlineData("$.id: { gt: 7 }", false)]
     [InlineData("$.price: { gt: 0, lt: 10 }", true)]
     [InlineData("$.price: { gt: 0, lt: 5 }", false)]
+    [InlineData("$.name: { eq: Ada, contains: d }", true)]     // equality plus another condition
+    [InlineData("$.name: { eq: Ada, contains: z }", false)]
+    [InlineData("$.name: { eq: Bob, contains: d }", false)]
+    [InlineData("$.id: { exists: true, gt: 0, lte: 7 }", true)]
+    [InlineData("$.name: { in: [Ada, Bob] }", true)]           // OR between values
+    [InlineData("$.name: { in: [Bob, Eve] }", false)]
+    [InlineData("$.id: { in: [6, 7] }", true)]
+    [InlineData("$.id: { in: [\"7\"] }", false)]                // typed, like equality
+    [InlineData("$.missing: { in: [1, 2] }", false)]
+    [InlineData("$.id: { any: [ { lt: 0 }, { gt: 5 } ] }", true)]          // OR between conditions
+    [InlineData("$.id: { any: [ { lt: 0 }, { gt: 100 } ] }", false)]
+    [InlineData("$.id: { any: [ 1, { gte: 7, lt: 8 } ] }", true)]          // an alternative with an AND inside
+    [InlineData("$.deletedAt: { any: [ null, { exists: false } ] }", true)]
+    [InlineData("$.missing: { any: [ null, { exists: false } ] }", true)]
+    [InlineData("$.name: { any: [ Bob, { contains: d } ], ne: Eve }", true)] // OR combined with AND
     [InlineData("$.name: { ne: Bob }", true)]
     [InlineData("$.name: { contains: d }", true)]
     [InlineData("$.tags: { contains: admin }", true)]
@@ -378,6 +396,47 @@ public class WorkflowEngineTests
     }
 
     [Fact]
+    public async Task OrConditions_AreDescribedInTheReport()
+    {
+        var (report, _) = await Run.Workflow($$"""
+            {{Api}}
+            endpoints:
+              item: { path: /item }
+            steps:
+              - call: item
+                expect:
+                  status: [200, 204]
+                  body:
+                    $.name: { in: [Bob, Eve] }
+                    $.id: { any: [ { lt: 0 }, { gte: 100, lt: 200 }, null ] }
+            """,
+            respond: _ => new FakeResponse(Body: Payload));
+
+        var step = report.Single();
+        Assert.False(step.IsSuccess);
+        Assert.Equal([HttpStatusCode.OK, HttpStatusCode.NoContent], step.ExpectedStatusCodes);
+        Assert.Collection(step.Assertions,
+            a => Assert.Equal("in [\"Bob\",\"Eve\"]", a.Condition),
+            b => Assert.Equal("< 0 or (>= 100 and < 200) or == null", b.Condition));
+    }
+
+    [Fact]
+    public async Task UnexpectedStatus_ListsTheAcceptedCodes()
+    {
+        var (report, _) = await Run.Workflow($$"""
+            {{Api}}
+            endpoints:
+              item: { path: /item }
+            steps:
+              - call: item
+                expect: { status: [200, 204] }
+            """,
+            respond: _ => new FakeResponse(HttpStatusCode.InternalServerError));
+
+        Assert.Equal("Expected status 200 or 204, got 500", report.Single().FailureReason);
+    }
+
+    [Fact]
     public async Task BodyChecksOnInvalidJson_FailTheStep()
     {
         var (report, _) = await Run.Workflow($$"""
@@ -406,6 +465,9 @@ public class WorkflowEngineTests
     [InlineData("X-Count: 3", true)]                       // header values are compared as text
     [InlineData("X-Missing: { exists: false }", true)]
     [InlineData("X-Missing: { exists: true }", false)]
+    [InlineData("X-Request-Id: { in: [abc, def] }", true)]
+    [InlineData("X-Count: { in: [1, 2] }", false)]
+    [InlineData("X-Request-Id: { any: [ { contains: z }, { contains: b } ] }", true)]
     public async Task HeaderChecks(string check, bool passed)
     {
         var (report, _) = await Run.Workflow($$"""
@@ -550,7 +612,7 @@ public class WorkflowEngineTests
         Assert.Equal("POST", step.Method);
         Assert.Equal("https://api.test/v1/users", step.Url?.ToString());
         Assert.Equal(HttpStatusCode.Created, step.StatusCode);
-        Assert.Equal(HttpStatusCode.Created, step.ExpectedStatusCode);
+        Assert.Equal([HttpStatusCode.Created], step.ExpectedStatusCodes);
         Assert.Equal(14, step.BytesSent);       // {"name":"ada"}
         Assert.Equal(11, step.BytesReceived);
         Assert.True(step.Duration > TimeSpan.Zero);

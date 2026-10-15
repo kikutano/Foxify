@@ -19,7 +19,7 @@ steps:
       body:
         $.catalog.name: Tyfapi Test Catalog
         $.catalog.metadata.created_by.username: admin
-        $.catalog.categories[0].name: Hardware
+        $.catalog.categories[0].name: { in: [Hardware, Software] }
         $.catalog.categories[0].products[0].name: Keyboard
         $.catalog.categories[0].products[0].price: 99.99
         $.catalog.categories[0].products[0].specifications.features[0]: mechanical

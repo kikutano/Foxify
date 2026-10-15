@@ -90,8 +90,8 @@ public sealed class CallStep : StepDefinition
 
 public sealed class Expectation
 {
-    /// <summary>Expected status code; when null any 2xx is accepted.</summary>
-    public int? Status { get; init; }
+    /// <summary>Accepted status codes; when empty any 2xx is accepted.</summary>
+    public IReadOnlyList<int> Status { get; init; } = [];
     public IReadOnlyList<Check> Headers { get; init; } = [];
     public IReadOnlyList<Check> Body { get; init; } = [];
     public IReadOnlyList<Condition> Duration { get; init; } = [];
@@ -113,7 +113,11 @@ public enum Operator
     LessThan,
     LessOrEqual,
     Exists,
-    Contains
+    Contains,
+    /// <summary>Equal to one of the values of a list.</summary>
+    In,
+    /// <summary>At least one of the <see cref="Condition.Alternatives"/> holds.</summary>
+    Any
 }
 
 public sealed class Condition
@@ -125,4 +129,6 @@ public sealed class Condition
     public bool Exists { get; init; }
     /// <summary>For duration conditions.</summary>
     public TimeSpan? DurationValue { get; init; }
+    /// <summary>For <see cref="Operator.Any"/>: each alternative is a list of conditions that must all hold.</summary>
+    public IReadOnlyList<IReadOnlyList<Condition>> Alternatives { get; init; } = [];
 }
