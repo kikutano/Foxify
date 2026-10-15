@@ -1,4 +1,6 @@
-![](logo.jpg)
+<p align="center">
+  <img src="logo.jpg" alt="foxify logo">
+</p>
 
 # ⚡ Foxify
 
