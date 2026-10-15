@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Text.Json;
+using Foxify.Core.Definitions;
 using Foxify.Core.Execution;
 using Foxify.Core.Models;
 using Foxify.Core.Reporting;
@@ -32,33 +34,46 @@ internal sealed class ConsoleReporter
         _fail = _unicode ? "✗" : "x";
     }
 
-    public void WriteHeader(string version, string workflowPath, string? envPath, WorkflowTemplate workflow)
+    public void WriteHeader(string version, string workflowPath, string? envPath,
+        WorkflowDefinition workflow, IReadOnlyDictionary<string, JsonElement> environment)
     {
-        var steps = workflow.Workflow.Where(s => !WorkflowEngine.IsDelayStep(s)).ToList();
-        _nameWidth = Math.Clamp(
-            steps.Select(s => WorkflowEngine.GetStepName(s).Length).DefaultIfEmpty(0).Max(), 4, MaxNameWidth);
+        var steps = workflow.Steps.OfType<CallStep>().ToList();
+        _nameWidth = Math.Clamp(steps.Select(s => s.Name.Length).DefaultIfEmpty(0).Max(), 4, MaxNameWidth);
 
         _console.WriteLine();
         _console.MarkupLine($"  [bold orange1]{(_unicode ? "⚡ " : "")}foxify[/] [grey]{Escape(version)}[/]");
         _console.WriteLine();
 
-        WriteHeaderRow("workflow", workflow.Metadata.Name);
+        WriteHeaderRow("workflow", workflow.Name);
         WriteHeaderRow("file", workflowPath);
         if (envPath is not null)
             WriteHeaderRow("env", envPath);
-        if (workflow.EnvironmentVariables.TryGetValue("baseUrl", out var baseUrl) && baseUrl is not null)
-            WriteHeaderRow("base url", baseUrl.ToString()!);
+        if (environment.TryGetValue("baseUrl", out var baseUrl) && baseUrl.ValueKind == JsonValueKind.String)
+            WriteHeaderRow("base url", baseUrl.GetString()!);
         WriteHeaderRow("steps", steps.Count.ToString(CultureInfo.InvariantCulture));
 
         _console.WriteLine();
     }
 
-    public async Task<WorkflowReport> RunAsync(WorkflowEngine engine, WorkflowTemplate workflow)
+    /// <summary>Prints the problems found while loading the workflow, one per line with its location.</summary>
+    public static void WriteLoadErrors(IAnsiConsole console, IReadOnlyList<string> errors)
+    {
+        var fail = console.Profile.Capabilities.Unicode ? "✗" : "x";
+        console.WriteLine();
+        console.MarkupLine($"  [bold red]{fail} The workflow is not valid[/] [grey]({errors.Count} {(errors.Count == 1 ? "problem" : "problems")})[/]");
+        console.WriteLine();
+        foreach (var error in errors)
+            console.MarkupLine($"  [red]{Escape(error)}[/]");
+        console.WriteLine();
+    }
+
+    public async Task<WorkflowReport> RunAsync(
+        WorkflowEngine engine, WorkflowDefinition workflow, IReadOnlyDictionary<string, JsonElement> environment)
     {
         engine.StepCompleted += WriteStep;
 
         if (!_live)
-            return await engine.ExecuteWorkflowAsync(workflow);
+            return await engine.ExecuteAsync(workflow, environment);
 
         WorkflowReport? report = null;
         await _console.Status()
@@ -67,7 +82,7 @@ internal sealed class ConsoleReporter
             .StartAsync("starting", async context =>
             {
                 engine.StepStarted += name => context.Status($"[grey]running[/] {Escape(name)}");
-                report = await engine.ExecuteWorkflowAsync(workflow);
+                report = await engine.ExecuteAsync(workflow, environment);
             });
 
         return report!;
@@ -127,10 +142,10 @@ internal sealed class ConsoleReporter
         {
             foreach (var assertion in step.Assertions)
             {
-                var check = $"{Escape(assertion.Variable)} {Escape(assertion.Expression)}";
+                var check = $"{Escape(assertion.Subject)} {Escape(assertion.Condition)}";
                 _console.MarkupLine(assertion.Passed
                     ? $"      [green]{_pass}[/] [grey]{check}[/]"
-                    : $"      [red]{_fail}[/] {check}  [grey]actual[/] [red]'{Escape(assertion.ActualValue)}'[/]");
+                    : $"      [red]{_fail}[/] {check}  [grey]actual[/] [red]{Escape(assertion.ActualValue)}[/]");
             }
         }
         else if (step.FailureReason is not null)

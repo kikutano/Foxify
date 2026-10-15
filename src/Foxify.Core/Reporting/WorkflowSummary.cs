@@ -1,4 +1,4 @@
-using Foxify.Core.Execution;
+using Foxify.Core.Definitions;
 using Foxify.Core.Models;
 
 namespace Foxify.Core.Reporting;
@@ -6,7 +6,7 @@ namespace Foxify.Core.Reporting;
 /// <summary>Aggregated metrics of a workflow run, in the spirit of the k6 end-of-test summary.</summary>
 public sealed class WorkflowSummary
 {
-    /// <summary>Steps the workflow would run (delays excluded).</summary>
+    /// <summary>Call steps of the workflow (sleeps excluded).</summary>
     public int TotalSteps { get; init; }
     public int PassedSteps { get; init; }
     public int FailedSteps { get; init; }
@@ -26,7 +26,7 @@ public sealed class WorkflowSummary
 
     public bool IsSuccess => FailedSteps == 0 && NotRunSteps == 0;
 
-    public static WorkflowSummary Create(WorkflowTemplate workflow, WorkflowReport report)
+    public static WorkflowSummary Create(WorkflowDefinition workflow, WorkflowReport report)
     {
         var responses = report.StepReports.Where(s => s.StatusCode is not null).ToList();
 
@@ -45,7 +45,7 @@ public sealed class WorkflowSummary
 
         return new WorkflowSummary
         {
-            TotalSteps = workflow.Workflow.Count(s => !WorkflowEngine.IsDelayStep(s)),
+            TotalSteps = workflow.Steps.OfType<CallStep>().Count(),
             PassedSteps = report.StepReports.Count(s => s.IsSuccess),
             FailedSteps = report.StepReports.Count(s => !s.IsSuccess),
             ChecksPassed = checksPassed,

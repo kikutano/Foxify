@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 namespace Foxify.Core.Execution;
 
 /// <summary>
-/// Minimal JSONPath subset used by <c>extract</c>:
+/// Minimal JSONPath subset used by checks and <c>save</c>:
 /// <c>$</c>, <c>$.a.b</c>, <c>$.items[0].name</c>, <c>$[1]</c>, <c>$.matrix[0][1]</c>.
 /// </summary>
 internal static partial class JsonPath
@@ -13,53 +13,60 @@ internal static partial class JsonPath
     [GeneratedRegex(@"\.([^.\[\]]+)|\[(\d+)\]")]
     private static partial Regex Segment();
 
-    /// <summary>
-    /// Returns the value at <paramref name="path"/> as a string (numbers keep their raw
-    /// representation, booleans are "true"/"false", objects and arrays are raw JSON),
-    /// or null when the path is invalid, does not match, or points to a JSON null.
-    /// </summary>
-    public static string? Select(JsonElement root, string path)
+    public static bool IsValid(string path) => TryParse(path, out _);
+
+    /// <summary>Finds the value at <paramref name="path"/>; false when the path does not match.</summary>
+    public static bool TrySelect(JsonElement root, string path, out JsonElement value)
     {
-        if (string.IsNullOrWhiteSpace(path) || path[0] != '$')
-            return null;
+        value = default;
+        if (!TryParse(path, out var segments))
+            return false;
 
-        var segments = path[1..];
         var current = root;
-        int consumed = 0;
-
-        foreach (Match segment in Segment().Matches(segments))
+        foreach (var segment in segments)
         {
-            // Reject paths with gaps between segments, e.g. "$.a..b" or "$.a[x]".
-            if (segment.Index != consumed)
-                return null;
-            consumed += segment.Length;
-
-            if (segment.Groups[1].Success)
+            if (segment.Property is { } property)
             {
-                if (current.ValueKind != JsonValueKind.Object ||
-                    !current.TryGetProperty(segment.Groups[1].Value, out current))
-                    return null;
+                if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(property, out current))
+                    return false;
             }
             else
             {
-                if (current.ValueKind != JsonValueKind.Array ||
-                    !int.TryParse(segment.Groups[2].Value, out var index) ||
-                    index >= current.GetArrayLength())
-                    return null;
-                current = current[index];
+                if (current.ValueKind != JsonValueKind.Array || segment.Index >= current.GetArrayLength())
+                    return false;
+                current = current[segment.Index];
             }
         }
 
-        if (consumed != segments.Length)
-            return null;
+        value = current;
+        return true;
+    }
 
-        return current.ValueKind switch
+    private readonly record struct PathSegment(string? Property, int Index);
+
+    private static bool TryParse(string path, out List<PathSegment> segments)
+    {
+        segments = new List<PathSegment>();
+        if (string.IsNullOrWhiteSpace(path) || path[0] != '$')
+            return false;
+
+        var rest = path[1..];
+        int consumed = 0;
+        foreach (Match match in Segment().Matches(rest))
         {
-            JsonValueKind.Null or JsonValueKind.Undefined => null,
-            JsonValueKind.True => "true",
-            JsonValueKind.False => "false",
-            JsonValueKind.String => current.GetString(),
-            _ => current.GetRawText() // numbers keep their exact representation; objects/arrays as JSON
-        };
+            // Reject paths with gaps between segments, e.g. "$.a..b" or "$.a[x]".
+            if (match.Index != consumed)
+                return false;
+            consumed += match.Length;
+
+            if (match.Groups[1].Success)
+                segments.Add(new PathSegment(match.Groups[1].Value, 0));
+            else if (int.TryParse(match.Groups[2].Value, out var index))
+                segments.Add(new PathSegment(null, index));
+            else
+                return false;
+        }
+
+        return consumed == rest.Length;
     }
 }

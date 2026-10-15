@@ -1,0 +1,142 @@
+name: Users
+description: Listing, filtering and the full lifecycle of a user created by the workflow itself.
+
+import:
+  - ../api/testserver.yaml
+
+steps:
+  - name: Log in
+    call: login
+    with:
+      password: password
+    save:
+      token: $.access_token
+
+  # --- Reading --------------------------------------------------------------
+
+  - name: First page of users
+    call: list_users
+    with:
+      page: 1
+      pageSize: 2
+    expect:
+      status: 200
+      body:
+        $.pagination.total: { gte: 3 }
+        $.pagination.page: 1
+        $.pagination.page_size: 2
+        $.data[0].id: 1
+        $.data[0].email: gaetano@example.com
+        $.data[1].id: 2
+
+  - name: Only active users
+    call: list_users
+    with:
+      active: true
+    expect:
+      body:
+        $.pagination.total: { gte: 2 }
+        $.data[0].active: true
+
+  - name: Search by name
+    call: list_users
+    with:
+      search: mario
+    expect:
+      body:
+        $.pagination.total: 1
+        $.data[0].email: mario@example.com
+
+  - name: User by id
+    call: get_user
+    with:
+      id: 1
+    expect:
+      status: 200
+      body:
+        $.id: 1
+        $.email: gaetano@example.com
+        $.address.city: Cerignola
+        $.address.country: Italy
+
+  - name: Nested users list
+    call: list_users_nested
+    expect:
+      body:
+        $.success: true
+        $.result.summary.count: { gte: 3 }
+        $.result.users[0].email: gaetano@example.com
+        $.result.users[0].profile.location.city: Cerignola
+
+  # --- Lifecycle of a new user ----------------------------------------------
+
+  - name: Create a user
+    call: create_user
+    with:
+      firstName: Test
+      lastName: User
+      email: test.user@example.com
+    expect:
+      status: 201
+      body:
+        $.id: { exists: true }
+        $.email: test.user@example.com
+        $.address.city: Bari
+    save:
+      userId: $.id
+
+  - name: Email is required
+    call: create_user
+    with:
+      firstName: Invalid
+      lastName: User
+      email: ""
+    expect:
+      status: 400
+      body:
+        $.error: validation_error
+        $.field: email
+
+  - name: Replace the user
+    call: replace_user
+    with:
+      id: ${userId}
+      firstName: Test
+      lastName: Updated
+      email: test.updated@example.com
+      city: Rome
+    expect:
+      status: 200
+      body:
+        $.email: test.updated@example.com
+        $.address.city: Rome
+
+  - name: Patch the user
+    call: patch_user
+    with:
+      id: ${userId}
+      changes:
+        firstName: Patched
+        active: false
+    expect:
+      status: 200
+      body:
+        $.firstName: Patched
+        $.email: test.updated@example.com
+        $.active: false
+
+  - name: Delete the user
+    call: delete_user
+    with:
+      id: ${userId}
+    expect:
+      status: 204
+
+  - name: Deleted user is gone
+    call: get_user
+    with:
+      id: ${userId}
+    expect:
+      status: 404
+      body:
+        $.error: user_not_found

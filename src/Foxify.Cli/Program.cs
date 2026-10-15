@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using Foxify.Cli;
+using Foxify.Core.Definitions;
 using Foxify.Core.Execution;
 using Foxify.Core.Parsing;
 using Foxify.Core.Reporting;
@@ -33,7 +35,7 @@ const string Usage = """
     Exit codes ('run'):
       0  all steps passed
       1  at least one step failed
-      2  invalid arguments or file not found
+      2  invalid arguments, file not found or invalid workflow
     """;
 
 UpdateCommand.CleanupPreviousVersion();
@@ -116,54 +118,48 @@ if (envFilePath is not null && !File.Exists(envFilePath))
 
 var console = CreateConsole(noColor);
 
+WorkflowDefinition workflow;
+IReadOnlyDictionary<string, JsonElement> environment;
 try
 {
-    var parser = new WorkflowParser();
-    var environmentVariables = envFilePath is null
-        ? new Dictionary<string, object>()
-        : parser.ParseEnvironment(File.ReadAllText(envFilePath));
-
-    var workflow = parser.Parse(File.ReadAllText(workflowPath), environmentVariables);
-
-    if (verbose)
-    {
-        PrintVariables("Metadata variables", workflow.Metadata.Variables);
-        PrintVariables("Workflow variables", workflow.Variables);
-        PrintVariables("Environment variables", workflow.EnvironmentVariables);
-    }
-
-    using var httpClient = new HttpClient();
-    if (workflow.Settings?.Timeout > 0)
-        httpClient.Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout);
-
-    // In verbose mode the engine's request/response log is printed and the spinner is
-    // disabled, since it would interleave with that log.
-    var engine = new WorkflowEngine(httpClient, verbose ? Console.Out : TextWriter.Null);
-    var reporter = new ConsoleReporter(console, live: !verbose);
-
-    reporter.WriteHeader(GetVersion(), workflowPath, envFilePath, workflow);
-
-    var stopwatch = Stopwatch.StartNew();
-    var report = await reporter.RunAsync(engine, workflow);
-    var summary = WorkflowSummary.Create(workflow, report);
-    reporter.WriteSummary(summary, stopwatch.Elapsed);
-
-    return summary.IsSuccess ? ExitSuccess : ExitWorkflowFailed;
+    // Everything is validated before the first request: a typo is reported, not half-run.
+    workflow = WorkflowLoader.Load(workflowPath);
+    environment = envFilePath is null ? new Dictionary<string, JsonElement>() : WorkflowLoader.LoadEnvironment(envFilePath);
 }
-catch (Exception ex)
+catch (WorkflowLoadException ex)
 {
-    Console.Error.WriteLine($"Error processing workflow: {ex.Message}");
-    if (verbose)
-        Console.Error.WriteLine(ex.StackTrace);
-    return ExitWorkflowFailed;
+    ConsoleReporter.WriteLoadErrors(console, ex.Errors);
+    return ExitUsageError;
 }
 
-static void PrintVariables(string title, Dictionary<string, object> variables)
+if (verbose)
+{
+    PrintVariables("Workflow variables", workflow.Variables);
+    PrintVariables("Environment variables", environment);
+}
+
+using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout) };
+
+// In verbose mode the engine's request/response log is printed and the spinner is
+// disabled, since it would interleave with that log.
+var engine = new WorkflowEngine(httpClient, verbose ? Console.Out : TextWriter.Null);
+var reporter = new ConsoleReporter(console, live: !verbose);
+
+reporter.WriteHeader(GetVersion(), workflowPath, envFilePath, workflow, environment);
+
+var stopwatch = Stopwatch.StartNew();
+var report = await reporter.RunAsync(engine, workflow, environment);
+var summary = WorkflowSummary.Create(workflow, report);
+reporter.WriteSummary(summary, stopwatch.Elapsed);
+
+return summary.IsSuccess ? ExitSuccess : ExitWorkflowFailed;
+
+static void PrintVariables(string title, IReadOnlyDictionary<string, JsonElement> variables)
 {
     Console.WriteLine($"{title}:");
-    foreach (var variable in variables)
+    foreach (var (name, value) in variables)
     {
-        Console.WriteLine($"  {variable.Key}: {variable.Value}");
+        Console.WriteLine($"  {name}: {value.GetRawText()}");
     }
 }
 
