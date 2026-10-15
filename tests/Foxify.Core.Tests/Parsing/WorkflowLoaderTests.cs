@@ -96,6 +96,12 @@ public sealed class WorkflowLoaderTests : IDisposable
     [InlineData("  - call: get_user\n    save: { id: data.id }", "invalid JSONPath 'data.id'")]
     [InlineData("  - call: get_user\n    expect: { body: { $.a: { gte: 1, name: x } } }", "cannot mix operators")]
     [InlineData("  - call: get_user\n    expect: { body: { $.a: { exists: maybe } } }", "exists must be true or false")]
+    [InlineData("  - call: get_user\n    expect: { status: [] }", "status needs at least one code")]
+    [InlineData("  - call: get_user\n    expect: { status: [200, abc] }", "invalid status code 'abc'")]
+    [InlineData("  - call: get_user\n    expect: { body: { $.a: { in: x } } }", "in needs a list of values")]
+    [InlineData("  - call: get_user\n    expect: { body: { $.a: { in: [] } } }", "in needs a list of values")]
+    [InlineData("  - call: get_user\n    expect: { body: { $.a: { any: { lt: 1 } } } }", "any needs a list of conditions")]
+    [InlineData("  - call: get_user\n    expect: { body: { $.a: { any: [ { lt: 1, x: 2 } ] } } }", "cannot mix operators")]
     [InlineData("  - call: get_user\n    expect: { duration: 2s }", "duration needs a comparison")]
     [InlineData("  - call: get_user\n    expect: { duration: { lt: soon } }", "invalid duration 'soon'")]
     [InlineData("  - call: get_user\n    expect: { duration: { eq: 1s } }", "unknown key 'eq' in expect.duration")]
@@ -209,7 +215,7 @@ public sealed class WorkflowLoaderTests : IDisposable
                   userId: $.id
             """, "test.yaml").Steps.Single();
 
-        Assert.Equal(200, step.Expect.Status);
+        Assert.Equal([200], step.Expect.Status);
         Assert.Equal(Operator.Contains, step.Expect.Headers.Single().Conditions.Single().Operator);
         Assert.Equal(["$.email", "$.total", "$.deleted"], step.Expect.Body.Select(c => c.Subject));
         Assert.Equal([Operator.GreaterOrEqual, Operator.LessThan], step.Expect.Body[1].Conditions.Select(c => c.Operator));

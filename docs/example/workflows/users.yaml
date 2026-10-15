@@ -64,6 +64,7 @@ steps:
     expect:
       body:
         $.success: true
+        $.result.summary.active: { gt: 0, lte: 3 }
         $.result.summary.count: { gte: 3 }
         $.result.users[0].email: gaetano@example.com
         $.result.users[0].profile.location.city: Cerignola
@@ -130,13 +131,13 @@ steps:
     with:
       id: ${userId}
     expect:
-      status: 204
+      status: [200, 204]           # either is a valid answer to DELETE
 
   - name: Deleted user is gone
     call: get_user
     with:
       id: ${userId}
     expect:
-      status: 404
+      status: [404, 410]
       body:
         $.error: user_not_found

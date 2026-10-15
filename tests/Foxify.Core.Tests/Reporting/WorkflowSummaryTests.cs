@@ -36,7 +36,7 @@ public class WorkflowSummaryTests
                 new StepReport
                 {
                     StatusCode = HttpStatusCode.OK,
-                    ExpectedStatusCode = HttpStatusCode.OK,
+                    ExpectedStatusCodes = { HttpStatusCode.OK },
                     BytesSent = 10,
                     BytesReceived = 100,
                     Assertions = { new() { Passed = true }, new() { Passed = true } }
@@ -45,7 +45,7 @@ public class WorkflowSummaryTests
                 {
                     IsSuccess = false,
                     StatusCode = HttpStatusCode.OK,
-                    ExpectedStatusCode = HttpStatusCode.OK,
+                    ExpectedStatusCodes = { HttpStatusCode.OK },
                     BytesReceived = 50,
                     Assertions = { new() { Passed = false } }
                 }
@@ -67,6 +67,27 @@ public class WorkflowSummaryTests
     }
 
     [Fact]
+    public void StatusInTheAcceptedList_CountsAsOnePassedCheck()
+    {
+        var report = new WorkflowReport
+        {
+            StepReports =
+            {
+                new StepReport
+                {
+                    StatusCode = HttpStatusCode.NoContent,
+                    ExpectedStatusCodes = { HttpStatusCode.OK, HttpStatusCode.NoContent }
+                }
+            }
+        };
+
+        var summary = WorkflowSummary.Create(WorkflowWithSteps(1), report);
+
+        Assert.Equal(1, summary.ChecksPassed);
+        Assert.Equal(0, summary.ChecksFailed);
+    }
+
+    [Fact]
     public void WrongStatus_CountsAsFailedCheck()
     {
         var report = new WorkflowReport
@@ -77,7 +98,7 @@ public class WorkflowSummaryTests
                 {
                     IsSuccess = false,
                     StatusCode = HttpStatusCode.InternalServerError,
-                    ExpectedStatusCode = HttpStatusCode.OK
+                    ExpectedStatusCodes = { HttpStatusCode.OK }
                 }
             }
         };

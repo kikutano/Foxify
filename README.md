@@ -200,7 +200,8 @@ steps:
         $.email: gaetano@example.com
         $.orders: { gt: 0, lt: 100 }       # several conditions on one value: all must pass
         $.name: { eq: Gaetano, contains: Gae }
-        $.deletedAt: { exists: false }
+        $.role: { in: [admin, owner] }     # OR: one of these values
+        $.deletedAt: { any: [ null, { exists: false } ] }   # OR: one of these conditions
 
   - sleep: 500ms
 ```
@@ -208,8 +209,8 @@ steps:
 | In a step | Description |
 |---|---|
 | `call` / `with` | The endpoint to call and its arguments. |
-| `expect.status` | Expected status code; without it any 2xx is accepted. |
-| `expect.body` | Checks by JSONPath: a plain value means equal; operators `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `exists`, `contains`. Combine them on one value, e.g. `{ gt: 0, lt: 10 }`: all must pass. |
+| `expect.status` | Expected status code, or a list (`[200, 204]`); without it any 2xx is accepted. |
+| `expect.body` | Checks by JSONPath: a plain value means equal; operators `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `exists`, `contains`. Combine them on one value, e.g. `{ gt: 0, lt: 10 }`: all must pass. For OR use `in: [a, b]` (one of these values) or `any: [ { lt: 0 }, { gt: 100 } ]` (one of these conditions). |
 | `expect.headers` | Checks on response headers. |
 | `expect.duration` | Response time, e.g. `{ lt: 500ms }`. |
 | `save` | Values from the response body for the next steps. |
