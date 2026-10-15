@@ -6,12 +6,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Reports trimming/AOT issues at build time: the CLI ships as a Native AOT binary. -->
+    <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Only the representation model (node tree) is used: no reflection, safe for Native AOT. -->
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
-    <!-- Source-generates the YAML (de)serialization code so the parser works under Native AOT. -->
-    <PackageReference Include="Vecc.YamlDotNet.Analyzers.StaticGenerator" Version="18.1.0" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Foxify.Core.Tests" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,5 @@
 using System.Net;
+using Foxify.Core.Definitions;
 using Foxify.Core.Models;
 using Foxify.Core.Reporting;
 
@@ -6,14 +7,16 @@ namespace Foxify.Core.Tests.Reporting;
 
 public class WorkflowSummaryTests
 {
-    private static WorkflowTemplate WorkflowWithSteps(int functionSteps, int delays = 0)
+    private static readonly SourceLocation Here = new("test.yaml", 1, 1);
+
+    private static WorkflowDefinition WorkflowWithSteps(int callSteps, int delays = 0)
     {
-        var workflow = new WorkflowTemplate();
-        for (int i = 0; i < functionSteps; i++)
-            workflow.Workflow.Add(new WorkflowStep { Type = "function", FunctionName = $"F{i}" });
+        var steps = new List<StepDefinition>();
+        for (int i = 0; i < callSteps; i++)
+            steps.Add(new CallStep { Name = $"F{i}", Call = $"F{i}", Location = Here });
         for (int i = 0; i < delays; i++)
-            workflow.Workflow.Add(new WorkflowStep { Type = "DELAY", DurationSeconds = 1 });
-        return workflow;
+            steps.Add(new SleepStep { Duration = TimeSpan.FromSeconds(1), Location = Here });
+        return new WorkflowDefinition { Steps = steps };
     }
 
     private static StepReport Step(int ms, bool success = true, HttpStatusCode? status = HttpStatusCode.OK) => new()
@@ -49,7 +52,7 @@ public class WorkflowSummaryTests
             }
         };
 
-        var summary = WorkflowSummary.Create(WorkflowWithSteps(functionSteps: 4, delays: 2), report);
+        var summary = WorkflowSummary.Create(WorkflowWithSteps(callSteps: 4, delays: 2), report);
 
         Assert.Equal(4, summary.TotalSteps);
         Assert.Equal(1, summary.PassedSteps);

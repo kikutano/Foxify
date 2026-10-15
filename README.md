@@ -6,7 +6,7 @@
 [![Release](https://img.shields.io/github/v/release/kikutano/foxify?include_prereleases)](https://github.com/kikutano/foxify/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](License.md)
 
-API testing from the command line. Describe HTTP calls, variable extraction and assertions in a YAML file, and run them with one command. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
+API testing from the command line. Describe your endpoints once in YAML, then write workflows that call them like functions, pass arguments and check the responses. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
 
 <p align="center">
   <img src="screen.png" alt="foxify run output in the terminal" width="640">
@@ -44,88 +44,88 @@ It downloads the latest release for your platform, verifies its SHA-256 checksum
 
 ## Quick start
 
-`env.yaml`:
-
-```yaml
-baseUrl: "https://jsonplaceholder.typicode.com"
-```
-
 `hello.yaml`:
 
 ```yaml
-metadata:
-  name: "Hello Foxify"
+name: Hello Foxify
+base_url: https://jsonplaceholder.typicode.com
 
-functions:
-  CreatePost:
-    type: HTTP_REQUEST
+endpoints:
+  create_post:
     method: POST
-    endpoint: "/posts"
-    headers:
-      Content-Type: application/json
-    body: |
-      { "title": "foxify", "body": "hello", "userId": 1 }
-    expected:
-      status_code: 201
-    extract:
-      postId: $.id            # save a value from the JSON response
-    asserts:
-      postId: "== 101"        # check an extracted value
+    path: /posts
+    body:
+      title: ${title}
+      userId: 1
+  get_user:
+    path: /users/${id}
 
-  GetUser:
-    type: HTTP_REQUEST
-    method: GET
-    endpoint: "/users/1"
-    expected:
-      status_code: 200
-    extract:
-      email: $.email
-    asserts:
-      email: "== 'Sincere@april.biz'"
+steps:
+  - name: Create a post
+    call: create_post
+    with:
+      title: hello
+    expect:
+      status: 201
+      body:
+        $.id: 101
+        $.title: hello
+    save:
+      postId: $.id              # available as ${postId} in the next steps
 
-workflow:
-  - type: function
-    function_name: CreatePost
-  - type: function
-    function_name: GetUser
-    depends_on: [CreatePost]
+  - call: get_user
+    with:
+      id: 1
+    expect:
+      body:
+        $.email: Sincere@april.biz
+        $.address.city: { contains: Gwen }
+      duration: { lt: 2s }
 ```
 
 Run it:
 
 ```bash
-foxify run hello.yaml -e env.yaml
+foxify run hello.yaml
 ```
 
 ```text
-  ⚡ foxify 0.1.0
+  ⚡ foxify 0.4.0
 
   workflow : Hello Foxify
   file     : hello.yaml
-  env      : env.yaml
-  base url : https://jsonplaceholder.typicode.com
   steps    : 2
 
-  ✓ CreatePost  POST   201   658.74ms  /posts
-  ✓ GetUser     GET    200    41.52ms  /users/1
+  ✓ Create a post  POST   201    708.6ms  /posts
+  ✓ get_user id=1  GET    200    33.27ms  /users/1
 
-  checks..............: 100.00%  ✓ 4  ✗ 0
+  checks..............: 100.00%  ✓ 6  ✗ 0
   steps...............: 2/2 passed
-  http_reqs...........: 2  2.61/s
-  http_req_duration...: avg=350.13ms min=41.52ms med=350.13ms max=658.74ms p(90)=597.02ms p(95)=627.88ms
-  data_received.......: 579 B
-  data_sent...........: 52 B
-  workflow_duration...: 767.26ms
+  http_reqs...........: 2  2.3/s
+  http_req_duration...: avg=370.94ms min=33.27ms med=370.94ms max=708.6ms p(90)=641.07ms p(95)=674.84ms
+  data_received.......: 559 B
+  data_sent...........: 28 B
+  workflow_duration...: 869.39ms
 
    PASSED   2 steps
 ```
 
-When a step fails, every assert of that step is listed with the actual value, and the steps after it are not run:
+When a step fails, every check of that step is listed with the actual value, and the steps after it are not run:
 
 ```text
-  ✗ GetUser     GET    200   227.05ms  /users/1
-      ✗ email == 'nobody@example.com'  actual 'Sincere@april.biz'
-      ✓ city == 'Gwenborough'
+  ✗ Wrong expectations  GET    200     4.73ms  /api/headers
+      ✗ header X-Custom-Header == "something-else"  actual "hello-world"
+      ✓ $.message contains "headers"
+      ✗ duration < 1ms  actual 4.73ms
+```
+
+A mistake in the YAML is reported before any request is sent, with every problem and its location:
+
+```text
+  ✗ The workflow is not valid (2 problems)
+
+  tests/users.yaml:12:5: unknown endpoint 'logn' (did you mean 'login'?)
+  tests/users.yaml:16:5: unknown key 'expcet' in a step (did you mean 'expect'?)
 ```
 
 ## Usage
@@ -151,32 +151,74 @@ Options for 'update':
 Exit codes ('run'):
   0  all steps passed
   1  at least one step failed
-  2  invalid arguments or file not found
+  2  invalid arguments, file not found or invalid workflow
 ```
 
 Execution stops at the first failing step. The exit code makes Foxify easy to use in CI. When the output is not a terminal (CI logs, pipes) the spinner is turned off and each step is printed on its own line.
 
-## Workflow file
+## Workflow format
 
-| Key | Description |
+Endpoints and tests live in separate files, so the same endpoints serve many workflows:
+
+```yaml
+# api/server.yaml: endpoints only, no expectations
+base_url: ${baseUrl}
+auth:
+  bearer:
+    Authorization: "Bearer ${token}"
+endpoints:
+  login:
+    method: POST
+    path: /api/login
+    params:
+      username: admin        # default
+      password:              # required
+    body:
+      username: ${username}
+      password: ${password}
+  get_user:
+    path: /api/users/${id}
+    auth: bearer
+```
+
+```yaml
+# workflows/users.yaml: steps that call the endpoints
+name: Users
+import: [../api/server.yaml]
+steps:
+  - call: login
+    with: { password: password }
+    save: { token: $.access_token }
+
+  - call: get_user
+    with: { id: 1 }
+    expect:
+      status: 200
+      headers:
+        Content-Type: { contains: json }
+      body:
+        $.email: gaetano@example.com
+        $.orders: { gte: 1 }
+        $.deletedAt: { exists: false }
+
+  - sleep: 500ms
+```
+
+| In a step | Description |
 |---|---|
-| `metadata.name` | Name shown in the report. |
-| `functions.<Name>` | A reusable HTTP request: `method`, `baseurl` (optional, defaults to `baseUrl` from the env file), `endpoint`, `headers`, `body`. |
-| `expected.status_code` | Expected HTTP status code. |
-| `extract` | `variable: <JSONPath>` pairs, e.g. `$.token`, `$.data[0].id`, `$.user.address.city`. |
-| `asserts` | Checks on extracted variables: `==`, `!=`, `>`, `>=`, `<`, `<=`, combinable with `&&` and `\|\|`. |
-| `workflow` | Steps run in order: `type: function` with `function_name` (and optional `depends_on`), or `type: DELAY` with `duration_seconds`. |
-| `variables`, `metadata.variables` | Default variables. Values in the env file override them. |
-| `settings.timeout` | Timeout of each HTTP request, in seconds (default 30). |
-| `settings.max_retries` | Retries on network errors and timeouts (default 3). HTTP error status codes are never retried. |
+| `call` / `with` | The endpoint to call and its arguments. |
+| `expect.status` | Expected status code; without it any 2xx is accepted. |
+| `expect.body` | Checks by JSONPath: a plain value means equal; operators `ne`, `gt`, `gte`, `lt`, `lte`, `exists`, `contains`. |
+| `expect.headers` | Checks on response headers. |
+| `expect.duration` | Response time, e.g. `{ lt: 500ms }`. |
+| `save` | Values from the response body for the next steps. |
+| `sleep` | A pause, e.g. `sleep: 2s`. |
 
-Use `${name}` anywhere in `baseurl`, `endpoint`, `headers` or `body` to reference variables from the env file, the workflow defaults or values extracted by earlier steps, e.g. `Authorization: "Bearer ${token}"`. Referencing a variable that is not defined fails the step.
-
-More details: [docs/variable_extraction_guide.md](docs/variable_extraction_guide.md).
+`${name}` reads the step's arguments, saved values, the environment file (`-e`) and the workflow's `variables`, in this order. The complete reference is in [docs/workflow-format.md](docs/workflow-format.md).
 
 ## Full example
 
-[docs/full_example.yaml](docs/full_example.yaml) covers authentication, CRUD, nested JSON, headers, query strings, status codes and delays against the bundled test server:
+[docs/example/](docs/example/) tests the bundled test server: one API file and four workflows covering authentication, CRUD, nested JSON, query strings, headers, status codes and slow responses.
 
 ```bash
 # terminal 1: start the test server on http://localhost:5122
@@ -184,11 +226,11 @@ dotnet run --project tests/Foxify.RealServer.Tests
 ```
 
 ```bash
-# terminal 2: run the workflow
-foxify run docs/full_example.yaml -e docs/environment.yaml
+# terminal 2: run a workflow
+foxify run docs/example/workflows/users.yaml -e docs/environment.yaml
 ```
 
-The workflow changes the server's in-memory data (it deletes a user), so restart the server before running it again.
+The workflows leave the server's data as they found it, so they can be run again without restarting it.
 
 ## Build from source
 
@@ -200,7 +242,7 @@ cd foxify
 dotnet test Foxify.slnx
 
 # run without installing
-dotnet run --project src/Foxify.Cli -- run docs/full_example.yaml -e docs/environment.yaml
+dotnet run --project src/Foxify.Cli -- run docs/example/workflows/users.yaml -e docs/environment.yaml
 
 # build the native binary (use your RID: win-x64, linux-x64, linux-arm64, osx-arm64)
 dotnet publish src/Foxify.Cli/Foxify.Cli.csproj -c Release -r linux-x64 -o publish

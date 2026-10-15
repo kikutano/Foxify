@@ -22,10 +22,14 @@ public class StepReport
     public long BytesReceived { get; set; }
 }
 
+/// <summary>The outcome of one condition of <c>expect</c>, e.g. <c>$.total &gt;= 3</c>.</summary>
 public class AssertionResult
 {
-    public string Variable { get; set; } = string.Empty;
-    public string Expression { get; set; } = string.Empty;
+    /// <summary>What was checked: a JSONPath, <c>header Name</c> or <c>duration</c>.</summary>
+    public string Subject { get; set; } = string.Empty;
+    /// <summary>The condition, e.g. <c>== "admin"</c>, <c>&gt;= 3</c>, <c>exists</c>.</summary>
+    public string Condition { get; set; } = string.Empty;
+    /// <summary>The actual value as JSON, or <c>(missing)</c>.</summary>
     public string ActualValue { get; set; } = string.Empty;
     public bool Passed { get; set; }
 }

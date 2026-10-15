@@ -50,8 +50,11 @@ jobs:
           done
           echo "Test server did not start"; cat server.log; exit 1
 
-      - name: End-to-end (docs/full_example.yaml)
-        run: ./publish/foxify run docs/full_example.yaml -e docs/environment.yaml
+      - name: End-to-end (docs/example/workflows)
+        run: |
+          for workflow in docs/example/workflows/*.yaml; do
+            ./publish/foxify run "$workflow" -e docs/environment.yaml
+          done
 
       - name: Test server log
         if: failure()

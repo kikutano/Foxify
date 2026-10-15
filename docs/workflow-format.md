@@ -1,12 +1,8 @@
-# Workflow format v2 (draft)
+# Workflow format
 
-> Status: **proposal under review**, not implemented yet. The complete example lives in [`docs/example/`](example/).
+Foxify separates *what an endpoint is* (method, path, headers, body shape) from *what a test expects* (status, values, timings). Endpoints are declared once and called by name, like functions, from any number of workflows. The complete example lives in [`docs/example/`](example/).
 
-## Why
-
-In the current format every `function` mixes two things: *what an endpoint is* (method, path, headers, body shape) and *what one test expects* (status, concrete values, asserts). That makes endpoints impossible to reuse: `Login` and `LoginInvalid` are two copies of the same endpoint, `TestStatus200…503` are five, and the final `workflow:` list just repeats every function name once.
-
-v2 splits them:
+Two kinds of file:
 
 | File | Contains | Reused by |
 |---|---|---|
@@ -66,7 +62,7 @@ endpoints:
 | `endpoints.<name>.query` | List of query parameters. Each one is sent only when the step passes it. |
 | `endpoints.<name>.headers` | Extra headers for this endpoint. |
 | `endpoints.<name>.auth` | One auth set or a list of them (`[bearer, apikey]`). |
-| `endpoints.<name>.body` | A YAML value (sent as JSON), a string (sent as is), or a single `${…}` placeholder. |
+| `endpoints.<name>.body` | A YAML value, sent as JSON (`application/json`); a string, sent as is (`text/plain` unless a `Content-Type` header says otherwise); or a single `${…}` placeholder. |
 | `endpoints.<name>.params` | Optional declaration of the arguments: `name: default`, or `name:` for a required one. Declared params are checked before the request is sent. |
 
 ## Workflow file
@@ -106,7 +102,7 @@ steps:
 | `import` | API files whose endpoints the steps can call. |
 | `endpoints`, `auth`, `base_url` | Same as in an API file: a workflow can define its own endpoints, handy for small single-file tests. |
 | `variables` | Default variables. |
-| `settings` | `timeout`, `max_retries`. |
+| `settings` | `timeout` (seconds per request, default 30) and `max_retries` (retries on network errors and timeouts, default 0; HTTP error status codes are never retried). |
 | `steps` | Run in order; the workflow stops at the first failing step. |
 
 ### Steps
@@ -114,13 +110,13 @@ steps:
 | Key | Description |
 |---|---|
 | `call` | Name of the endpoint. |
-| `name` | Shown in the report; defaults to the `call` name. |
+| `name` | Shown in the report. Without it the step is shown as the call plus its path and query arguments, e.g. `status code=200`; body and header arguments are left out, since they may be secrets. |
 | `with` | Arguments for the endpoint's placeholders. They may reference variables (`id: ${userId}`). |
-| `expect.status` | Expected status code. |
+| `expect.status` | Expected status code. Without it any 2xx status is accepted and anything else fails the step. |
 | `expect.headers` | Checks on response headers (case-insensitive names). |
 | `expect.body` | Checks on the JSON body, keyed by JSONPath. |
 | `expect.duration` | Check on the response time, e.g. `{ lt: 500ms }`. |
-| `save` | `variable: <JSONPath>` pairs stored for the following steps. |
+| `save` | `variable: <JSONPath>` pairs stored for the following steps, after every check passed. A path that matches nothing fails the step. |
 | `sleep` | A step of its own: waits, e.g. `sleep: 500ms` or `sleep: 2s`. |
 
 ## Variables
@@ -162,37 +158,31 @@ expect:
 | Operator | Meaning |
 |---|---|
 | *(plain value)* | equal |
+| `eq` | equal, to compare a whole object: `$.user: { eq: { name: Ada } }` |
 | `ne` | not equal |
-| `gt`, `gte`, `lt`, `lte` | numeric comparison (`duration` also accepts `ms`/`s` values) |
+| `gt`, `gte`, `lt`, `lte` | numeric comparison; for `duration` the values are times (`500ms`, `2s`, `1m`) |
 | `exists` | the path exists (`true`) or not (`false`) |
 | `contains` | the array contains the value, or the string contains the text |
 
-Equality is typed: `$.id: 1` matches the number `1`, `$.id: "1"` matches the string `"1"`. Every check of a step is evaluated and reported, not only the first failure.
+Equality is typed: `$.id: 1` matches the number `1`, `$.id: "1"` matches the string `"1"`; numbers compare by value (`9.9` equals `9.90`). Header values are text, so header checks compare text. A mapping is read as operators only when all its keys are operators; mixing operators and fields is an error. Expected values may contain placeholders (`$.id: ${userId}`). Every check of a step is evaluated and reported, not only the first failure.
 
 ## Validation before running
 
-The whole workflow is checked before the first request, so mistakes are reported immediately with the file and line:
+The whole workflow, imports included, is checked before the first request. Every problem is reported at once, as `file:line:column: message`:
 
-- `call` to an endpoint that does not exist (with a "did you mean" suggestion);
-- a required `param` missing from `with`;
-- an unknown operator or an invalid duration;
-- two imported endpoints with the same name.
+- `call` to an endpoint that does not exist, and unknown keys (both with a "did you mean" suggestion);
+- a required `param` missing from `with`, or an `auth` set that does not exist;
+- an invalid JSONPath, status code, operator or duration;
+- an imported file that does not exist, or two endpoints with the same name.
 
-## Compatibility with the current format
+```text
+  ✗ The workflow is not valid (2 problems)
 
-Files with `functions:` + `workflow:` keep working: each old function is read as an endpoint plus the expectations of the step that calls it, and the run prints a deprecation notice. The old format is removed in 1.0.
+  workflows/users.yaml:12:5: unknown endpoint 'logn' (did you mean 'login'?)
+  workflows/users.yaml:16:5: unknown key 'expcet' in a step (did you mean 'expect'?)
+```
 
-| Current format | v2 |
-|---|---|
-| `functions.<Name>` (request part) | `endpoints.<name>` |
-| `functions.<Name>.expected.status_code` | `steps[].expect.status` |
-| `extract` + `asserts` | `expect.body` (checks) and `save` (values for later steps) |
-| `workflow: - type: function` | `steps: - call:` |
-| `type: DELAY` + `duration_seconds` | `- sleep: 1s` |
-| `depends_on` | not needed: a missing saved value fails the step |
-| `"== 'x'"`, `">= 3"`, `&&` | `x`, `{ gte: 3 }`, several operators on the same path |
-
-## Not in this version
+## Not supported yet
 
 - Namespaced imports (`call: server.login`) — duplicate names are an error for now.
 - Running a whole folder (`foxify run docs/example/workflows/`).
