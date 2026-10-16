@@ -130,11 +130,27 @@ A mistake in the YAML is reported before any request is sent, with every problem
   tests/users.yaml:16:5: unknown key 'expcet' in a step (did you mean 'expect'?)
 ```
 
+## Generate tests with a coding agent
+
+Let a coding agent (Claude Code, Cursor, Copilot, Codex, ...) read your backend and write the Foxify files for you. Give it [`docs/llm-guide.md`](docs/llm-guide.md): the format, the rules that are easy to get wrong, a step-by-step procedure and a complete example. Then paste a prompt like this:
+
+```text
+Read https://raw.githubusercontent.com/kikutano/foxify/main/docs/llm-guide.md (or run `foxify guide`)
+and follow it: look at this backend's routes, authentication and seed data, write the Foxify API
+file and workflows in foxify/, then run them with foxify until they pass. Put credentials only in
+foxify/env.local.yaml and add it to .gitignore. Tell me which failures look like backend bugs.
+```
+
+`foxify guide` prints the same guide from the installed binary, so it always matches your version, also offline. If the agent cannot open links, paste the file into the chat.
+
+The agent can check its own work: an invalid file is reported with `file:line:column` and a suggestion before any request is sent, and a failing check shows the actual value.
+
 ## Usage
 
 ```text
 foxify run <workflow.yaml> [options]
 foxify update [--check] [--force]
+foxify guide       Print the guide for coding agents (LLMs) that write Foxify files.
 foxify --help
 foxify --version
 
