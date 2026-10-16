@@ -3,10 +3,10 @@ using System.Text.RegularExpressions;
 
 namespace Foxify.Core.Execution;
 
-/// <summary>Durations written as <c>500ms</c>, <c>2s</c>, <c>1.5s</c> or <c>1m</c>.</summary>
+/// <summary>Durations written as <c>500ms</c>, <c>2s</c>, <c>1.5s</c>, <c>1m</c>, <c>2h</c> or <c>1d</c>.</summary>
 internal static partial class Durations
 {
-    [GeneratedRegex(@"^\s*(\d+(?:\.\d+)?)\s*(ms|s|m)\s*$")]
+    [GeneratedRegex(@"^\s*(\d+(?:\.\d+)?)\s*(ms|s|m|h|d)\s*$")]
     private static partial Regex Pattern();
 
     public static bool TryParse(string? text, out TimeSpan duration)
@@ -21,6 +21,8 @@ internal static partial class Durations
         {
             "ms" => TimeSpan.FromMilliseconds(amount),
             "s" => TimeSpan.FromSeconds(amount),
+            "h" => TimeSpan.FromHours(amount),
+            "d" => TimeSpan.FromDays(amount),
             _ => TimeSpan.FromMinutes(amount)
         };
         return true;

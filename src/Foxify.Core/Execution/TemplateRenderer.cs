@@ -55,6 +55,9 @@ internal static partial class TemplateRenderer
     private static JsonElement Resolve(string name, IVariableScope scope)
     {
         name = name.Trim();
+        if (Generators.IsGenerated(name))
+            return Generators.Generate(name);
+
         return scope.TryGet(name, out var value)
             ? value
             : throw new InvalidOperationException($"Variable '{name}' is not defined.");

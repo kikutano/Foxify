@@ -138,7 +138,9 @@ catch (WorkflowLoadException ex)
 
 if (verbose)
 {
-    PrintVariables("Workflow variables", workflow.Variables);
+    Console.WriteLine("Workflow variables:");
+    foreach (var (name, value) in workflow.Variables)
+        Console.WriteLine($"  {name}: {value}");
     PrintVariables("Environment variables", environment);
 }
 

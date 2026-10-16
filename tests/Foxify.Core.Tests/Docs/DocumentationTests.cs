@@ -95,6 +95,30 @@ public sealed partial class DocumentationTests : IDisposable
             AssertLoads(() => WorkflowLoader.Parse(block, Path.Combine(_directory, "snippet.yaml")), "a guide snippet");
     }
 
+    [Theory]
+    [InlineData("README.md")]
+    [InlineData("docs/llm-guide.md")]
+    [InlineData("docs/workflow-format.md")]
+    public void EveryYamlBlock_IsValidYaml(string markdownPath)
+    {
+        // Fragments (a step, an expect block) are not whole workflows, but they must still be YAML:
+        // e.g. `with: { id: ${id} }` is not, because `{` opens another flow mapping.
+        var blocks = YamlBlocks(markdownPath);
+        Assert.NotEmpty(blocks);
+
+        foreach (var block in blocks)
+        {
+            try
+            {
+                new YamlDotNet.RepresentationModel.YamlStream().Load(new StringReader(block));
+            }
+            catch (YamlDotNet.Core.YamlException ex)
+            {
+                Assert.Fail($"Invalid YAML in {markdownPath} ({ex.Start.Line}:{ex.Start.Column}: {ex.Message}):{Environment.NewLine}{block}");
+            }
+        }
+    }
+
     [Fact]
     public void Readme_StandaloneWorkflows_AreValid()
     {

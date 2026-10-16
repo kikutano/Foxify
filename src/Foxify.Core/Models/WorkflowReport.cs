@@ -20,6 +20,8 @@ public class StepReport
     public long ExecutionTimeMilliseconds => (long)Duration.TotalMilliseconds;
     public long BytesSent { get; set; }
     public long BytesReceived { get; set; }
+    /// <summary>How many times the call was sent: more than 1 for an <c>until</c> step that polled.</summary>
+    public int Attempts { get; set; } = 1;
 }
 
 /// <summary>The outcome of one condition of <c>expect</c>, e.g. <c>$.total &gt;= 3</c>.</summary>

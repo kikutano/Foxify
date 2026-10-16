@@ -35,8 +35,11 @@ public sealed class WorkflowDefinition
     public string SourceFile { get; init; } = string.Empty;
     public IReadOnlyDictionary<string, EndpointDefinition> Endpoints { get; init; } = new Dictionary<string, EndpointDefinition>();
     public IReadOnlyList<StepDefinition> Steps { get; init; } = [];
-    /// <summary>Default variables; the environment file overrides them.</summary>
-    public IReadOnlyDictionary<string, JsonElement> Variables { get; init; } = new Dictionary<string, JsonElement>();
+    /// <summary>
+    /// Default variables; the environment file overrides them. Each one is resolved once per run,
+    /// the first time it is used, so a generated value (<c>${$uuid}</c>) stays the same in every step.
+    /// </summary>
+    public IReadOnlyDictionary<string, Template> Variables { get; init; } = new Dictionary<string, Template>();
     public WorkflowSettings Settings { get; init; } = new();
 }
 
@@ -82,10 +85,24 @@ public sealed class CallStep : StepDefinition
     public required string Call { get; init; }
     public IReadOnlyDictionary<string, Template> With { get; init; } = new Dictionary<string, Template>();
     public Expectation Expect { get; init; } = new();
+    /// <summary>When set, the call is repeated until these checks pass (polling), then <see cref="Expect"/> is evaluated.</summary>
+    public RetryUntil? Until { get; init; }
     /// <summary>Variable name to JSONPath of the response body.</summary>
     public IReadOnlyDictionary<string, string> Save { get; init; } = new Dictionary<string, string>();
     /// <summary>The endpoint named by <see cref="Call"/>, bound when the workflow is loaded.</summary>
     public EndpointDefinition Endpoint { get; internal set; } = null!;
+}
+
+/// <summary><c>until</c>: repeat a call every <see cref="Every"/> until <see cref="Checks"/> pass, for at most <see cref="Timeout"/>.</summary>
+public sealed class RetryUntil
+{
+    public static readonly TimeSpan DefaultEvery = TimeSpan.FromSeconds(1);
+    public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>Status, header and body checks; duration checks are not used.</summary>
+    public Expectation Checks { get; init; } = new();
+    public TimeSpan Every { get; init; } = DefaultEvery;
+    public TimeSpan Timeout { get; init; } = DefaultTimeout;
 }
 
 public sealed class Expectation

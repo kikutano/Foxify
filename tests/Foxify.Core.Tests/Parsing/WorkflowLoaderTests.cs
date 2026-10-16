@@ -102,6 +102,15 @@ public sealed class WorkflowLoaderTests : IDisposable
     [InlineData("  - call: get_user\n    expect: { body: { $.a: { in: [] } } }", "in needs a list of values")]
     [InlineData("  - call: get_user\n    expect: { body: { $.a: { any: { lt: 1 } } } }", "any needs a list of conditions")]
     [InlineData("  - call: get_user\n    expect: { body: { $.a: { any: [ { lt: 1, x: 2 } ] } } }", "cannot mix operators")]
+    [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { every: 1s }", "until needs a condition: status, headers or body")]
+    [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { status: 200, every: soon }", "invalid duration 'soon'")]
+    [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { status: 200, every: 0ms }", "every must be greater than 0")]
+    [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { status: 200, every: 5s, timeout: 1s }", "timeout (1s) must be at least every (5s)")]
+    [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { duration: { lt: 1s } }", "unknown key 'duration' in until")]
+    [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { body: { $.a..b: 1 } }", "invalid JSONPath '$.a..b'")]
+    [InlineData("  - sleep: 1s\n    until: { status: 200 }", "a sleep step cannot have 'until'")]
+    [InlineData("  - call: get_user\n    with: { id: \"${$uid}\" }", "unknown generated value '$uid' (did you mean '$uuid'?)")]
+    [InlineData("  - call: get_user\n    with: { id: \"${$now+2x}\" }", "invalid offset '2x' in '$now+2x'")]
     [InlineData("  - call: get_user\n    expect: { duration: 2s }", "duration needs a comparison")]
     [InlineData("  - call: get_user\n    expect: { duration: { lt: soon } }", "invalid duration 'soon'")]
     [InlineData("  - call: get_user\n    expect: { duration: { eq: 1s } }", "unknown key 'eq' in expect.duration")]
@@ -154,6 +163,7 @@ public sealed class WorkflowLoaderTests : IDisposable
     [InlineData("call: get_user\n    with: { id: 1, baseUrl: http://other }")]         // placeholder of base_url
     [InlineData("call: create_user\n    with: { email: a@b.c, meta: x }")]             // param and body placeholder
     [InlineData("call: get_user\n    with: { id: 1, expected: Ada }\n    expect: { body: { $.name: { any: [ \"${expected}\" ] } } }")] // used by a check
+    [InlineData("call: get_user\n    with: { id: 1, wanted: Ada }\n    until: { body: { $.name: \"${wanted}\" } }")]  // used by an until check
     public void KnownArguments_AreAccepted(string step)
     {
         WorkflowLoader.Parse($"{ArgumentsApi}\nsteps:\n  - {step}\n", "test.yaml");

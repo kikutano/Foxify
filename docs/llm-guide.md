@@ -120,8 +120,9 @@ A workflow may also contain `base_url`, `headers`, `auth` and `endpoints` itself
 | `expect.headers` | Checks on response headers, keyed by header name (case-insensitive). Every operator works (`exists`, `in`, `any`, `ne`, `contains`, numeric ones). Header values are text and are compared as text, so quoting the expected value makes no difference: `X-Count: 3` and `X-Count: "3"` are the same check. |
 | `expect.body` | Checks on the JSON body, keyed by JSONPath. |
 | `expect.duration` | Response time: `{ lt: 500ms }`. Only `gt`, `gte`, `lt`, `lte`. |
+| `until` | Repeat the call until conditions pass (polling): see section 6b. |
 | `save` | `variable: <JSONPath>`. A path that matches nothing fails the step. |
-| `sleep` | `sleep: 500ms`. A sleep step has no `call`, `with`, `expect` or `save`. |
+| `sleep` | `sleep: 500ms`. A sleep step has no `call`, `with`, `expect`, `until` or `save`. Durations use `ms`, `s`, `m`, `h`, `d`. |
 
 ## 5. Checks
 
@@ -191,6 +192,42 @@ YAML types matter in bodies and checks:
 - Plain scalars are typed: `true`, `false`, `null`, `42`, `9.9`. **Quote values that must stay strings**: `zip: "00100"`, `version: "1.0"`, `phone: "0612345678"`.
 - A plain scalar made of **one** placeholder keeps the variable's type: `quantity: ${qty}` with `qty: 2` sends `2`; `active: ${flag}` sends `true` or `false`.
 - A placeholder inside a longer text, or inside quotes, produces a string: `name: "user-${n}"`, `id: "${id}"`.
+- **Inside `{ }` or `[ ]` (flow style) a placeholder must be quoted**: in `{ id: ${id} }` YAML reads `{` as the start of another mapping and the file is invalid. Write `{ id: "${id}" }` (a string), or use block style (one key per line) when the type matters.
+
+## 6b. Polling and generated values
+
+**Asynchronous operations: use `until`.** When the backend finishes the work later (a job, a queue consumer, a webhook), repeat the call until the result is there. Never use a fixed `sleep` for this.
+
+```yaml
+- name: Booking is confirmed
+  call: get_booking
+  with:
+    id: ${bookingId}
+  until:                            # same status / headers / body checks as expect
+    body:
+      $.status: { in: [Confirmed, Rejected] }   # stop waiting on any final state
+    every: 1s                       # default 1s
+    timeout: 30s                    # default 30s
+  expect:                           # evaluated on the last response
+    body:
+      $.status: Confirmed
+```
+
+- While the `until` conditions fail, the step waits `every` and sends the same request again; any status is accepted meanwhile unless `until.status` is set (`until: { status: 200 }` waits for a resource to appear).
+- Stop waiting on **every** final state (`Confirmed` or `Rejected`), then check the one you expect in `expect`: the failure then says "Rejected" at once instead of timing out.
+- After `timeout` the step fails with `Gave up after N attempts` and the last values.
+
+**Unique values: generated placeholders start with `$`.** `${$uuid}`, `${$timestamp}` (Unix seconds, a number), `${$randomInt}`, `${$randomString}` (8 characters), `${$now}` (UTC, `2026-10-16T09:41:00Z`), `${$now+2h}`, `${$now-30m}`, `${$today}` (`2026-10-16`), `${$today+1d}`.
+
+- **Every use is a new value.** To reuse one (create with an email, then search it), define it in `variables`: a variable is resolved once per run.
+- Use them for fields that must be unique on every run (emails, codes, names) and for dates in the future (`pickupAt: ${$now+2h}`).
+- For resources that cannot be deleted, prefer a **fixed** name plus "create, accept `409`, find by `search`" when the backend has a search: it keeps the data from growing on every run. Use generated values when there is no way to find an existing resource again.
+
+```yaml
+variables:
+  noteTitle: "Foxify note ${$randomString}"   # one value for the whole run
+  remindAt: ${$now+1d}
+```
 
 ## 7. Environment file
 
@@ -222,6 +259,7 @@ Follow these steps in order.
 5. **Write the workflows**, one per feature or resource:
    - a **smoke** workflow: the main read endpoints answer as expected;
    - **auth**: valid login, wrong password (`401`), invalid token (`401`/`403`, with `with: { token: invalid-token }`), and no token at all. A request without the `Authorization` header needs an endpoint without `auth` (e.g. `me_anonymous`): that is a different request, not a variant, so it is the one case where a second endpoint for the same route is right;
+   - asynchronous results (status set by a job, a webhook, a queue): poll them with `until` (section 6b);
    - for each resource: **list and read** (including filters and pagination), **create** with valid data, **validation errors** (`400`/`422`, check the error field), **not found** (`404`), and the **full lifecycle** of a resource the workflow creates itself: create, save its id, read, update, delete, verify it is gone.
 6. **Write `env.example.yaml`**, and `env.local.yaml` with the local values if you know them.
 7. **Run every workflow**: `foxify run foxify/workflows/<name>.yaml -e foxify/env.local.yaml`. The backend must be running locally; start it if you can, otherwise ask the user to.
@@ -252,7 +290,11 @@ Safety: run workflows only against a **local or test** environment, never agains
 | `$.a: 1` and `$.a: { lt: 5 }` as two keys | `$.a: { eq: 1, lt: 5 }` |
 | `$.items[*].id`, `$.items[?(@.id==1)]` | `$.items[0].id: 1` (by index); `contains` matches whole elements only |
 | `zip: 00100` (becomes the number 100) | `zip: "00100"` |
+| `with: { id: ${orderId} }` (invalid YAML) | `with: { id: "${orderId}" }`, or block style: `with:` then `id: ${orderId}` on its own line |
 | `sleep: 2` | `sleep: 2s` |
+| `sleep: 5s` and hoping an async job finished | `until: { body: { $.status: Done }, every: 1s, timeout: 30s }` |
+| `${uuid}`, `{{$guid}}`, `Date.now()` | `${$uuid}`, `${$timestamp}`: generated values start with `$` |
+| `${$uuid}` written twice for the same value | define it once in `variables`: every use of `${$uuid}` is a new value |
 | `duration: 500` or `{ lt: 500 }` | `duration: { lt: 500ms }` |
 | an endpoint per variant (`login_ok`, `login_wrong`) | one `login` endpoint, different `with` |
 | a token in the API file | `Authorization: "Bearer ${token}"` and `save: { token: ... }` |
@@ -389,6 +431,9 @@ description: Lifecycle of a note created by the workflow itself.
 import:
   - ../api/backend.yaml
 
+variables:
+  noteTitle: "Foxify note ${$randomString}"   # unique per run, the same in every step
+
 steps:
   - name: Log in
     call: login
@@ -401,12 +446,12 @@ steps:
   - name: Create a note
     call: create_note
     with:
-      title: Foxify test note
+      title: ${noteTitle}
     expect:
       status: 201
       body:
         $.id: { exists: true }
-        $.title: Foxify test note
+        $.title: ${noteTitle}
         $.pinned: false
       duration: { lt: 1s }
     save:
@@ -426,16 +471,16 @@ steps:
     expect:
       body:
         $.id: ${noteId}
-        $.title: Foxify test note
+        $.title: ${noteTitle}
 
   - name: Search finds the note
     call: list_notes
     with:
-      search: Foxify test
+      search: "${noteTitle}"
     expect:
       body:
         $.total: { gte: 1 }
-        $.items[0].title: { contains: Foxify }
+        $.items[0].title: ${noteTitle}
 
   - name: Pin the note
     call: update_note
@@ -481,7 +526,7 @@ A failing check looks like this; fix the test or report the backend behavior:
 ```text
   ✗ Read the note  GET  200  12.4ms  /api/notes/42
       ✓ $.id == 42
-      ✗ $.title == "Foxify test note"  actual "Untitled"
+      ✗ $.title == "Foxify note k3x9q2ab"  actual "Untitled"
 ```
 
 ## 12. Checklist before you finish
@@ -494,3 +539,4 @@ A failing check looks like this; fix the test or report the backend behavior:
 - [ ] Path placeholders and required inputs are declared as `params`.
 - [ ] No exact count on a list the workflow adds to (`{ gte: 1 }`, not `1`), and no body checks on responses without a body.
 - [ ] No unsupported JSONPath (`*`, `?()`, `..`) and no repeated keys in `expect.body`.
+- [ ] Asynchronous results are awaited with `until`, never with a fixed `sleep`.
