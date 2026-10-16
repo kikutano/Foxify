@@ -129,6 +129,46 @@ public sealed class WorkflowLoaderTests : IDisposable
         Assert.Contains(errors, e => e.Contains(message));
     }
 
+    private const string ArgumentsApi = """
+        base_url: ${baseUrl}
+        auth:
+          bearer: { Authorization: "Bearer ${token}" }
+        endpoints:
+          list_users:
+            path: /users
+            query: [page, pageSize]
+            auth: bearer
+          get_user:
+            path: /users/${id}
+            auth: bearer
+          create_user:
+            method: POST
+            path: /users
+            params: { email: }
+            body: { email: "${email}", meta: "${meta}" }
+        """;
+
+    [Theory]
+    [InlineData("call: list_users\n    with: { pageSize: 2 }")]                       // query name
+    [InlineData("call: get_user\n    with: { id: 1, token: invalid-token }")]          // placeholder of an auth set
+    [InlineData("call: get_user\n    with: { id: 1, baseUrl: http://other }")]         // placeholder of base_url
+    [InlineData("call: create_user\n    with: { email: a@b.c, meta: x }")]             // param and body placeholder
+    [InlineData("call: get_user\n    with: { id: 1, expected: Ada }\n    expect: { body: { $.name: { any: [ \"${expected}\" ] } } }")] // used by a check
+    public void KnownArguments_AreAccepted(string step)
+    {
+        WorkflowLoader.Parse($"{ArgumentsApi}\nsteps:\n  - {step}\n", "test.yaml");
+    }
+
+    [Fact]
+    public void UnknownArguments_AreReported_WithASuggestion()
+    {
+        var errors = LoadFails($"{ArgumentsApi}\nsteps:\n  - call: list_users\n    with: {{ pagesize: 2, foo: bar }}\n").Errors;
+
+        Assert.Equal(2, errors.Count);
+        Assert.Contains("unknown argument 'pagesize' for endpoint 'list_users' (did you mean 'pageSize'?)", errors[0]);
+        Assert.Contains("unknown argument 'foo' for endpoint 'list_users'", errors[1]);
+    }
+
     [Fact]
     public void AllProblems_AreReportedTogether_InFileOrder()
     {

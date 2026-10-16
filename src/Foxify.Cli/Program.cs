@@ -17,6 +17,7 @@ const string Usage = """
     Usage:
       foxify run <workflow.yaml> [options]
       foxify update [--check] [--force]
+      foxify guide       Print the guide for coding agents (LLMs) that write Foxify files.
       foxify --help
       foxify --version
 
@@ -51,6 +52,9 @@ if (args[0] is "--version")
     Console.WriteLine(GetVersion());
     return ExitSuccess;
 }
+
+if (args[0] == "guide")
+    return GuideCommand.Run();
 
 if (args[0] == "update")
 {

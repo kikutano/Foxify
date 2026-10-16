@@ -25,4 +25,9 @@
     <InternalsVisibleTo Include="Foxify.Cli.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Printed by `foxify guide`, so the guide always matches the installed version. -->
+    <EmbeddedResource Include="..\..\docs\llm-guide.md" LogicalName="llm-guide.md" />
+  </ItemGroup>
+
 </Project>

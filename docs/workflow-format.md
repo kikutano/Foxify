@@ -221,7 +221,7 @@ expect:
 The whole workflow, imports included, is checked before the first request. Every problem is reported at once, as `file:line:column: message`:
 
 - `call` to an endpoint that does not exist, and unknown keys (both with a "did you mean" suggestion);
-- a required `param` missing from `with`, or an `auth` set that does not exist;
+- a required `param` missing from `with`, an argument in `with` that the endpoint does not use (a typo such as `pagesize`), or an `auth` set that does not exist;
 - an invalid JSONPath, status code, operator or duration;
 - an imported file that does not exist, or two endpoints with the same name.
 

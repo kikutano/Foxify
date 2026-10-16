@@ -526,6 +526,35 @@ internal sealed partial class Loader
             if (defaultValue is null && !step.With.ContainsKey(name))
                 Report(step.Location, $"missing required param '{name}' of endpoint '{endpoint.Name}' (defined at {endpoint.Location})");
         }
+
+        // An argument nothing reads is almost always a typo (`pagesize` for `pageSize`): it would
+        // silently send nothing, and the step could still pass.
+        var accepted = AcceptedArguments(step, endpoint);
+        foreach (var (name, value) in step.With)
+        {
+            if (!accepted.Contains(name))
+                Report(value.Location, $"unknown argument '{name}' for endpoint '{endpoint.Name}'{Suggest(name, accepted)}");
+        }
+    }
+
+    /// <summary>
+    /// Names a step can pass in <c>with</c>: the endpoint's params and query names, every placeholder
+    /// of its base URL, path, headers (auth sets included) and body, and the placeholders of the
+    /// step's own expectations.
+    /// </summary>
+    private static HashSet<string> AcceptedArguments(CallStep step, EndpointDefinition endpoint)
+    {
+        var templates = new List<Template?> { endpoint.BaseUrl, endpoint.Path, endpoint.Body };
+        templates.AddRange(endpoint.Headers.Select(h => h.Value));
+        templates.AddRange(step.Expect.Headers.Concat(step.Expect.Body).SelectMany(c => Values(c.Conditions)));
+
+        var names = templates.OfType<Template>().SelectMany(t => TemplateRenderer.Placeholders(t.Node)).ToHashSet();
+        names.UnionWith(endpoint.Query);
+        names.UnionWith(endpoint.Params?.Keys ?? []);
+        return names;
+
+        static IEnumerable<Template?> Values(IEnumerable<Condition> conditions) =>
+            conditions.SelectMany(c => c.Alternatives.SelectMany(Values).Append(c.Value));
     }
 
     // --- Values and settings -------------------------------------------------

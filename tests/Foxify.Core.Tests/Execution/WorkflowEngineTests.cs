@@ -546,7 +546,7 @@ public class WorkflowEngineTests
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         await engine.ExecuteAsync(workflow);
 
-        Assert.True(stopwatch.Elapsed >= TimeSpan.FromMilliseconds(90));
+        Assert.True(stopwatch.Elapsed >= TimeSpan.FromMilliseconds(80)); // OS timers may fire a few ms early
         Assert.Equal(["sleep 100ms", "After sleep"], started);
         Assert.Equal(["After sleep"], completed);
     }
