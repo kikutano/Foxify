@@ -8,19 +8,46 @@ internal interface IVariableScope
     bool TryGet(string name, out JsonElement value);
 }
 
-/// <summary>Workflow-wide variables: saved values, then the environment, then the workflow defaults.</summary>
+/// <summary>
+/// Workflow-wide variables: saved values, then the environment, then the workflow defaults.
+/// A default is resolved the first time it is used and then kept, so a generated value
+/// (<c>email: "smoke-${$uuid}@example.com"</c>) is the same in every step of the run.
+/// Defaults may use the environment, other defaults and generated values.
+/// </summary>
 internal sealed class GlobalVariables(
-    IReadOnlyDictionary<string, JsonElement> defaults,
+    IReadOnlyDictionary<string, Template> defaults,
     IReadOnlyDictionary<string, JsonElement> environment) : IVariableScope
 {
     private readonly Dictionary<string, JsonElement> _saved = new();
+    private readonly Dictionary<string, JsonElement> _resolvedDefaults = new();
+    private readonly HashSet<string> _resolving = new();
 
     public void Save(string name, JsonElement value) => _saved[name] = value;
 
-    public bool TryGet(string name, out JsonElement value) =>
-        _saved.TryGetValue(name, out value)
-        || environment.TryGetValue(name, out value)
-        || defaults.TryGetValue(name, out value);
+    public bool TryGet(string name, out JsonElement value)
+    {
+        if (_saved.TryGetValue(name, out value) || environment.TryGetValue(name, out value))
+            return true;
+
+        if (_resolvedDefaults.TryGetValue(name, out value))
+            return true;
+
+        if (!defaults.TryGetValue(name, out var template))
+            return false;
+
+        if (!_resolving.Add(name))
+            throw new InvalidOperationException($"Variable '{name}' refers to itself.");
+        try
+        {
+            value = TemplateRenderer.RenderValue(template, this);
+            _resolvedDefaults[name] = value;
+            return true;
+        }
+        finally
+        {
+            _resolving.Remove(name);
+        }
+    }
 }
 
 /// <summary>

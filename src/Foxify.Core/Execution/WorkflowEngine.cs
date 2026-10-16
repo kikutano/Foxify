@@ -78,11 +78,38 @@ public sealed class WorkflowEngine
             // the scope of the endpoint's placeholders.
             var arguments = step.With.ToDictionary(a => a.Key, a => TemplateRenderer.RenderValue(a.Value, globals));
             var scope = new CallScope(step.Endpoint, arguments, globals);
+            var polling = Stopwatch.StartNew();
 
-            using var response = await SendWithRetriesAsync(step.Endpoint, scope, settings.MaxRetries, report);
-            _log.WriteLine($"Response Status: {response.StatusCode} ({report.ExecutionTimeMilliseconds} ms)");
+            for (int attempt = 1; ; attempt++)
+            {
+                report.Attempts = attempt;
+                using var response = await SendWithRetriesAsync(step.Endpoint, scope, settings.MaxRetries, report);
+                // JSON is UTF-8 by definition (RFC 8259), so the body is decoded as UTF-8.
+                var body = await response.Content.ReadAsByteArrayAsync();
+                _log.WriteLine($"Response Status: {response.StatusCode} ({report.ExecutionTimeMilliseconds} ms)");
+                _log.WriteLine($"Response Content: {Encoding.UTF8.GetString(body)}");
 
-            await CheckResponseAsync(step, response, scope, globals, report);
+                if (step.Until is { } until && CheckUntil(until, response, body, scope) is { } pending)
+                {
+                    if (polling.Elapsed + until.Every > until.Timeout)
+                    {
+                        report.StatusCode = response.StatusCode;
+                        report.BytesReceived = body.Length;
+                        report.Assertions.AddRange(pending.FailedChecks);
+                        var gaveUp = $"Gave up after {attempt} attempts in {Durations.Format(until.Timeout)}";
+                        Fail(report, pending.FailedChecks.Count > 0 ? gaveUp : $"{gaveUp}: {pending.Reason}");
+                        return;
+                    }
+
+                    _log.WriteLine($"Waiting: {pending.Reason}. Next attempt in {Durations.Format(until.Every)}");
+                    StepStarted?.Invoke($"{step.Name} (attempt {attempt + 1})");
+                    await Task.Delay(until.Every);
+                    continue;
+                }
+
+                CheckResponse(step, response, body, scope, globals, report);
+                return;
+            }
         }
         catch (Exception ex)
         {
@@ -136,20 +163,67 @@ public sealed class WorkflowEngine
         }
     }
 
+    private sealed record UntilPending(string Reason, List<AssertionResult> FailedChecks);
+
+    /// <summary>The checks of <c>until</c> on one response: null when they all pass, otherwise what is still missing.</summary>
+    private static UntilPending? CheckUntil(RetryUntil until, HttpResponseMessage response, byte[] body, CallScope scope)
+    {
+        var checks = until.Checks;
+        int status = (int)response.StatusCode;
+        if (checks.Status.Count > 0 && !checks.Status.Contains(status))
+            return new UntilPending($"status {status}, waiting for {string.Join(" or ", checks.Status)}", []);
+
+        var results = EvaluateHeaders(checks.Headers, response, scope);
+        if (checks.Body.Count > 0)
+        {
+            if (TryParseJson(body) is not { } json)
+                return new UntilPending("the response body is not valid JSON", results.Where(r => !r.Passed).ToList());
+            using (json)
+                results.AddRange(EvaluateBody(checks.Body, json, scope));
+        }
+
+        var failed = results.Where(r => !r.Passed).ToList();
+        return failed.Count == 0
+            ? null
+            : new UntilPending(string.Join("; ", failed.Select(f => $"{f.Subject} {f.Condition}, actual {f.ActualValue}")), failed);
+    }
+
+    private static List<AssertionResult> EvaluateHeaders(IReadOnlyList<Check> checks, HttpResponseMessage response, CallScope scope) =>
+        checks.SelectMany(check => check.Conditions.Select(condition =>
+            CheckEvaluator.EvaluateHeader(check.Subject, condition, HeaderValue(response, check.Subject), scope))).ToList();
+
+    private static IEnumerable<AssertionResult> EvaluateBody(IReadOnlyList<Check> checks, JsonDocument json, CallScope scope)
+    {
+        foreach (var check in checks)
+        {
+            JsonElement? actual = JsonPath.TrySelect(json.RootElement, check.Subject, out var value) ? value : null;
+            foreach (var condition in check.Conditions)
+                yield return CheckEvaluator.EvaluateBody(check.Subject, condition, actual, scope);
+        }
+    }
+
+    private static JsonDocument? TryParseJson(byte[] body)
+    {
+        try
+        {
+            return JsonDocument.Parse(body);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>
     /// Checks the status code, then evaluates every header, body and duration condition,
     /// and finally stores the <c>save</c> values when everything passed.
     /// </summary>
-    private async Task CheckResponseAsync(
-        CallStep step, HttpResponseMessage response, CallScope scope, GlobalVariables globals, StepReport report)
+    private void CheckResponse(
+        CallStep step, HttpResponseMessage response, byte[] bodyBytes, CallScope scope, GlobalVariables globals, StepReport report)
     {
         var expect = step.Expect;
         report.StatusCode = response.StatusCode;
-
-        // JSON is UTF-8 by definition (RFC 8259), so the body is decoded as UTF-8.
-        var bodyBytes = await response.Content.ReadAsByteArrayAsync();
         report.BytesReceived = bodyBytes.Length;
-        _log.WriteLine($"Response Content: {Encoding.UTF8.GetString(bodyBytes)}");
 
         int status = (int)response.StatusCode;
         if (expect.Status.Count > 0)
@@ -167,21 +241,13 @@ public sealed class WorkflowEngine
             return;
         }
 
-        foreach (var check in expect.Headers)
-        {
-            var actual = HeaderValue(response, check.Subject);
-            foreach (var condition in check.Conditions)
-                report.Assertions.Add(CheckEvaluator.EvaluateHeader(check.Subject, condition, actual, scope));
-        }
+        report.Assertions.AddRange(EvaluateHeaders(expect.Headers, response, scope));
 
         JsonDocument? json = null;
         if (expect.Body.Count > 0 || step.Save.Count > 0)
         {
-            try
-            {
-                json = JsonDocument.Parse(bodyBytes);
-            }
-            catch (JsonException)
+            json = TryParseJson(bodyBytes);
+            if (json is null)
             {
                 Fail(report, "The response body is not valid JSON");
                 return;
@@ -190,12 +256,8 @@ public sealed class WorkflowEngine
 
         using (json)
         {
-            foreach (var check in expect.Body)
-            {
-                JsonElement? actual = JsonPath.TrySelect(json!.RootElement, check.Subject, out var value) ? value : null;
-                foreach (var condition in check.Conditions)
-                    report.Assertions.Add(CheckEvaluator.EvaluateBody(check.Subject, condition, actual, scope));
-            }
+            if (json is not null)
+                report.Assertions.AddRange(EvaluateBody(expect.Body, json, scope));
 
             foreach (var condition in expect.Duration)
                 report.Assertions.Add(CheckEvaluator.EvaluateDuration(condition, report.Duration));

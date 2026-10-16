@@ -44,8 +44,9 @@ internal sealed partial class Loader
     private static readonly string[] ApiKeys = ["base_url", "headers", "auth", "endpoints"];
     private static readonly string[] WorkflowKeys = ["name", "description", "import", "variables", "settings", "steps", .. ApiKeys];
     private static readonly string[] EndpointKeys = ["method", "path", "query", "headers", "auth", "body", "params"];
-    private static readonly string[] StepKeys = ["name", "call", "with", "expect", "save", "sleep"];
+    private static readonly string[] StepKeys = ["name", "call", "with", "expect", "until", "save", "sleep"];
     private static readonly string[] ExpectKeys = ["status", "headers", "body", "duration"];
+    private static readonly string[] UntilKeys = ["status", "headers", "body", "every", "timeout"];
     private static readonly string[] SettingsKeys = ["timeout", "max_retries"];
 
     private static readonly Dictionary<string, Operator> Operators = new()
@@ -118,9 +119,11 @@ internal sealed partial class Loader
             SourceFile = fullPath,
             Endpoints = endpoints,
             Steps = steps,
-            Variables = entries.TryGetValue("variables", out var variables) ? ParseLiterals(file, variables, "variables") : new Dictionary<string, JsonElement>(),
+            Variables = entries.TryGetValue("variables", out var variables) ? ParseTemplates(file, variables, "variables") : new Dictionary<string, Template>(),
             Settings = entries.TryGetValue("settings", out var settings) ? ParseSettings(file, settings) : new WorkflowSettings()
         };
+
+        ValidateGeneratedValues(endpoints.Values, steps.OfType<CallStep>(), workflow.Variables.Values);
 
         if (_problems.Count > 0)
             throw Problems();
@@ -309,7 +312,7 @@ internal sealed partial class Loader
 
             if (entries.TryGetValue("sleep", out var sleepNode))
             {
-                foreach (var key in new[] { "call", "with", "expect", "save" }.Where(entries.ContainsKey))
+                foreach (var key in new[] { "call", "with", "expect", "until", "save" }.Where(entries.ContainsKey))
                     Error(file, item, $"a sleep step cannot have '{key}'");
 
                 if (Scalar(file, sleepNode, "sleep") is { } text)
@@ -361,6 +364,7 @@ internal sealed partial class Loader
                 With = with,
                 Save = save,
                 Expect = entries.TryGetValue("expect", out var expectNode) ? ParseExpect(file, expectNode) : new Expectation(),
+                Until = entries.TryGetValue("until", out var untilNode) ? ParseUntil(file, untilNode) : null,
                 Location = location
             });
         }
@@ -385,7 +389,45 @@ internal sealed partial class Loader
     private Expectation ParseExpect(FileContext file, YamlNode node)
     {
         var entries = Collect(file, node, "expect", ExpectKeys);
+        var checks = ParseChecks(file, entries, "expect");
+        var duration = entries.TryGetValue("duration", out var durationNode) ? ParseDurationConditions(file, durationNode) : [];
 
+        return new Expectation { Status = checks.Status, Headers = checks.Headers, Body = checks.Body, Duration = duration };
+    }
+
+    /// <summary><c>until</c>: the same status, header and body checks as <c>expect</c>, plus <c>every</c> and <c>timeout</c>.</summary>
+    private RetryUntil? ParseUntil(FileContext file, YamlNode node)
+    {
+        var entries = Collect(file, node, "until", UntilKeys);
+        if (!entries.Keys.Any(k => k is "status" or "headers" or "body"))
+        {
+            Error(file, node, "until needs a condition: status, headers or body");
+            return null;
+        }
+
+        var every = ParseDuration(file, entries, "every", RetryUntil.DefaultEvery);
+        var timeout = ParseDuration(file, entries, "timeout", RetryUntil.DefaultTimeout);
+        if (every <= TimeSpan.Zero)
+            Error(file, entries["every"], "every must be greater than 0");
+        else if (timeout < every)
+            Error(file, entries.GetValueOrDefault("timeout") ?? node, $"timeout ({Durations.Format(timeout)}) must be at least every ({Durations.Format(every)})");
+
+        return new RetryUntil { Checks = ParseChecks(file, entries, "until"), Every = every, Timeout = timeout };
+    }
+
+    private TimeSpan ParseDuration(FileContext file, Dictionary<string, YamlNode> entries, string key, TimeSpan fallback)
+    {
+        if (!entries.TryGetValue(key, out var node) || Scalar(file, node, key) is not { } text)
+            return fallback;
+        if (Durations.TryParse(text, out var duration))
+            return duration;
+
+        Error(file, node, $"invalid duration '{text}': use e.g. 500ms, 2s or 1m");
+        return fallback;
+    }
+
+    private Expectation ParseChecks(FileContext file, Dictionary<string, YamlNode> entries, string what)
+    {
         // `status: 200` or `status: [200, 204]`: any of the listed codes is accepted.
         var status = new List<int>();
         if (entries.TryGetValue("status", out var statusNode))
@@ -408,14 +450,14 @@ internal sealed partial class Loader
         var headers = new List<Check>();
         if (entries.TryGetValue("headers", out var headersNode))
         {
-            foreach (var (name, _, value) in Entries(file, headersNode, "expect.headers"))
+            foreach (var (name, _, value) in Entries(file, headersNode, $"{what}.headers"))
                 headers.Add(new Check { Subject = name, Conditions = ParseConditions(file, value) });
         }
 
         var body = new List<Check>();
         if (entries.TryGetValue("body", out var bodyNode))
         {
-            foreach (var (path, keyNode, value) in Entries(file, bodyNode, "expect.body"))
+            foreach (var (path, keyNode, value) in Entries(file, bodyNode, $"{what}.body"))
             {
                 if (JsonPath.IsValid(path))
                     body.Add(new Check { Subject = path, Conditions = ParseConditions(file, value) });
@@ -424,9 +466,7 @@ internal sealed partial class Loader
             }
         }
 
-        var duration = entries.TryGetValue("duration", out var durationNode) ? ParseDurationConditions(file, durationNode) : [];
-
-        return new Expectation { Status = status, Headers = headers, Body = body, Duration = duration };
+        return new Expectation { Status = status, Headers = headers, Body = body };
     }
 
     /// <summary>
@@ -544,20 +584,59 @@ internal sealed partial class Loader
     /// </summary>
     private static HashSet<string> AcceptedArguments(CallStep step, EndpointDefinition endpoint)
     {
-        var templates = new List<Template?> { endpoint.BaseUrl, endpoint.Path, endpoint.Body };
-        templates.AddRange(endpoint.Headers.Select(h => h.Value));
-        templates.AddRange(step.Expect.Headers.Concat(step.Expect.Body).SelectMany(c => Values(c.Conditions)));
-
-        var names = templates.OfType<Template>().SelectMany(t => TemplateRenderer.Placeholders(t.Node)).ToHashSet();
+        var names = EndpointTemplates(endpoint).Concat(CheckTemplates(step))
+            .SelectMany(t => TemplateRenderer.Placeholders(t.Node))
+            .ToHashSet();
         names.UnionWith(endpoint.Query);
         names.UnionWith(endpoint.Params?.Keys ?? []);
         return names;
+    }
+
+    private static IEnumerable<Template> EndpointTemplates(EndpointDefinition endpoint) =>
+        new[] { endpoint.BaseUrl, endpoint.Path, endpoint.Body }
+            .Concat(endpoint.Headers.Select(h => h.Value))
+            .Concat(endpoint.Params?.Values ?? [])
+            .OfType<Template>();
+
+    /// <summary>Expected values of the step's <c>expect</c> and <c>until</c> checks.</summary>
+    private static IEnumerable<Template> CheckTemplates(CallStep step)
+    {
+        var checks = step.Expect.Headers.Concat(step.Expect.Body);
+        if (step.Until is { } until)
+            checks = checks.Concat(until.Checks.Headers).Concat(until.Checks.Body);
+        return checks.SelectMany(c => Values(c.Conditions)).OfType<Template>();
 
         static IEnumerable<Template?> Values(IEnumerable<Condition> conditions) =>
             conditions.SelectMany(c => c.Alternatives.SelectMany(Values).Append(c.Value));
     }
 
+    /// <summary>Every <c>${$...}</c> placeholder must be a known generator: a typo like <c>${$uid}</c> is reported.</summary>
+    private void ValidateGeneratedValues(
+        IEnumerable<EndpointDefinition> endpoints, IEnumerable<CallStep> steps, IEnumerable<Template> variables)
+    {
+        var templates = endpoints.SelectMany(EndpointTemplates)
+            .Concat(steps.SelectMany(s => s.With.Values.Concat(CheckTemplates(s))))
+            .Concat(variables);
+
+        foreach (var template in templates)
+        {
+            foreach (var name in TemplateRenderer.Placeholders(template.Node).Where(Generators.IsGenerated).Distinct())
+            {
+                if (Generators.Validate(name) is { } problem)
+                    Report(template.Location, $"{problem}{Suggest(name, Generators.Names)}");
+            }
+        }
+    }
+
     // --- Values and settings -------------------------------------------------
+
+    private Dictionary<string, Template> ParseTemplates(FileContext file, YamlNode node, string what)
+    {
+        var values = new Dictionary<string, Template>();
+        foreach (var (name, _, value) in Entries(file, node, what))
+            values[name] = Template(file, value);
+        return values;
+    }
 
     private Dictionary<string, JsonElement> ParseLiterals(FileContext file, YamlNode node, string what)
     {

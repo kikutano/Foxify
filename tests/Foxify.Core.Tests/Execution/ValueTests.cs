@@ -76,6 +76,8 @@ public class DurationsTests
     [InlineData("2s", 2000)]
     [InlineData("1.5s", 1500)]
     [InlineData("1m", 60000)]
+    [InlineData("2h", 7200000)]
+    [InlineData("1d", 86400000)]
     [InlineData(" 20 ms ", 20)]
     public void TryParse_AcceptsUnits(string text, double milliseconds)
     {

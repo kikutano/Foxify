@@ -101,7 +101,7 @@ steps:
 | `name`, `description` | Shown in the report. |
 | `import` | API files whose endpoints the steps can call. |
 | `endpoints`, `auth`, `base_url` | Same as in an API file: a workflow can define its own endpoints, handy for small single-file tests. |
-| `variables` | Default variables. |
+| `variables` | Default variables. Each is resolved once per run, the first time it is used, and may use the environment, other variables and generated values (see below). |
 | `settings` | `timeout` (seconds per request, default 30) and `max_retries` (retries on network errors and timeouts, default 0; HTTP error status codes are never retried). |
 | `steps` | Run in order; the workflow stops at the first failing step. |
 
@@ -116,8 +116,9 @@ steps:
 | `expect.headers` | Checks on response headers (case-insensitive names). |
 | `expect.body` | Checks on the JSON body, keyed by JSONPath. |
 | `expect.duration` | Check on the response time, e.g. `{ lt: 500ms }`. |
+| `until` | Repeat the call until conditions pass (polling), see below. |
 | `save` | `variable: <JSONPath>` pairs stored for the following steps, after every check passed. A path that matches nothing fails the step. |
-| `sleep` | A step of its own: waits, e.g. `sleep: 500ms` or `sleep: 2s`. |
+| `sleep` | A step of its own: waits, e.g. `sleep: 500ms` or `sleep: 2s`. Durations use `ms`, `s`, `m`, `h` or `d`. |
 
 ## Variables
 
@@ -140,6 +141,62 @@ So a step can override a saved value for itself only, without changing it for th
 An undefined variable fails the step before the request is sent.
 
 **Types in bodies.** A value that is a single placeholder keeps the argument's type: with `active: ${active}` and `with: { active: false }` the JSON is `"active": false`, not `"active": "false"`. Placeholders inside a longer text produce strings. In `with`, plain YAML scalars keep their type (`true`, `42`, `null`); quote them to send a string (`zipCode: "70100"`).
+
+## Polling with `until`
+
+For operations that complete asynchronously (a booking confirmed by a background job, a payment settled by a webhook), `until` repeats the call until its conditions pass:
+
+```yaml
+- name: Booking is confirmed
+  call: get_booking
+  with:
+    id: ${bookingId}
+  until:                              # same status / headers / body checks as expect
+    body:
+      $.status: { in: [Confirmed, Rejected] }
+    every: 1s                         # pause between attempts (default 1s)
+    timeout: 30s                      # give up after this time (default 30s)
+  expect:                             # evaluated on the last response only
+    body:
+      $.status: Confirmed
+  save:
+    paymentId: $.paymentId
+```
+
+- `until` takes `status`, `headers` and `body`, written exactly like in `expect`, plus `every` and `timeout`.
+- While its conditions do not hold, the step waits `every` and sends the request again, with the same arguments. Any status is accepted while waiting, unless `until.status` is set (`until: { status: 200 }` waits for a resource to appear).
+- When they hold, `expect` and `save` are applied to that last response.
+- If they still do not hold after `timeout`, the step fails with `Gave up after N attempts in 30s` and the report shows the values of the last attempt.
+- A network error is not a reason to keep waiting: after the `settings.max_retries` retries of that attempt, it fails the step.
+
+## Generated values
+
+Placeholders whose name starts with `$` produce a value instead of reading a variable:
+
+| Placeholder | Value |
+|---|---|
+| `${$uuid}` | a random UUID, e.g. `"3f2a…"` |
+| `${$timestamp}` | Unix time in seconds, a number |
+| `${$randomInt}` | a random number from 0 to 999999 |
+| `${$randomString}` | 8 random lowercase letters and digits |
+| `${$now}` | the current UTC time, `"2026-10-16T09:41:00Z"`; with an offset: `${$now+2h}`, `${$now-30m}` |
+| `${$today}` | the current UTC date, `"2026-10-16"`; with an offset: `${$today+1d}` |
+
+**Every use generates a new value.** To use the same value in several places (an email that a step creates and a later step searches), define it in `variables`: a variable is resolved once per run.
+
+```yaml
+variables:
+  newUserEmail: "smoke-${$uuid}@example.com"
+  pickupAt: ${$now+2h}
+
+steps:
+  - call: create_user
+    with: { email: "${newUserEmail}" }
+  - call: list_users
+    with: { search: "${newUserEmail}" }
+```
+
+A lone placeholder keeps the generated type: `count: ${$randomInt}` sends a number, `id: "${$randomInt}"` a string. The environment file is read as plain values: generated values work in `variables`, endpoints and steps.
 
 ## Checks
 
@@ -222,7 +279,8 @@ The whole workflow, imports included, is checked before the first request. Every
 
 - `call` to an endpoint that does not exist, and unknown keys (both with a "did you mean" suggestion);
 - a required `param` missing from `with`, an argument in `with` that the endpoint does not use (a typo such as `pagesize`), or an `auth` set that does not exist;
-- an invalid JSONPath, status code, operator or duration;
+- an invalid JSONPath, status code, operator or duration, an `until` without a condition, or a `timeout` shorter than `every`;
+- an unknown generated value, such as `${$uid}` (with a "did you mean");
 - an imported file that does not exist, or two endpoints with the same name.
 
 ```text

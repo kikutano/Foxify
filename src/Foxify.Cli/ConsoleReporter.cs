@@ -130,13 +130,17 @@ internal sealed class ConsoleReporter
         var method = Escape((step.Method ?? "").PadRight(6));
         var duration = step.StatusCode is null ? "" : FormatDuration(step.Duration);
         var path = step.Url is null ? "" : step.Url.IsAbsoluteUri ? step.Url.PathAndQuery : step.Url.ToString();
+        var attempts = step.Attempts > 1 ? $"  [grey]({step.Attempts} attempts)[/]" : "";
 
         _console.MarkupLine(
             $"  {icon} {(step.IsSuccess ? name : $"[red]{name}[/]")}  [bold]{method}[/] {StatusMarkup(step)}" +
-            $"  [grey]{duration,9}  {Escape(path)}[/]");
+            $"  [grey]{duration,9}  {Escape(path)}[/]{attempts}");
 
         if (step.IsSuccess)
             return;
+
+        if (step.FailureReason is not null)
+            _console.MarkupLine($"      [red]{_fail} {Escape(step.FailureReason)}[/]");
 
         if (step.Assertions.Any(a => !a.Passed))
         {
@@ -147,10 +151,6 @@ internal sealed class ConsoleReporter
                     ? $"      [green]{_pass}[/] [grey]{check}[/]"
                     : $"      [red]{_fail}[/] {check}  [grey]actual[/] [red]{Escape(assertion.ActualValue)}[/]");
             }
-        }
-        else if (step.FailureReason is not null)
-        {
-            _console.MarkupLine($"      [red]{_fail} {Escape(step.FailureReason)}[/]");
         }
     }
 

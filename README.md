@@ -232,9 +232,10 @@ steps:
 | `expect.headers` | Checks on response headers. |
 | `expect.duration` | Response time, e.g. `{ lt: 500ms }`. |
 | `save` | Values from the response body for the next steps. |
+| `until` | Polling: repeat the call until conditions pass, e.g. `until: { body: { $.status: Confirmed }, every: 1s, timeout: 30s }`. |
 | `sleep` | A pause, e.g. `sleep: 2s`. |
 
-`${name}` reads the step's arguments, saved values, the environment file (`-e`) and the workflow's `variables`, in this order. The complete reference is in [docs/workflow-format.md](docs/workflow-format.md).
+`${name}` reads the step's arguments, saved values, the environment file (`-e`) and the workflow's `variables`, in this order. Names starting with `$` are generated: `${$uuid}`, `${$timestamp}`, `${$randomString}`, `${$now+2h}`, `${$today+1d}`; define one in `variables` to reuse the same value in every step. The complete reference is in [docs/workflow-format.md](docs/workflow-format.md).
 
 ## Full example
 
