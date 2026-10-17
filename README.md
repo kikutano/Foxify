@@ -2,13 +2,14 @@
   <img src="logo.jpg" alt="foxify logo">
 </p>
 
-# ⚡ Foxify
+# ⚡ Foxify 
 
 [![CI](https://github.com/kikutano/foxify/actions/workflows/ci.yml/badge.svg)](https://github.com/kikutano/foxify/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/kikutano/foxify?include_prereleases)](https://github.com/kikutano/foxify/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](License.md)
 
-API testing from the command line. Describe your endpoints once in YAML, then write workflows that call them like functions, pass arguments and check the responses. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
+Tired of pay for Postman? Try this! Fast, light, use your favorite AI to create endpoints, E2E tests against your environment! Describe testing flows using YAML file and make sure your API will never break again!
+Foxify is an API testing from the command line. Describe your endpoints once in YAML, then write workflows that call them like functions, pass arguments and check the responses. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
 
 <p align="center">
   <img src="screen.png" alt="foxify run output in the terminal" width="640">
