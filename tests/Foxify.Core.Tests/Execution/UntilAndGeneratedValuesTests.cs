@@ -132,7 +132,7 @@ public class UntilTests
             """, "test.yaml");
         var engine = new WorkflowEngine(new HttpClient(new FakeServer(BecomesConfirmedAfter(2))));
         var started = new List<string>();
-        engine.StepStarted += started.Add;
+        engine.StepStarted += s => started.Add(s.Description);
 
         await engine.ExecuteAsync(workflow);
 

@@ -1,11 +1,19 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Foxify.Core.Definitions;
 using Foxify.Core.Models;
 
 namespace Foxify.Core.Execution;
+
+/// <summary>A step is starting: <see cref="Attempt"/> is more than 1 when an <c>until</c> step polls again.</summary>
+public sealed record StepProgress(int Index, string Name, int Attempt = 1, bool IsSleep = false)
+{
+    /// <summary>The name, plus the attempt when polling: <c>Wait (attempt 2)</c>.</summary>
+    public string Description => Attempt > 1 ? $"{Name} (attempt {Attempt})" : Name;
+}
 
 /// <summary>
 /// Runs a loaded workflow: executes the steps in order, carries saved values from one
@@ -17,11 +25,14 @@ public sealed class WorkflowEngine
     private static readonly TimeSpan RetryBaseDelay = TimeSpan.FromMilliseconds(250);
     private static readonly IReadOnlyDictionary<string, JsonElement> NoVariables = new Dictionary<string, JsonElement>();
 
+    /// <summary>Recorded response bodies are cut after this many bytes.</summary>
+    public const int MaxRecordedBodyBytes = 1024 * 1024;
+
     private readonly HttpClient _httpClient;
     private readonly TextWriter _log;
 
-    /// <summary>Raised before each step runs, with a short description of the step.</summary>
-    public event Action<string>? StepStarted;
+    /// <summary>Raised before each step runs, and again before each new attempt of an <c>until</c> step.</summary>
+    public event Action<StepProgress>? StepStarted;
 
     /// <summary>Raised after each call step, successful or not.</summary>
     public event Action<StepReport>? StepCompleted;
@@ -32,6 +43,9 @@ public sealed class WorkflowEngine
         _log = log ?? TextWriter.Null;
     }
 
+    /// <summary>Record the request and response of every call in <see cref="StepReport.Request"/> and <see cref="StepReport.Response"/>.</summary>
+    public bool RecordExchanges { get; set; }
+
     public async Task<WorkflowReport> ExecuteAsync(
         WorkflowDefinition workflow, IReadOnlyDictionary<string, JsonElement>? environment = null)
     {
@@ -40,20 +54,19 @@ public sealed class WorkflowEngine
 
         _log.WriteLine($"Executing workflow: {workflow.Name}");
 
-        foreach (var step in workflow.Steps)
+        for (int index = 0; index < workflow.Steps.Count; index++)
         {
-            if (step is SleepStep sleep)
+            if (workflow.Steps[index] is SleepStep sleep)
             {
-                var description = $"sleep {Durations.Format(sleep.Duration)}";
-                StepStarted?.Invoke(description);
-                _log.WriteLine(description);
+                StepStarted?.Invoke(new StepProgress(index, sleep.Name, IsSleep: true));
+                _log.WriteLine(sleep.Name);
                 await Task.Delay(sleep.Duration);
                 continue;
             }
 
-            var call = (CallStep)step;
-            var stepReport = new StepReport { StepName = call.Name };
-            StepStarted?.Invoke(call.Name);
+            var call = (CallStep)workflow.Steps[index];
+            var stepReport = new StepReport { Index = index, StepName = call.Name };
+            StepStarted?.Invoke(new StepProgress(index, call.Name));
 
             await ExecuteCallAsync(call, globals, workflow.Settings, stepReport);
 
@@ -88,6 +101,8 @@ public sealed class WorkflowEngine
                 var body = await response.Content.ReadAsByteArrayAsync();
                 _log.WriteLine($"Response Status: {response.StatusCode} ({report.ExecutionTimeMilliseconds} ms)");
                 _log.WriteLine($"Response Content: {Encoding.UTF8.GetString(body)}");
+                if (RecordExchanges)
+                    report.Response = Record(response, body);
 
                 if (step.Until is { } until && CheckUntil(until, response, body, scope) is { } pending)
                 {
@@ -102,7 +117,7 @@ public sealed class WorkflowEngine
                     }
 
                     _log.WriteLine($"Waiting: {pending.Reason}. Next attempt in {Durations.Format(until.Every)}");
-                    StepStarted?.Invoke($"{step.Name} (attempt {attempt + 1})");
+                    StepStarted?.Invoke(new StepProgress(report.Index, step.Name, attempt + 1));
                     await Task.Delay(until.Every);
                     continue;
                 }
@@ -136,6 +151,11 @@ public sealed class WorkflowEngine
 
             if (attempt == 0)
                 _log.WriteLine($"Executing {request.Method} {request.RequestUri}");
+            if (RecordExchanges)
+            {
+                report.Request = await RecordAsync(request);
+                report.Response = null; // a network error must not leave the previous attempt's response
+            }
 
             try
             {
@@ -235,7 +255,7 @@ public sealed class WorkflowEngine
                 return;
             }
         }
-        else if (status is < 200 or > 299)
+        else if (!expect.AnyStatus && status is < 200 or > 299)
         {
             Fail(report, $"Expected a 2xx status, got {status} (set expect.status to expect another one)");
             return;
@@ -278,11 +298,35 @@ public sealed class WorkflowEngine
                     return;
                 }
 
-                globals.Save(name, value.Clone());
+                var saved = value.Clone();
+                globals.Save(name, saved);
+                report.Saved.Add(new(name, saved));
                 _log.WriteLine($"Saved {name} = {JsonValues.ToDisplay(value)}");
             }
         }
     }
+
+    private static async Task<RecordedRequest> RecordAsync(HttpRequestMessage request) => new()
+    {
+        Method = request.Method.Method,
+        Url = request.RequestUri?.ToString() ?? "",
+        Headers = Headers(request.Headers, request.Content?.Headers),
+        Body = request.Content is null ? null : await request.Content.ReadAsStringAsync()
+    };
+
+    private static RecordedResponse Record(HttpResponseMessage response, byte[] body) => new()
+    {
+        Status = (int)response.StatusCode,
+        Reason = response.ReasonPhrase,
+        Headers = Headers(response.Headers, response.Content.Headers),
+        Body = Encoding.UTF8.GetString(body, 0, Math.Min(body.Length, MaxRecordedBodyBytes)),
+        BodyTruncated = body.Length > MaxRecordedBodyBytes
+    };
+
+    private static List<KeyValuePair<string, string>> Headers(HttpHeaders headers, HttpHeaders? contentHeaders) =>
+        headers.Concat(contentHeaders ?? Enumerable.Empty<KeyValuePair<string, IEnumerable<string>>>())
+            .Select(h => new KeyValuePair<string, string>(h.Key, string.Join(", ", h.Value)))
+            .ToList();
 
     private static string? HeaderValue(HttpResponseMessage response, string name) =>
         response.Headers.TryGetValues(name, out var values) || response.Content.Headers.TryGetValues(name, out values)

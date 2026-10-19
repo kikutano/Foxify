@@ -540,7 +540,7 @@ public class WorkflowEngineTests
         var engine = new Foxify.Core.Execution.WorkflowEngine(new HttpClient(new FakeServer()));
         var started = new List<string>();
         var completed = new List<string>();
-        engine.StepStarted += started.Add;
+        engine.StepStarted += s => started.Add(s.Description);
         engine.StepCompleted += r => completed.Add(r.StepName);
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
