@@ -10,6 +10,8 @@ You are going to write API tests for a backend with **Foxify**, a command-line A
 - **Workflow files** `import` API files and run **steps** in order. A step `call`s an endpoint `with` arguments, checks the response with `expect` and stores values with `save` for the next steps.
 - **Environment files** hold per-environment values (base URL, credentials). Pass one with `-e`.
 - `foxify run <workflow.yaml> -e <env.yaml>` validates the whole workflow and its imports, then runs it and stops at the first failing step.
+- `foxify inspect <file.yaml>` validates an API or workflow file without sending anything, and lists its endpoints and steps.
+- `foxify call <api.yaml> <endpoint> --with name=value -e <env.yaml>` sends one request and prints the whole response (status, headers, body), whatever the status. Use it to see the real shape of a response before writing checks.
 
 Exit codes: `0` all steps passed, `1` a step failed, `2` invalid workflow or arguments (nothing was sent).
 
@@ -255,7 +257,7 @@ Follow these steps in order.
    For each endpoint note: method, path and path parameters, query parameters, request body fields and validation rules, whether it needs authentication, status codes and response body shape.
 2. **Understand authentication**: how a client obtains a token (login endpoint, the field that contains it), which header carries it, API keys. Model each mechanism as an `auth` set.
 3. **Find real test data**: seed data, fixtures, migrations, test users, `.env.example`, `docker-compose.yml` (base URL and port). Use values that exist in the backend; never invent ids, emails or expected values. If credentials or the base URL cannot be found, ask the user.
-4. **Write the API file** with every endpoint you found.
+4. **Write the API file** with every endpoint you found. Check it with `foxify inspect foxify/api/<name>.yaml` (exit `0` means valid), then try the main endpoints with `foxify call`, for example `foxify call foxify/api/backend.yaml get_note --with id=1 -e foxify/env.local.yaml`: the checks you write next should match the responses you saw, not the ones you expect. An endpoint that needs a token gets it with `--with token=...` or `--var token=...`, from a `call` of the login endpoint.
 5. **Write the workflows**, one per feature or resource:
    - a **smoke** workflow: the main read endpoints answer as expected;
    - **auth**: valid login, wrong password (`401`), invalid token (`401`/`403`, with `with: { token: invalid-token }`), and no token at all. A request without the `Authorization` header needs an endpoint without `auth` (e.g. `me_anonymous`): that is a different request, not a variant, so it is the one case where a second endpoint for the same route is right;

@@ -106,8 +106,11 @@ internal static class CheckEvaluator
         };
     }
 
-    /// <summary>The condition as shown in the report, e.g. <c>&gt;= 3</c>, <c>in ["a","b"]</c>, <c>&lt; 0 or &gt; 100</c>.</summary>
-    private static string Describe(Condition condition, IVariableScope scope) => condition.Operator switch
+    /// <summary>
+    /// The condition as shown in the report, e.g. <c>&gt;= 3</c>, <c>in ["a","b"]</c>, <c>&lt; 0 or &gt; 100</c>.
+    /// Without a scope placeholders are shown as written (<c>== "${email}"</c>).
+    /// </summary>
+    internal static string Describe(Condition condition, IVariableScope? scope) => condition.Operator switch
     {
         Operator.Exists => condition.Exists ? "exists" : "does not exist",
         Operator.Any => string.Join(" or ", condition.Alternatives.Select(alternative => alternative.Count == 1
@@ -116,8 +119,13 @@ internal static class CheckEvaluator
         _ => $"{Symbol(condition.Operator)} {DescribeValue(condition, scope)}"
     };
 
-    private static string DescribeValue(Condition condition, IVariableScope scope)
+    private static string DescribeValue(Condition condition, IVariableScope? scope)
     {
+        if (condition.DurationValue is { } limit)
+            return Durations.Format(limit);
+        if (scope is null)
+            return JsonValues.ToDisplay(TemplateRenderer.ToLiteral(condition.Value!.Node));
+
         try
         {
             return JsonValues.ToDisplay(TemplateRenderer.RenderValue(condition.Value!, scope));

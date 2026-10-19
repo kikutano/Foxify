@@ -1,9 +1,12 @@
 using System.Net;
+using System.Text.Json;
 
 namespace Foxify.Core.Models;
 
 public class StepReport
 {
+    /// <summary>Position of the step in the workflow, sleeps included (0-based).</summary>
+    public int Index { get; set; }
     public string StepName { get; set; } = string.Empty;
     public string? Method { get; set; }
     public Uri? Url { get; set; }
@@ -22,6 +25,12 @@ public class StepReport
     public long BytesReceived { get; set; }
     /// <summary>How many times the call was sent: more than 1 for an <c>until</c> step that polled.</summary>
     public int Attempts { get; set; } = 1;
+    /// <summary>The values stored by <c>save</c>, in order.</summary>
+    public List<KeyValuePair<string, JsonElement>> Saved { get; set; } = new();
+    /// <summary>The request sent (last attempt); recorded only when the engine captures exchanges.</summary>
+    public RecordedRequest? Request { get; set; }
+    /// <summary>The response received (last attempt); recorded only when the engine captures exchanges.</summary>
+    public RecordedResponse? Response { get; set; }
 }
 
 /// <summary>The outcome of one condition of <c>expect</c>, e.g. <c>$.total &gt;= 3</c>.</summary>
@@ -34,6 +43,25 @@ public class AssertionResult
     /// <summary>The actual value as JSON, or <c>(missing)</c>.</summary>
     public string ActualValue { get; set; } = string.Empty;
     public bool Passed { get; set; }
+}
+
+public sealed class RecordedRequest
+{
+    public required string Method { get; init; }
+    public required string Url { get; init; }
+    /// <summary>Request and content headers, in the order they were set.</summary>
+    public required IReadOnlyList<KeyValuePair<string, string>> Headers { get; init; }
+    public string? Body { get; init; }
+}
+
+public sealed class RecordedResponse
+{
+    public required int Status { get; init; }
+    public string? Reason { get; init; }
+    public required IReadOnlyList<KeyValuePair<string, string>> Headers { get; init; }
+    /// <summary>The body as UTF-8 text, cut at <c>WorkflowEngine.MaxRecordedBodyBytes</c>.</summary>
+    public required string Body { get; init; }
+    public bool BodyTruncated { get; init; }
 }
 
 public class WorkflowReport

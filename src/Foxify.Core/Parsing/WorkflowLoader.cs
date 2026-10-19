@@ -7,11 +7,20 @@ using YamlDotNet.RepresentationModel;
 
 namespace Foxify.Core.Parsing;
 
-/// <summary>A workflow, API or environment file is invalid; <see cref="Errors"/> lists every problem found.</summary>
-public sealed class WorkflowLoadException(IReadOnlyList<string> errors)
-    : Exception(string.Join(Environment.NewLine, errors))
+/// <summary>One problem of a file; <see cref="Line"/> is 0 when it concerns the whole file.</summary>
+public sealed record LoadProblem(string File, int Line, int Column, string Message)
 {
-    public IReadOnlyList<string> Errors { get; } = errors;
+    public override string ToString() => Line > 0 ? $"{File}:{Line}:{Column}: {Message}" : $"{File}: {Message}";
+}
+
+/// <summary>A workflow, API or environment file is invalid; <see cref="Problems"/> lists every problem found.</summary>
+public sealed class WorkflowLoadException(IReadOnlyList<LoadProblem> problems)
+    : Exception(string.Join(Environment.NewLine, problems))
+{
+    public IReadOnlyList<LoadProblem> Problems { get; } = problems;
+
+    /// <summary>The problems as <c>file:line:column: message</c>.</summary>
+    public IReadOnlyList<string> Errors { get; } = problems.Select(p => p.ToString()).ToList();
 }
 
 /// <summary>
@@ -31,12 +40,38 @@ public static class WorkflowLoader
     public static WorkflowDefinition Parse(string yaml, string filePath) =>
         new Loader().LoadWorkflow(yaml, Path.GetFullPath(filePath));
 
+    /// <summary>
+    /// Loads a workflow, or an API file (a file without <c>steps</c>) as a workflow with no steps:
+    /// what <c>foxify inspect</c> and <c>foxify call</c> accept.
+    /// </summary>
+    public static WorkflowDefinition LoadAny(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        return new Loader().LoadAny(File.ReadAllText(fullPath), fullPath);
+    }
+
+    /// <summary>
+    /// A workflow of one step that calls <paramref name="endpoint"/> of <paramref name="source"/> with
+    /// <paramref name="arguments"/> (values as YAML text, see <see cref="ParseYamlValue"/>) and accepts any status.
+    /// The arguments are validated like a step's <c>with</c>.
+    /// </summary>
+    public static WorkflowDefinition CreateCall(
+        WorkflowDefinition source, string endpoint, IReadOnlyList<KeyValuePair<string, string>> arguments) =>
+        new Loader().CreateCall(source, endpoint, arguments);
+
     /// <summary>Loads an environment file: a flat map of variable names to values.</summary>
     public static IReadOnlyDictionary<string, JsonElement> LoadEnvironment(string path)
     {
         var fullPath = Path.GetFullPath(path);
         return new Loader().LoadEnvironment(File.ReadAllText(fullPath), fullPath);
     }
+
+    /// <summary>
+    /// A value given on the command line (<c>--var id=42</c>), typed like a YAML value: <c>42</c> is a number,
+    /// <c>true</c> a boolean, <c>"42"</c> a string, <c>[a, b]</c> a list; an empty value is an empty string.
+    /// Placeholders are not resolved, as in an environment file.
+    /// </summary>
+    public static JsonElement ParseYamlValue(string text) => TemplateRenderer.ToLiteral(Loader.ParseValueNode(text));
 }
 
 internal sealed partial class Loader
@@ -129,6 +164,76 @@ internal sealed partial class Loader
             throw Problems();
 
         return workflow;
+    }
+
+    public WorkflowDefinition LoadAny(string text, string fullPath)
+    {
+        var root = Open(text, fullPath, out var file);
+        if (root is null)
+            throw Problems();
+
+        if (root.Children.Keys.Any(k => k is YamlScalarNode { Value: "steps" }))
+            return LoadWorkflow(text, fullPath);
+
+        var endpoints = new Dictionary<string, EndpointDefinition>();
+        AddEndpoints(endpoints, ParseApi(file, Collect(file, root, "an API file", ApiKeys)));
+        if (_problems.Count > 0)
+            throw Problems();
+
+        return new WorkflowDefinition
+        {
+            Name = Path.GetFileNameWithoutExtension(fullPath),
+            SourceFile = fullPath,
+            Endpoints = endpoints
+        };
+    }
+
+    public WorkflowDefinition CreateCall(
+        WorkflowDefinition source, string endpoint, IReadOnlyList<KeyValuePair<string, string>> arguments)
+    {
+        var location = new SourceLocation("command line", 0, 0);
+        _files.Add(location.File);
+
+        var with = new Dictionary<string, Template>();
+        foreach (var (name, text) in arguments)
+        {
+            try
+            {
+                with[name] = new Template(ParseValueNode(text), location);
+            }
+            catch (YamlException ex)
+            {
+                Report(location, $"invalid value for '{name}': {ex.Message}");
+            }
+        }
+
+        var step = new CallStep { Call = endpoint, With = with, Expect = new Expectation { AnyStatus = true }, Location = location };
+        Bind(step, source.Endpoints.ToDictionary());
+        ValidateGeneratedValues([], [step], []);
+
+        if (_problems.Count > 0)
+            throw Problems();
+
+        return new WorkflowDefinition
+        {
+            Name = source.Name,
+            Description = source.Description,
+            SourceFile = source.SourceFile,
+            Endpoints = source.Endpoints,
+            Steps = [step],
+            Variables = source.Variables,
+            Settings = source.Settings
+        };
+    }
+
+    /// <summary>A command-line value as a YAML node; an empty value is an empty string, not null.</summary>
+    internal static YamlNode ParseValueNode(string text)
+    {
+        var stream = new YamlStream();
+        stream.Load(new StringReader(text));
+        return stream.Documents.Count == 0
+            ? new YamlScalarNode(text) { Style = ScalarStyle.DoubleQuoted }
+            : stream.Documents[0].RootNode;
     }
 
     public IReadOnlyDictionary<string, JsonElement> LoadEnvironment(string text, string fullPath)
@@ -592,6 +697,15 @@ internal sealed partial class Loader
         return names;
     }
 
+    /// <summary>Names a call of the endpoint can pass, sorted; generated values excluded.</summary>
+    internal static List<string> EndpointArguments(EndpointDefinition endpoint)
+    {
+        var names = EndpointTemplates(endpoint).SelectMany(t => TemplateRenderer.Placeholders(t.Node)).ToHashSet();
+        names.UnionWith(endpoint.Query);
+        names.UnionWith(endpoint.Params?.Keys ?? []);
+        return names.Where(n => !Generators.IsGenerated(n)).Order(StringComparer.Ordinal).ToList();
+    }
+
     private static IEnumerable<Template> EndpointTemplates(EndpointDefinition endpoint) =>
         new[] { endpoint.BaseUrl, endpoint.Path, endpoint.Body }
             .Concat(endpoint.Headers.Select(h => h.Value))
@@ -678,7 +792,7 @@ internal sealed partial class Loader
         .OrderBy(p => _files.IndexOf(p.Location.File))
         .ThenBy(p => p.Location.Line)
         .ThenBy(p => p.Location.Column)
-        .Select(p => p.Location.Line > 0 ? $"{p.Location}: {p.Message}" : $"{p.Location.File}: {p.Message}")
+        .Select(p => new LoadProblem(p.Location.File, p.Location.Line, p.Location.Column, p.Message))
         .ToList());
 
     /// <summary>A path relative to the current directory when the file is inside it, otherwise the full path.</summary>

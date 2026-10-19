@@ -75,6 +75,9 @@ public abstract class StepDefinition
 public sealed class SleepStep : StepDefinition
 {
     public required TimeSpan Duration { get; init; }
+
+    /// <summary>How the step is shown: <c>sleep 500ms</c>.</summary>
+    public string Name => $"sleep {Execution.Durations.Format(Duration)}";
 }
 
 public sealed class CallStep : StepDefinition
@@ -109,6 +112,8 @@ public sealed class Expectation
 {
     /// <summary>Accepted status codes; when empty any 2xx is accepted.</summary>
     public IReadOnlyList<int> Status { get; init; } = [];
+    /// <summary>Accept any status, also 4xx and 5xx: set by <c>foxify call</c>, which explores an endpoint.</summary>
+    public bool AnyStatus { get; init; }
     public IReadOnlyList<Check> Headers { get; init; } = [];
     public IReadOnlyList<Check> Body { get; init; } = [];
     public IReadOnlyList<Condition> Duration { get; init; } = [];

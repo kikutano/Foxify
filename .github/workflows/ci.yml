@@ -56,6 +56,15 @@ jobs:
             ./publish/foxify run "$workflow" -e docs/environment.yaml
           done
 
+      # The JSON protocol (docs/protocol.md) read by tools, on the Native AOT binary.
+      - name: End-to-end (inspect, call, ndjson)
+        run: |
+          ./publish/foxify inspect docs/example/api/testserver.yaml
+          ./publish/foxify inspect docs/example/workflows/users.yaml --json | jq -e '.valid and .kind == "workflow" and (.steps | length) > 0'
+          ./publish/foxify call docs/example/api/testserver.yaml status --with code=404 -e docs/environment.yaml
+          ./publish/foxify run docs/example/workflows/users.yaml -e docs/environment.yaml --reporter ndjson > events.ndjson
+          jq -e -s '.[0].event == "run_started" and .[-1].event == "run_finished" and .[-1].success' events.ndjson
+
       - name: Test server log
         if: failure()
         run: cat server.log || true

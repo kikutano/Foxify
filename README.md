@@ -148,31 +148,65 @@ The agent can check its own work: an invalid file is reported with `file:line:co
 ## Usage
 
 ```text
-foxify run <workflow.yaml> [options]
-foxify update [--check] [--force]
-foxify guide       Print the guide for coding agents (LLMs) that write Foxify files.
-foxify --help
-foxify --version
+  foxify run <workflow.yaml> [options]
+  foxify call <file.yaml> <endpoint> [--with name=value]... [options]
+  foxify inspect <file.yaml> [--json]
+  foxify update [--check] [--force]
+  foxify guide       Print the guide for coding agents (LLMs) that write Foxify files.
+  foxify --help
+  foxify --version
 
-Options for 'run':
-  -e, --env <file>   Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
-  -v, --verbose      Print variables, requests and responses while running.
-  --no-color         Disable colors (also honored: the NO_COLOR environment variable).
+'call' sends one request to an endpoint of an API or workflow file and prints the response.
+'inspect' validates a file and lists its endpoints, variables and steps.
+
+Options for 'run' and 'call':
+  -e, --env <file>        Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
+  --var <name=value>      Set a variable, over the environment file. Repeatable.
+  --with <name=value>     ('call' only) An argument of the endpoint, like a step's 'with'. Repeatable.
+  --reporter <name>       console (default) or ndjson: one JSON event per line, for tools.
+  -v, --verbose           Print variables, requests and responses while running.
+  --no-color              Disable colors (also honored: the NO_COLOR environment variable).
+
+Values of --var and --with are typed like YAML: 42 is a number, true a boolean,
+'"42"' a string, '[a, b]' a list.
+
+Options for 'inspect':
+  --json                  Print JSON, for tools.
+  --no-color              Disable colors.
 
 Options for 'update':
-  --check            Only tell whether a newer version is available.
-  --force            Reinstall the latest version, also over a development build.
+  --check                 Only tell whether a newer version is available.
+  --force                 Reinstall the latest version, also over a development build.
 
-  -h, --help         Show this help.
-  --version          Show the version.
+  -h, --help              Show this help.
+  --version               Show the version.
 
-Exit codes ('run'):
-  0  all steps passed
+Exit codes ('run', 'call', 'inspect'):
+  0  all steps passed ('call': a response was received; 'inspect': the file is valid)
   1  at least one step failed
-  2  invalid arguments, file not found or invalid workflow
+  2  invalid arguments, file not found or invalid file
 ```
 
 Execution stops at the first failing step. The exit code makes Foxify easy to use in CI. When the output is not a terminal (CI logs, pipes) the spinner is turned off and each step is printed on its own line.
+
+### Explore an API
+
+`inspect` lists what a file defines, and `call` sends a single request and prints the whole response, without writing a workflow:
+
+```bash
+foxify inspect docs/example/api/testserver.yaml
+foxify call docs/example/api/testserver.yaml status --with code=404 -e docs/environment.yaml
+```
+
+`call` accepts any status, so a `404` is shown, not reported as a failure. Arguments are validated like a step's `with`: a missing required param or a misspelled name is an error.
+
+### Use Foxify from other tools
+
+`inspect --json` and `run --reporter ndjson` (also `call`) print JSON for programs: editors, CI dashboards, a local UI. The format is versioned and documented in [docs/protocol.md](docs/protocol.md).
+
+```bash
+foxify run docs/example/workflows/users.yaml -e docs/environment.yaml --var baseUrl=http://127.0.0.1:5122/ --reporter ndjson
+```
 
 ## Workflow format
 

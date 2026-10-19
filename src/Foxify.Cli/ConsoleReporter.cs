@@ -3,6 +3,7 @@ using System.Text.Json;
 using Foxify.Core.Definitions;
 using Foxify.Core.Execution;
 using Foxify.Core.Models;
+using Foxify.Core.Parsing;
 using Foxify.Core.Reporting;
 using Spectre.Console;
 
@@ -12,7 +13,7 @@ namespace Foxify.Cli;
 /// Renders a workflow run: a header, one line per step as it completes (with a spinner
 /// while a request is in flight on interactive terminals) and a k6-style summary.
 /// </summary>
-internal sealed class ConsoleReporter
+internal sealed class ConsoleReporter : IRunReporter
 {
     private const int MaxNameWidth = 32;
     private const int MetricNameWidth = 20;
@@ -44,23 +45,33 @@ internal sealed class ConsoleReporter
         _console.MarkupLine($"  [bold orange1]{(_unicode ? "⚡ " : "")}foxify[/] [grey]{Escape(version)}[/]");
         _console.WriteLine();
 
-        WriteHeaderRow("workflow", workflow.Name);
+        if (ShowResponse)
+            WriteHeaderRow("call", steps.Single().Call);
+        else
+            WriteHeaderRow("workflow", workflow.Name);
         WriteHeaderRow("file", workflowPath);
         if (envPath is not null)
             WriteHeaderRow("env", envPath);
         if (environment.TryGetValue("baseUrl", out var baseUrl) && baseUrl.ValueKind == JsonValueKind.String)
             WriteHeaderRow("base url", baseUrl.GetString()!);
-        WriteHeaderRow("steps", steps.Count.ToString(CultureInfo.InvariantCulture));
+        if (!ShowResponse)
+            WriteHeaderRow("steps", steps.Count.ToString(CultureInfo.InvariantCulture));
 
         _console.WriteLine();
     }
 
+    /// <summary><c>foxify call</c>: print the response (status, headers, body) under the step line.</summary>
+    public bool ShowResponse { get; init; }
+
     /// <summary>Prints the problems found while loading the workflow, one per line with its location.</summary>
-    public static void WriteLoadErrors(IAnsiConsole console, IReadOnlyList<string> errors)
+    public void WriteLoadErrors(string file, IReadOnlyList<LoadProblem> problems) =>
+        WriteLoadErrors(_console, problems.Select(p => p.ToString()).ToList());
+
+    public static void WriteLoadErrors(IAnsiConsole console, IReadOnlyList<string> errors, string what = "workflow")
     {
         var fail = console.Profile.Capabilities.Unicode ? "✗" : "x";
         console.WriteLine();
-        console.MarkupLine($"  [bold red]{fail} The workflow is not valid[/] [grey]({errors.Count} {(errors.Count == 1 ? "problem" : "problems")})[/]");
+        console.MarkupLine($"  [bold red]{fail} The {what} is not valid[/] [grey]({errors.Count} {(errors.Count == 1 ? "problem" : "problems")})[/]");
         console.WriteLine();
         foreach (var error in errors)
             console.MarkupLine($"  [red]{Escape(error)}[/]");
@@ -81,7 +92,7 @@ internal sealed class ConsoleReporter
             .SpinnerStyle(new Style(Color.Orange1))
             .StartAsync("starting", async context =>
             {
-                engine.StepStarted += name => context.Status($"[grey]running[/] {Escape(name)}");
+                engine.StepStarted += step => context.Status($"[grey]running[/] {Escape(step.Description)}");
                 report = await engine.ExecuteAsync(workflow, environment);
             });
 
@@ -91,6 +102,8 @@ internal sealed class ConsoleReporter
     public void WriteSummary(WorkflowSummary summary, TimeSpan elapsed)
     {
         _console.WriteLine();
+        if (ShowResponse)
+            return; // one call: the step line and the response say it all
 
         int checks = summary.ChecksPassed + summary.ChecksFailed;
         WriteMetric("checks", checks == 0
@@ -136,6 +149,9 @@ internal sealed class ConsoleReporter
             $"  {icon} {(step.IsSuccess ? name : $"[red]{name}[/]")}  [bold]{method}[/] {StatusMarkup(step)}" +
             $"  [grey]{duration,9}  {Escape(path)}[/]{attempts}");
 
+        if (ShowResponse && step.Response is { } response)
+            WriteResponse(response);
+
         if (step.IsSuccess)
             return;
 
@@ -151,6 +167,44 @@ internal sealed class ConsoleReporter
                     ? $"      [green]{_pass}[/] [grey]{check}[/]"
                     : $"      [red]{_fail}[/] {check}  [grey]actual[/] [red]{Escape(assertion.ActualValue)}[/]");
             }
+        }
+    }
+
+    private void WriteResponse(RecordedResponse response)
+    {
+        _console.WriteLine();
+        _console.MarkupLine($"  [bold]HTTP {response.Status}[/] [grey]{Escape(response.Reason ?? "")}[/]");
+        foreach (var (name, value) in response.Headers)
+            _console.MarkupLine($"  [grey]{Escape(name)}:[/] {Escape(value)}");
+        _console.WriteLine();
+
+        foreach (var line in PrettyBody(response.Body).Split('\n'))
+            _console.WriteLine($"  {line.TrimEnd('\r')}");
+        if (response.BodyTruncated)
+            _console.MarkupLine($"  [yellow](body cut at {FormatBytes(WorkflowEngine.MaxRecordedBodyBytes)})[/]");
+    }
+
+    /// <summary>A JSON body indented, anything else as it is.</summary>
+    private static string PrettyBody(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            using var stream = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions
+            {
+                Indented = true,
+                // Shown to a person, not embedded in HTML: keep accents and symbols readable.
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            }))
+            {
+                document.RootElement.WriteTo(writer);
+            }
+            return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        }
+        catch (JsonException)
+        {
+            return body;
         }
     }
 
