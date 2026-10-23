@@ -52,6 +52,12 @@ It downloads the latest release for your platform, verifies its SHA-256 checksum
 
 [**Foxify for VS Code**](https://github.com/kikutano/foxify-vscode) runs the same files from the editor:
 
+<p align="center">
+  <a href="https://github.com/kikutano/foxify-vscode">
+    <img src="https://raw.githubusercontent.com/kikutano/foxify-vscode/main/media/screen.png" alt="A Foxify workflow open in VS Code: a Run workflow link above it, a green check next to each step, and the run view with the steps, the checks of the selected step and its response" width="800">
+  </a>
+</p>
+
 - problems underlined as you save, with the suggestions of `foxify`;
 - **▶ Call** above every endpoint: it asks for the arguments and shows the response;
 - **▶ Run workflow**, and workflows in the Test Explorer, one test per step;
