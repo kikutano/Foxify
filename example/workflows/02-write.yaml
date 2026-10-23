@@ -1,0 +1,49 @@
+name: Create, replace, rename and delete a post
+description: Requests with a body. JSONPlaceholder answers as if it saved the data, without changing anything.
+
+import: [../api/jsonplaceholder.yaml]
+
+variables:
+  # A generated value, resolved once per run: the same title in every step.
+  title: "Hello from Foxify ${$randomString}"
+
+steps:
+  - name: Create a post
+    call: create_post
+    with:
+      title: ${title}               # text and userId keep their defaults
+    expect:
+      status: 201
+      body:
+        $.id: 101                   # the id JSONPlaceholder gives to a new post
+        $.title: ${title}
+        $.body: Written with Foxify
+        $.userId: 1
+
+  - name: Replace a post
+    call: replace_post
+    with:
+      id: 1
+      title: ${title}
+    expect:
+      body:
+        $.id: 1
+        $.title: ${title}
+        $.body: Replaced with Foxify
+
+  - name: Rename a post
+    call: rename_post
+    with:
+      id: 1
+      title: Renamed
+    expect:
+      body:
+        $.title: Renamed
+        $.userId: 1                 # PATCH changes only the title
+
+  - name: Delete a post
+    call: delete_post
+    with:
+      id: 1
+    expect:
+      status: 200

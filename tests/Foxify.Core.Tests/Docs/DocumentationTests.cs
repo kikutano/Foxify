@@ -119,6 +119,22 @@ public sealed partial class DocumentationTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData("example", "example/environment.yaml")]
+    [InlineData("docs/example", "docs/environment.yaml")]
+    public void ExampleProjects_AreValid(string folder, string environment)
+    {
+        // Users open these folders first: every workflow, its imports and the environment must load.
+        var workflows = Directory.GetFiles(RepositoryFile(Path.Combine(folder, "workflows")), "*.yaml");
+
+        Assert.NotEmpty(workflows);
+        foreach (var workflow in workflows)
+            AssertLoads(() => WorkflowLoader.Load(workflow), Path.GetFileName(workflow));
+        AssertLoads(() => WorkflowLoader.LoadEnvironment(RepositoryFile(environment)), environment);
+        foreach (var api in Directory.GetFiles(RepositoryFile(Path.Combine(folder, "api")), "*.yaml"))
+            AssertLoads(() => WorkflowLoader.LoadAny(api), Path.GetFileName(api));
+    }
+
     [Fact]
     public void Readme_StandaloneWorkflows_AreValid()
     {
