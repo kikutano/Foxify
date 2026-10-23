@@ -1,0 +1,60 @@
+name: Every kind of check
+description: Operators, OR conditions, headers, response time, query parameters and polling.
+
+import: [../api/jsonplaceholder.yaml]
+
+steps:
+  - name: Several conditions on one value
+    call: get_post
+    with:
+      id: 1
+    expect:
+      body:
+        $.id: { gte: 1, lte: 100 }          # all the conditions must pass
+        $.userId: { in: [1, 2, 3] }         # OR: one of these values
+        $.title: { exists: true, ne: "" }
+        $.author: { exists: false }         # this field must not be there
+
+  - name: Headers and response time
+    call: get_user
+    with:
+      id: 1
+    expect:
+      headers:
+        Content-Type: { contains: application/json }
+      duration: { lt: 5s }
+      body:
+        $.website: { any: [hildegard.org, { contains: ".org" }] }   # OR: one of these conditions
+        $.company.name: { contains: Romaguera }
+
+  - name: Filter with query parameters
+    call: list_todos
+    with:
+      userId: 1
+      completed: true                       # sent as ?userId=1&completed=true
+    expect:
+      body:
+        $[0].id: 4
+        $[0].completed: true
+
+  - name: Wait until a condition holds
+    call: get_post
+    with:
+      id: 1
+    # Polling: repeat the call until the checks pass. With a real API this waits for
+    # a job or a queue; JSONPlaceholder always answers the same, so it passes at once.
+    until:
+      body:
+        $.userId: 1
+      every: 1s
+      timeout: 10s
+
+  - sleep: 500ms                            # a pause, when an API needs one
+
+  - name: After the pause
+    call: get_post
+    with:
+      id: 2
+    expect:
+      body:
+        $.id: 2

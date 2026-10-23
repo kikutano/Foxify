@@ -1,0 +1,76 @@
+# The endpoints of JSONPlaceholder (https://jsonplaceholder.typicode.com), a free fake REST API.
+# An API file only describes requests: what to send, and which arguments a call takes.
+# The checks are in the workflows.
+#
+# Writes are simulated: the server answers as if it saved the data, but nothing changes,
+# so every workflow can run again and again.
+
+base_url: ${baseUrl}            # from environment.yaml
+
+headers:                        # sent with every request of this file
+  Accept: application/json
+
+endpoints:
+  list_posts:
+    path: /posts
+    query: [userId]             # sent only when a step passes it
+
+  get_post:
+    path: /posts/${id}
+    params:
+      id:                       # no default: required
+
+  list_comments:
+    path: /posts/${postId}/comments
+    params:
+      postId:
+
+  get_user:
+    path: /users/${id}
+    params:
+      id:
+
+  list_todos:
+    path: /todos
+    query: [userId, completed]
+
+  create_post:
+    method: POST
+    path: /posts
+    params:
+      title:
+      text: Written with Foxify # a default: optional
+      userId: 1
+    body:
+      title: ${title}
+      body: ${text}
+      userId: ${userId}
+
+  replace_post:
+    method: PUT
+    path: /posts/${id}
+    params:
+      id:
+      title:
+      text: Replaced with Foxify
+      userId: 1
+    body:
+      id: ${id}
+      title: ${title}
+      body: ${text}
+      userId: ${userId}
+
+  rename_post:
+    method: PATCH
+    path: /posts/${id}
+    params:
+      id:
+      title:
+    body:
+      title: ${title}
+
+  delete_post:
+    method: DELETE
+    path: /posts/${id}
+    params:
+      id:

@@ -7,6 +7,9 @@
 [![CI](https://github.com/kikutano/foxify/actions/workflows/ci.yml/badge.svg)](https://github.com/kikutano/foxify/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/kikutano/foxify?include_prereleases)](https://github.com/kikutano/foxify/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](License.md)
+[![VS Code extension](https://img.shields.io/github/v/release/kikutano/foxify-vscode?label=VS%20Code%20extension&color=orange)](https://github.com/kikutano/foxify-vscode)
+
+**[Install](#install)** · **[VS Code extension](#vs-code-extension)** · **[Try the example](#try-the-example)** · [Workflow format](docs/workflow-format.md) · [Guide for coding agents](docs/llm-guide.md)
 
 Tired to pay Postman? Try this! Fast, light, use your favorite AI to create endpoints, E2E tests against your environment! Describe testing flows using YAML file and make sure your API will never break again!
 Foxify is an API testing from the command line. Describe your endpoints once in YAML, then write workflows that call them like functions, pass arguments and check the responses. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
@@ -44,6 +47,34 @@ foxify update
 ```
 
 It downloads the latest release for your platform, verifies its SHA-256 checksum and replaces the binary in place. `foxify update --check` only tells you whether a newer version exists. Re-running the install script works too, and `FOXIFY_VERSION=0.1.0` pins a specific version.
+
+## VS Code extension
+
+[**Foxify for VS Code**](https://github.com/kikutano/foxify-vscode) runs the same files from the editor:
+
+- problems underlined as you save, with the suggestions of `foxify`;
+- **▶ Call** above every endpoint: it asks for the arguments and shows the response;
+- **▶ Run workflow**, and workflows in the Test Explorer, one test per step;
+- the request and response of every step, and the environment file picked in the status bar.
+
+```bash
+curl -fsSLO https://github.com/kikutano/foxify-vscode/releases/latest/download/foxify-vscode.vsix
+code --install-extension foxify-vscode.vsix
+```
+
+It needs `foxify` installed as above.
+
+## Try the example
+
+[example/](example/) is a small, complete project that tests [JSONPlaceholder](https://jsonplaceholder.typicode.com), a free fake REST API: nothing to start, nothing else to install. Three short, commented workflows show reads, writes and every kind of check.
+
+```bash
+git clone https://github.com/kikutano/foxify.git
+cd foxify/example
+foxify run workflows/01-read.yaml -e environment.yaml
+```
+
+Or open the `example` folder in VS Code and click **▶ Run workflow**. See [example/README.md](example/README.md).
 
 ## Quick start
 
@@ -272,9 +303,9 @@ steps:
 
 `${name}` reads the step's arguments, saved values, the environment file (`-e`) and the workflow's `variables`, in this order. Names starting with `$` are generated: `${$uuid}`, `${$timestamp}`, `${$randomString}`, `${$now+2h}`, `${$today+1d}`; define one in `variables` to reuse the same value in every step. The complete reference is in [docs/workflow-format.md](docs/workflow-format.md).
 
-## Full example
+## Test server example
 
-[docs/example/](docs/example/) tests the bundled test server: one API file and four workflows covering authentication, CRUD, nested JSON, query strings, headers, status codes and slow responses.
+[docs/example/](docs/example/) tests the test server of this repository, and is what CI runs: one API file and four workflows covering authentication, CRUD, nested JSON, query strings, headers, status codes and slow responses. It needs the .NET SDK to start the server; for a first look, [example/](example/) needs nothing.
 
 ```bash
 # terminal 1: start the test server on http://localhost:5122

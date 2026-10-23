@@ -1,0 +1,52 @@
+name: Read posts and users
+description: The basics. Call endpoints, check the responses, save values for the next steps.
+
+import: [../api/jsonplaceholder.yaml]
+
+steps:
+  - name: Read a post
+    call: get_post
+    with:
+      id: 1
+    expect:
+      status: 200
+      body:
+        $.id: 1
+        $.title: { contains: sunt aut facere }
+    save:
+      authorId: $.userId            # available as ${authorId} in the next steps
+
+  - name: Read its author
+    call: get_user
+    with:
+      id: ${authorId}
+    expect:
+      body:
+        $.name: Leanne Graham
+        $.email: Sincere@april.biz
+        $.address.city: Gwenborough   # nested values with a JSONPath
+
+  - name: List the author's posts
+    call: list_posts
+    with:
+      userId: ${authorId}           # sent as ?userId=1
+    expect:
+      body:
+        $[0].userId: 1
+        $[9].id: 10                 # 10 posts per user
+
+  - name: Read the comments of the post
+    call: list_comments
+    with:
+      postId: 1
+    expect:
+      body:
+        $[0].postId: 1
+        $[0].email: Eliseo@gardner.biz
+
+  - name: A post that does not exist
+    call: get_post
+    with:
+      id: 999
+    expect:
+      status: 404                   # without expect.status, only a 2xx passes
