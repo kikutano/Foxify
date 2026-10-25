@@ -67,9 +67,10 @@ It downloads the latest release for your platform, verifies its SHA-256 checksum
 - **▶ Run workflow**, and workflows in the Test Explorer, one test per step;
 - the request and response of every step, and the environment file picked in the status bar.
 
+Install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=kikutano.tinyprobe-vscode), or [Open VSX](https://open-vsx.org/extension/kikutano/tinyprobe-vscode) for Cursor, Windsurf and VSCodium, or from a terminal:
+
 ```bash
-curl -fsSLO https://github.com/kikutano/tinyprobe-vscode/releases/latest/download/tinyprobe-vscode.vsix
-code --install-extension tinyprobe-vscode.vsix
+code --install-extension kikutano.tinyprobe-vscode
 ```
 
 It needs `tinyprobe` installed as above.

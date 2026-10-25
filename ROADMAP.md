@@ -38,7 +38,7 @@ Clean up the project before inviting people in.
 - [x] **M0-4** `repo` README: fix the opening sentence ("Tired of paying for Postman?"), refresh the sample output (it still shows 0.4.0), link this roadmap.
 - [x] **M0-5** `repo` Choose a name that is free for a developer tool (GitHub, npm, VS Code Marketplace, Open VSX, trademarks): **tinyprobe**, [decision 0002](docs/decisions/0002-name-tinyprobe.md).
 - [x] **M0-6** `repo` `CONTRIBUTING.md` (how to build, test and propose a feature with a spec), issue and PR templates, in both repositories.
-- [ ] **M0-7** `ext` Publish on the VS Code Marketplace and Open VSX; the release workflow publishes every tag. Needs the publisher accounts and tokens. *Done when:* "tinyprobe" can be installed from the Extensions view of VS Code and VSCodium, and the READMEs show that as the main way to install it.
+- [x] **M0-7** `ext` Publish on the VS Code Marketplace and Open VSX. Open VSX is published by the release workflow (`OVSX_PAT`); the Marketplace gets each `.vsix` by hand on its publisher page, because Azure DevOps retires the tokens it accepted on 2026-12-01 (see the Inbox).
 - [x] **M0-8** `repo` Use the name tinyprobe everywhere, in both repositories: binary, install scripts, release assets, namespaces, docs, the extension id, commands and settings, the GitHub repositories. PRs #13, and #1 in tinyprobe-vscode.
 - [x] **M0-9** `repo` A logo and an extension icon for tinyprobe: a shell prompt followed by a check mark (`media/` in both repositories). The social preview image `media/social-preview.png` is uploaded by hand in the repository settings.
 
@@ -99,4 +99,4 @@ Not planned now. We reconsider them after M4.
 
 New ideas, not planned yet.
 
-- 
+- `ext` Publish to the VS Code Marketplace from the release workflow, without a token: Trusted Publishing when Microsoft ships it, or Microsoft Entra ID with a GitHub federated credential. Until then each `.vsix` is uploaded by hand.

@@ -24,3 +24,5 @@ Only if it changed since its last tag:
 1. `scripts/dev.sh check` there, with the released binary if possible (`TINYPROBE_PATH=$(command -v tinyprobe)` after `tinyprobe update`).
 2. Bump `version` in `package.json`, add the `CHANGELOG.md` section; if it needs the new CLI, `MINIMUM_VERSION` in `src/protocol.js` and the README "Requirements".
 3. Commit, then the annotated tag the same way. Release the CLI first when the extension depends on it: its CI installs the latest CLI release.
+
+4. The Release workflow publishes the GitHub Release and Open VSX. The VS Code Marketplace is by hand: ask the user to upload the release's `tinyprobe-vscode.vsix` with **Update** on https://marketplace.visualstudio.com/manage, then check the version with the Marketplace API.
