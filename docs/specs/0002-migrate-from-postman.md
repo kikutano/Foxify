@@ -142,14 +142,14 @@ The point of the section is better conversions, so we measure them before and af
 
 ## Acceptance criteria
 
-- [ ] Sections 12 and 13 and the new common mistakes are in `docs/llm-guide.md`; `tinyprobe guide` prints them.
-- [ ] Every YAML example in the guide loads (`DocumentationTests`).
-- [ ] The Postman fixture is in `docs/example/postman/`, with a README that says how to score a conversion. It is a test bench for the guide, not something users get: no reference conversion, no CI step.
-- [ ] Baseline and new scores are recorded here. With the new section:
+- [x] Sections 12 and 13 and the new common mistakes are in `docs/llm-guide.md`; `tinyprobe guide` prints them.
+- [x] Every YAML example in the guide loads (`DocumentationTests`).
+- [x] The Postman fixture is in `docs/example/postman/`, with a README that says how to score a conversion. It is a test bench for the guide, not something users get: no reference conversion, no CI step.
+- [x] Baseline and new scores are recorded here. With the new section:
   - no invented syntax and no secrets in committed files;
   - every planted untranslatable case is reported;
   - every translatable request is covered.
-- [ ] `scripts/dev.sh check` passes.
+- [x] `scripts/dev.sh check` passes.
 
 ## Decisions
 
@@ -163,6 +163,17 @@ Answered on 2026-10-25:
 
 ## Scores
 
-| Run | Agent | Rounds | Requests covered | Untranslatable reported | Invented syntax | Secrets committed |
-|---|---|---|---|---|---|---|
-| baseline | — | — | — | — | — | — |
+On the bench of `docs/example/postman/` (20 requests: 18 translatable, 2 not; 44 assertions; 4 planted untranslatable cases). "Rounds" counts `tinyprobe` invocations, `guide` excluded.
+
+| Run | Guide | Agent | Rounds | Invalid files | Requests covered | Checks kept | Untranslatable reported | Secrets committed | Coverage report |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline | 0.10.0 | Claude Code, Sonnet | 8 | 0 | 18 / 18 | 40 / 44 (2 approximated) | 4 / 4, in the answer only | 0 | no |
+| baseline | 0.10.0 | Claude Code, Haiku | 26 | 0 | 18 / 18 | 40 / 44 (2 approximated) | 4 / 4, in the answer only | 0 | no |
+| new | section 12 | Claude Code, Sonnet | 7 | 0 (one `call` without a required argument) | 18 / 18 | 40 / 44 (2 approximated) | 4 / 4, in `MIGRATION.md` | 0 | yes, every request |
+| new | section 12 | Claude Code, Haiku | 26 | 0 | 18 / 18 | 40 / 44 (2 approximated) | 4 / 4, in `MIGRATION.md` | 0 | yes, every request |
+
+Baseline notes: variants were merged into one endpoint (`login` with a wrong password, `bearer_check` with an invalid token). The regex became `contains "@example.com"`, and `forEach` became a check of `$.data[0]`. Nothing was written down: the list of what was not converted exists only in the final chat answer, and is lost when the session ends.
+
+With section 12, both models followed the procedure. Sonnet wrote `MIGRATION.md` with all 20 requests, the 2 skipped ones and the 2 weakened checks, and the totals. It also listed the Postman variables it did not carry over and why. The other measures stayed at their best. Haiku did the same, and also counted the dropped and the weakened checks separately.
+
+What this bench shows: the current guide already makes both models convert well, so section 12 mainly adds what was missing, a written coverage report. It did not cost extra rounds. This collection is small and clean; a large or messy one (hundreds of requests, nested folders, heavy scripts) would test the inventory and the one-folder-at-a-time rule, and is a good next bench.

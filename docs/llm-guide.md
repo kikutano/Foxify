@@ -245,7 +245,7 @@ A flat map of variable names to values. Put here everything that changes between
 
 ## 8. Procedure
 
-Follow these steps in order.
+Follow these steps in order. If the user gives you a Postman collection or the exports of another API tool, follow section 12 instead.
 
 1. **Find the endpoints.** Prefer an OpenAPI/Swagger document if the project has one. Otherwise read the route definitions, for example:
    - ASP.NET: `app.MapGet/MapPost(...)`, `[HttpGet]`, `[Route]` on controllers
@@ -305,6 +305,11 @@ Safety: run workflows only against a **local or test** environment, never agains
 | `$.total: 1` after creating an item | `$.total: { gte: 1 }`: a previous failed run may have left data |
 | body checks on a `204` or an empty `401` | only `status`: there is no JSON body to check |
 | `import: [api/backend.yaml]` from `tinyprobe/workflows/` | `import: [../api/backend.yaml]`: paths are relative to the workflow |
+| one endpoint per Postman request (`login_ok`, `login_wrong_password`) | one endpoint; each variant is a step with its own `with` (section 12) |
+| `{{token}}` left in a converted file | `${token}` |
+| the real values of a Postman environment in `env.example.yaml` | placeholders there; real values only in `env.local.yaml` |
+| a workflow that relies on a token saved by another workflow | each workflow logs in itself |
+| a Postman request or check skipped without a word | a line in `MIGRATION.md` that says what and why |
 
 ## 11. Complete example
 
@@ -531,7 +536,239 @@ A failing check looks like this; fix the test or report the backend behavior:
       ✗ $.title == "tinyprobe note k3x9q2ab"  actual "Untitled"
 ```
 
-## 12. Checklist before you finish
+## 12. Migrating from Postman and other tools
+
+Follow this section when the user gives you exports of another API tool (a Postman collection, its environments) instead of, or as well as, a backend to read. The mapping below is for Postman; for another tool, follow the same procedure and use the closest rows.
+
+### 12.1 Procedure
+
+1. **Inventory first.** Read the export files before writing anything. A Postman collection export is v2.1 when `info.schema` ends in `v2.1.0/collection.json`; for v2.0 or v1, ask the user to export it again as v2.1. List:
+   - every folder and request, with its method and URL;
+   - the `auth` of the collection, of each folder and of each request;
+   - the collection `variable`s, and the keys of each environment file;
+   - the scripts (`event` with `listen: prerequest` or `test`) at every level.
+
+   Write this list to `tinyprobe/MIGRATION.md`, one row per request (section 12.4). It becomes the coverage report.
+2. **Environments.** Each environment export (`values[]`) becomes `tinyprobe/env.<name>.yaml`, a flat map of its enabled keys. Values of type `secret`, and keys that look like credentials (`password`, `token`, `apiKey`, `secret`, `clientSecret`), go only into `env.local.yaml`, which is in `.gitignore`; `env.example.yaml` gets every key with a placeholder value. Keys that scripts fill at run time (a token, a created id) don't belong in env files: they become `save`.
+3. **API file.** Group endpoints by resource, not by folder. Requests that differ only in their values (a wrong password, a missing field, another token) are **one endpoint**: declare its inputs as `params`, and each Postman request becomes a step with its own `with`.
+4. **Workflows.** One workflow per folder that tests a flow, with the steps in the folder's order. Each workflow logs in itself (section 9), even when Postman relied on an earlier folder to set the token.
+5. **One folder at a time.** For each folder: write its endpoints and its workflow, `tinyprobe inspect` them, `tinyprobe run` the workflow until it passes, and update `MIGRATION.md`. Then move to the next folder. Never convert everything first and validate at the end.
+6. **Coverage report.** Finish `MIGRATION.md` (section 12.4) and tell the user the totals: requests converted, requests skipped, checks dropped, failures that look like backend bugs.
+
+### 12.2 Postman to tinyprobe
+
+| Postman | tinyprobe |
+|---|---|
+| `{{name}}` in the URL, headers or body | `${name}` |
+| `{{baseUrl}}/users/:id` and `url.variable` | `base_url: ${baseUrl}`, `path: /users/${id}`, `params: { id: }` |
+| `url.query` | `query: [name, ...]`; the values go in the step's `with` |
+| `disabled: true` on a header, query parameter or form field | leave it out |
+| raw JSON body | a YAML mapping; `"qty": {{qty}}` without quotes becomes `qty: ${qty}`, which keeps the type |
+| `urlencoded` body | a string body `"a=${a}&b=${b}"` and the header `Content-Type: application/x-www-form-urlencoded` |
+| collection, folder or request `auth`: `bearer`, `apikey` | `auth` sets in the API file; a request with `inherit` (or no `auth`) uses its parent's set, `noauth` uses none |
+| `basic` auth | `Authorization: "Basic ${basicAuth}"`, with the base64 of `user:password` in `env.local.yaml` |
+| collection `variable`s | workflow `variables` for non-secret defaults, otherwise env files |
+| `pm.environment.set("t", pm.response.json().token)` (also `collectionVariables`, `globals`, `pm.variables`) | `save: { t: $.token }` |
+| `pm.response.to.have.status(201)`, `pm.response.code === 201` | `expect.status: 201` |
+| `pm.response.to.be.success` | no `status` (any 2xx) |
+| `pm.response.to.be.ok` | `status: 200` |
+| `pm.expect(json.a).to.eql(1)`, `.to.equal(1)` | `$.a: 1` (`eq` for a whole object) |
+| `.to.be.above(n)`, `.below(n)`, `.at.least(n)`, `.at.most(n)` | `gt`, `lt`, `gte`, `lte` |
+| `.to.include(x)` on an array or a string | `contains` |
+| `.to.be.oneOf([a, b])` | `in: [a, b]` |
+| `.to.have.property("id")`, `.to.exist` | `{ exists: true }` |
+| `.to.be.true`, `.to.be.null` | `true`, `null` |
+| `.to.have.lengthOf(2)` on an array | `$.items[1]: { exists: true }` and `$.items[2]: { exists: false }` |
+| `pm.response.to.have.header("X-Id")` | `headers: { X-Id: { exists: true } }` |
+| `pm.response.headers.get("X-Id")` compared to a value | `headers: { X-Id: value }` |
+| `pm.response.responseTime` below `500` | `duration: { lt: 500ms }` |
+| `{{$guid}}`, `{{$timestamp}}`, `{{$randomInt}}`, `{{$isoTimestamp}}` | `${$uuid}`, `${$timestamp}`, `${$randomInt}`, `${$now}` |
+| other `{{$random...}}` (`$randomFirstName`, `$randomEmail`) | text built on a generated value: `"name-${$randomString}"`, `"user-${$randomString}@example.com"` |
+| a value computed in a pre-request script (`Date.now()`, a unique email) | a workflow variable built on a generated value, so it is the same in every step |
+| a retry loop (`setTimeout` and `setNextRequest` on the same request) | `until` |
+| saved example responses (`response[]`) | not tests: read them to learn the shape of a response, then check it against the real backend with `tinyprobe call` |
+| `pm.test("Name", ...)` | the step's `name` |
+
+An example. This collection excerpt:
+
+```json
+{
+  "info": { "name": "Shop", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}" }] },
+  "item": [
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST", "url": "{{baseUrl}}/api/login", "auth": { "type": "noauth" },
+        "body": { "mode": "raw", "raw": "{ \"email\": \"{{email}}\", \"password\": \"{{password}}\" }" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+        "pm.environment.set(\"token\", pm.response.json().accessToken);"
+      ] } }]
+    },
+    {
+      "name": "Get order",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/7" },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "const json = pm.response.json();",
+        "pm.test(\"Paid or shipped\", () => pm.expect(json.status).to.be.oneOf([\"paid\", \"shipped\"]));",
+        "pm.test(\"Two items\", () => pm.expect(json.items).to.have.lengthOf(2));"
+      ] } }]
+    },
+    {
+      "name": "Create order",
+      "request": {
+        "method": "POST", "url": "{{baseUrl}}/api/orders",
+        "body": { "mode": "raw", "raw": "{ \"productId\": {{productId}}, \"quantity\": 1 }" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test(\"Created\", () => pm.response.to.have.status(201));"
+      ] } }]
+    },
+    {
+      "name": "Create order - quantity zero",
+      "request": {
+        "method": "POST", "url": "{{baseUrl}}/api/orders",
+        "body": { "mode": "raw", "raw": "{ \"productId\": {{productId}}, \"quantity\": 0 }" }
+      },
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test(\"Rejected\", () => pm.response.to.have.status(422));"
+      ] } }]
+    }
+  ]
+}
+```
+
+becomes one API file, where the two "Create order" requests are one endpoint:
+
+```yaml
+# file: tinyprobe/api/shop.yaml
+base_url: ${baseUrl}
+
+auth:
+  bearer:
+    Authorization: "Bearer ${token}"
+
+endpoints:
+  login:
+    method: POST
+    path: /api/login
+    params:
+      email:
+      password:
+    body:
+      email: ${email}
+      password: ${password}
+
+  get_order:
+    path: /api/orders/${id}
+    params:
+      id:
+    auth: bearer
+
+  create_order:
+    method: POST
+    path: /api/orders
+    auth: bearer
+    params:
+      productId:
+      quantity: 1
+    body:
+      productId: ${productId}
+      quantity: ${quantity}
+```
+
+and one workflow, with the Postman test names as step names:
+
+```yaml
+# file: tinyprobe/workflows/orders.yaml
+name: Orders
+import:
+  - ../api/shop.yaml
+
+steps:
+  - name: Login
+    call: login
+    with:
+      email: ${email}
+      password: ${password}
+    expect:
+      status: 200
+    save:
+      token: $.accessToken
+
+  - name: Get order
+    call: get_order
+    with:
+      id: 7
+    expect:
+      body:
+        $.status: { in: [paid, shipped] }
+        $.items[1]: { exists: true }
+        $.items[2]: { exists: false }
+
+  - name: Create order
+    call: create_order
+    with:
+      productId: ${productId}
+    expect:
+      status: 201
+
+  - name: Create order - quantity zero
+    call: create_order
+    with:
+      productId: ${productId}
+      quantity: 0
+    expect:
+      status: 422
+```
+
+`email` and `productId` go into `env.example.yaml` and `env.local.yaml`; `password` only into `env.local.yaml`. The collection never deletes the order it creates, so `MIGRATION.md` says that this workflow leaves an order behind on every run (section 9).
+
+### 12.3 What cannot be translated
+
+**Never invent syntax.** When something has no tinyprobe equivalent:
+
+1. if the request still makes sense without it, translate the rest and drop only what has no equivalent;
+2. otherwise, skip the request.
+
+Either way, write a line in `MIGRATION.md`: the request, what was not translated, and why. A skipped request that is not in the report looks, to the user, like a request that was migrated.
+
+| In Postman | What to do |
+|---|---|
+| a pre-request script with logic: a signature (HMAC), a hash, a value in a format tinyprobe cannot generate | skip the request, or translate it without that value if the backend accepts it; report it |
+| `pm.sendRequest` in a script | a plain request becomes a step before; otherwise report it |
+| `postman.setNextRequest` branching (not a retry loop) | translate the main path; report the branches |
+| data files, `pm.iterationData` | translate one iteration with the first row; report that `for_each` is not supported yet |
+| a `formdata` body, a file upload | skip the request; report it (multipart bodies are not supported yet) |
+| the OAuth 2.0 auth helper | client credentials: a token request as the first step, with `save`; other grant types: report them, and ask the user for a token in `env.local.yaml` |
+| cookies set by one response and sent by the next | report it (cookies are not supported yet) |
+| regex checks (`.to.match`), type checks (`.to.be.a("string")`), JSON schema (`jsonSchema`, `tv4`) | keep what has an equivalent (`{ exists: true }`, `contains` for a fixed part of the text); drop the rest and report it |
+| a loop over a response array (`json.forEach`) | check the first items by index; report that the others are not checked |
+| XML or HTML responses | check `status` and headers only; report the body checks |
+| JSONPath beyond the subset (`[*]`, filters, `..`) | index-based checks, or report it |
+
+### 12.4 The coverage report
+
+`tinyprobe/MIGRATION.md` stays in the repository: it tells the team what the tests cover and what they don't yet. For example:
+
+```markdown
+# Migration from Postman
+
+Source: Shop.postman_collection.json (4 requests), environments: Local, Staging.
+
+| Folder | Request | Became | Notes |
+|---|---|---|---|
+| Auth | Login | `login`, step "Login" in workflows/orders.yaml | |
+| Orders | Get order | `get_order`, step "Get order" | |
+| Orders | Create order | `create_order`, step "Create order" | leaves an order behind on every run |
+| Orders | Create order - quantity zero | `create_order`, step "Create order - quantity zero" | |
+
+Converted: 4 of 4 requests. Skipped: 0. Checks dropped: 0.
+```
+
+## 13. Checklist before you finish
 
 - [ ] Every workflow runs with exit code `0` against the local backend, or the remaining failures are reported to the user as possible backend bugs.
 - [ ] No real secret in API or workflow files; secrets are in `env.local.yaml`, which is in `.gitignore`.
@@ -542,3 +779,5 @@ A failing check looks like this; fix the test or report the backend behavior:
 - [ ] No exact count on a list the workflow adds to (`{ gte: 1 }`, not `1`), and no body checks on responses without a body.
 - [ ] No unsupported JSONPath (`*`, `?()`, `..`) and no repeated keys in `expect.body`.
 - [ ] Asynchronous results are awaited with `until`, never with a fixed `sleep`.
+- [ ] After a migration: `MIGRATION.md` lists every request of the collection, with what it became or why it was skipped, and every dropped check.
+- [ ] After a migration: no `{{...}}` placeholder is left, and no Postman `secret` value is in a committed file.

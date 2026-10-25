@@ -72,10 +72,11 @@ public sealed partial class DocumentationTests : IDisposable
         var workflows = files.Where(f => IsWorkflow(File.ReadAllText(f))).ToList();
         var environments = files.Where(f => Path.GetFileName(f).StartsWith("env.", StringComparison.Ordinal)).ToList();
 
-        // Guards the extraction itself: an example API file, two workflows and two env files.
-        Assert.Equal(2, workflows.Count);
+        // Guards the extraction itself: the complete example (an API file, two workflows, two env files)
+        // and the Postman migration example (an API file, one workflow).
+        Assert.Equal(3, workflows.Count);
         Assert.Equal(2, environments.Count);
-        Assert.Equal(5, files.Count);
+        Assert.Equal(7, files.Count);
 
         foreach (var workflow in workflows)
             AssertLoads(() => WorkflowLoader.Load(workflow), Path.GetFileName(workflow));
