@@ -15,3 +15,9 @@
 # Local-only convenience files (never commit credentials or local endpoints)
 ################################################################################
 docs/dev_credentials.json
+
+################################################################################
+# Local development output (scripts/dev.sh)
+################################################################################
+.dev/
+publish/

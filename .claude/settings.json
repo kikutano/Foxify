@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(scripts/dev.sh build)",
+      "Bash(scripts/dev.sh test)",
+      "Bash(scripts/dev.sh e2e)",
+      "Bash(scripts/dev.sh check)",
+      "Bash(scripts/dev.sh install)",
+      "Bash(scripts/dev.sh example)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git switch -c:*)",
+      "Bash(./.dev/foxify/foxify:*)",
+      "Bash(foxify-dev:*)"
+    ]
+  }
+}
