@@ -20,7 +20,7 @@ steps:
     expect:
       status: 200
       body:
-        $.access_token: tyfapi-test-token
+        $.access_token: tinyprobe-test-token
         $.token_type: Bearer
         $.expires_in: 3600
         $.user.username: admin

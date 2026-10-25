@@ -1,9 +1,0 @@
-<Solution>
-  <Project Path="src/Foxify.Core/Foxify.Core.csproj" />
-  <Folder Name="/tests/">
-    <Project Path="tests/Foxify.Cli.Tests/Foxify.Cli.Tests.csproj" />
-    <Project Path="tests/Foxify.Core.Tests/Foxify.Core.Tests.csproj" />
-    <Project Path="tests/Foxify.RealServer.Tests/Foxify.RealServer.Tests.csproj" Id="ca52d5d3-e279-437e-8044-9a69c140bc5d" />
-  </Folder>
-  <Project Path="src/Foxify.Cli/Foxify.Cli.csproj" />
-</Solution>

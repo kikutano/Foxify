@@ -1,6 +1,6 @@
 # Workflow format
 
-Foxify separates *what an endpoint is* (method, path, headers, body shape) from *what a test expects* (status, values, timings). Endpoints are declared once and called by name, like functions, from any number of workflows. The complete example lives in [`docs/example/`](example/).
+tinyprobe separates *what an endpoint is* (method, path, headers, body shape) from *what a test expects* (status, values, timings). Endpoints are declared once and called by name, like functions, from any number of workflows. The complete example lives in [`docs/example/`](example/).
 
 Two kinds of file:
 
@@ -21,7 +21,7 @@ docs/example/
 ```
 
 ```bash
-foxify run docs/example/workflows/users.yaml -e docs/environment.yaml
+tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml
 ```
 
 ## API file
@@ -246,7 +246,7 @@ expect:
       ✗ $.count < 10  actual 12
 ```
 
-To combine equality with other conditions write it as `eq`: a plain value is a single condition. A JSONPath cannot be repeated as a key (`$.email: …` twice), since YAML does not allow duplicate keys; foxify reports it before running.
+To combine equality with other conditions write it as `eq`: a plain value is a single condition. A JSONPath cannot be repeated as a key (`$.email: …` twice), since YAML does not allow duplicate keys; tinyprobe reports it before running.
 
 ### Alternatives (OR)
 
@@ -293,6 +293,6 @@ The whole workflow, imports included, is checked before the first request. Every
 ## Not supported yet
 
 - Namespaced imports (`call: server.login`) — duplicate names are an error for now.
-- Running a whole folder (`foxify run docs/example/workflows/`).
+- Running a whole folder (`tinyprobe run docs/example/workflows/`).
 - Repeating a step over a list of arguments (`for_each`).
 - Reusable step sequences (e.g. a shared "log in" block).

@@ -39,7 +39,7 @@ endpoints:
     path: /posts
     params:
       title:
-      text: Written with Foxify # a default: optional
+      text: Written with tinyprobe # a default: optional
       userId: 1
     body:
       title: ${title}
@@ -52,7 +52,7 @@ endpoints:
     params:
       id:
       title:
-      text: Replaced with Foxify
+      text: Replaced with tinyprobe
       userId: 1
     body:
       id: ${id}

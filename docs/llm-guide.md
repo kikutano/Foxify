@@ -1,26 +1,26 @@
-# Foxify guide for coding agents
+# tinyprobe guide for coding agents
 
-You are going to write API tests for a backend with **Foxify**, a command-line API testing tool. This guide is everything you need: the file format, the rules that are easy to get wrong, a procedure to follow and a complete example. Follow it exactly; do not use syntax that is not described here.
+You are going to write API tests for a backend with **tinyprobe**, a command-line API testing tool. This guide is everything you need: the file format, the rules that are easy to get wrong, a procedure to follow and a complete example. Follow it exactly; do not use syntax that is not described here.
 
-> This guide matches the installed version when read with `foxify guide`. Check that Foxify is installed with `foxify --version`; if it is not, tell the user to install it: https://github.com/kikutano/foxify#install
+> This guide matches the installed version when read with `tinyprobe guide`. Check that tinyprobe is installed with `tinyprobe --version`; if it is not, tell the user to install it: https://github.com/kikutano/tinyprobe#install
 
-## 1. How Foxify works
+## 1. How tinyprobe works
 
 - **API files** declare the backend's endpoints once: method, path, query, headers, auth, body and parameters. No expectations.
 - **Workflow files** `import` API files and run **steps** in order. A step `call`s an endpoint `with` arguments, checks the response with `expect` and stores values with `save` for the next steps.
 - **Environment files** hold per-environment values (base URL, credentials). Pass one with `-e`.
-- `foxify run <workflow.yaml> -e <env.yaml>` validates the whole workflow and its imports, then runs it and stops at the first failing step.
-- `foxify inspect <file.yaml>` validates an API or workflow file without sending anything, and lists its endpoints and steps.
-- `foxify call <api.yaml> <endpoint> --with name=value -e <env.yaml>` sends one request and prints the whole response (status, headers, body), whatever the status. Use it to see the real shape of a response before writing checks.
+- `tinyprobe run <workflow.yaml> -e <env.yaml>` validates the whole workflow and its imports, then runs it and stops at the first failing step.
+- `tinyprobe inspect <file.yaml>` validates an API or workflow file without sending anything, and lists its endpoints and steps.
+- `tinyprobe call <api.yaml> <endpoint> --with name=value -e <env.yaml>` sends one request and prints the whole response (status, headers, body), whatever the status. Use it to see the real shape of a response before writing checks.
 
 Exit codes: `0` all steps passed, `1` a step failed, `2` invalid workflow or arguments (nothing was sent).
 
 ## 2. Project layout
 
-Create the files in a `foxify/` folder at the root of the user's repository, unless the user asks otherwise:
+Create the files in a `tinyprobe/` folder at the root of the user's repository, unless the user asks otherwise:
 
 ```text
-foxify/
+tinyprobe/
 ├── api/
 │   └── backend.yaml          # all endpoints of the backend (split by area if it is large)
 ├── workflows/
@@ -31,7 +31,7 @@ foxify/
 └── env.local.yaml            # NOT committed: real values for the local backend
 ```
 
-Add `foxify/env.*.yaml` to `.gitignore`, except `env.example.yaml`.
+Add `tinyprobe/env.*.yaml` to `.gitignore`, except `env.example.yaml`.
 
 ## 3. API file
 
@@ -227,14 +227,14 @@ YAML types matter in bodies and checks:
 
 ```yaml
 variables:
-  noteTitle: "Foxify note ${$randomString}"   # one value for the whole run
+  noteTitle: "tinyprobe note ${$randomString}"   # one value for the whole run
   remindAt: ${$now+1d}
 ```
 
 ## 7. Environment file
 
 ```yaml
-# file: foxify/env.example.yaml
+# file: tinyprobe/env.example.yaml
 baseUrl: http://localhost:8080
 email: user@example.com
 password: change-me
@@ -257,14 +257,14 @@ Follow these steps in order.
    For each endpoint note: method, path and path parameters, query parameters, request body fields and validation rules, whether it needs authentication, status codes and response body shape.
 2. **Understand authentication**: how a client obtains a token (login endpoint, the field that contains it), which header carries it, API keys. Model each mechanism as an `auth` set.
 3. **Find real test data**: seed data, fixtures, migrations, test users, `.env.example`, `docker-compose.yml` (base URL and port). Use values that exist in the backend; never invent ids, emails or expected values. If credentials or the base URL cannot be found, ask the user.
-4. **Write the API file** with every endpoint you found. Check it with `foxify inspect foxify/api/<name>.yaml` (exit `0` means valid), then try the main endpoints with `foxify call`, for example `foxify call foxify/api/backend.yaml get_note --with id=1 -e foxify/env.local.yaml`: the checks you write next should match the responses you saw, not the ones you expect. An endpoint that needs a token gets it with `--with token=...` or `--var token=...`, from a `call` of the login endpoint.
+4. **Write the API file** with every endpoint you found. Check it with `tinyprobe inspect tinyprobe/api/<name>.yaml` (exit `0` means valid), then try the main endpoints with `tinyprobe call`, for example `tinyprobe call tinyprobe/api/backend.yaml get_note --with id=1 -e tinyprobe/env.local.yaml`: the checks you write next should match the responses you saw, not the ones you expect. An endpoint that needs a token gets it with `--with token=...` or `--var token=...`, from a `call` of the login endpoint.
 5. **Write the workflows**, one per feature or resource:
    - a **smoke** workflow: the main read endpoints answer as expected;
    - **auth**: valid login, wrong password (`401`), invalid token (`401`/`403`, with `with: { token: invalid-token }`), and no token at all. A request without the `Authorization` header needs an endpoint without `auth` (e.g. `me_anonymous`): that is a different request, not a variant, so it is the one case where a second endpoint for the same route is right;
    - asynchronous results (status set by a job, a webhook, a queue): poll them with `until` (section 6b);
    - for each resource: **list and read** (including filters and pagination), **create** with valid data, **validation errors** (`400`/`422`, check the error field), **not found** (`404`), and the **full lifecycle** of a resource the workflow creates itself: create, save its id, read, update, delete, verify it is gone.
 6. **Write `env.example.yaml`**, and `env.local.yaml` with the local values if you know them.
-7. **Run every workflow**: `foxify run foxify/workflows/<name>.yaml -e foxify/env.local.yaml`. The backend must be running locally; start it if you can, otherwise ask the user to.
+7. **Run every workflow**: `tinyprobe run tinyprobe/workflows/<name>.yaml -e tinyprobe/env.local.yaml`. The backend must be running locally; start it if you can, otherwise ask the user to.
    - Exit `2`: the YAML is invalid. Every problem is listed as `file:line:column: message`, with suggestions. Fix them and run again.
    - Exit `1`: a check failed. The report shows each check with its actual value. Decide whether **your test** is wrong (fix it) or **the backend** does not do what its code or documentation says (keep the test and report it to the user). Never weaken a check only to make it pass.
 8. **Report to the user**: the files you created, what each workflow covers, the endpoints you did not cover and why, and any failure that looks like a backend bug.
@@ -304,14 +304,14 @@ Safety: run workflows only against a **local or test** environment, never agains
 | `path: /api/notes/${id}` without `params` | `params: { id: }`: a forgotten `with.id` is then caught before running |
 | `$.total: 1` after creating an item | `$.total: { gte: 1 }`: a previous failed run may have left data |
 | body checks on a `204` or an empty `401` | only `status`: there is no JSON body to check |
-| `import: [api/backend.yaml]` from `foxify/workflows/` | `import: [../api/backend.yaml]`: paths are relative to the workflow |
+| `import: [api/backend.yaml]` from `tinyprobe/workflows/` | `import: [../api/backend.yaml]`: paths are relative to the workflow |
 
 ## 11. Complete example
 
 A backend with JWT login and a notes resource.
 
 ```yaml
-# file: foxify/api/backend.yaml
+# file: tinyprobe/api/backend.yaml
 base_url: ${baseUrl}
 
 headers:
@@ -379,7 +379,7 @@ endpoints:
 ```
 
 ```yaml
-# file: foxify/workflows/auth.yaml
+# file: tinyprobe/workflows/auth.yaml
 name: Authentication
 import:
   - ../api/backend.yaml
@@ -427,14 +427,14 @@ steps:
 ```
 
 ```yaml
-# file: foxify/workflows/notes.yaml
+# file: tinyprobe/workflows/notes.yaml
 name: Notes
 description: Lifecycle of a note created by the workflow itself.
 import:
   - ../api/backend.yaml
 
 variables:
-  noteTitle: "Foxify note ${$randomString}"   # unique per run, the same in every step
+  noteTitle: "tinyprobe note ${$randomString}"   # unique per run, the same in every step
 
 steps:
   - name: Log in
@@ -510,7 +510,7 @@ steps:
 ```
 
 ```yaml
-# file: foxify/env.local.yaml
+# file: tinyprobe/env.local.yaml
 baseUrl: http://localhost:8080
 email: user@example.com
 password: change-me
@@ -519,8 +519,8 @@ password: change-me
 Run:
 
 ```bash
-foxify run foxify/workflows/auth.yaml -e foxify/env.local.yaml
-foxify run foxify/workflows/notes.yaml -e foxify/env.local.yaml
+tinyprobe run tinyprobe/workflows/auth.yaml -e tinyprobe/env.local.yaml
+tinyprobe run tinyprobe/workflows/notes.yaml -e tinyprobe/env.local.yaml
 ```
 
 A failing check looks like this; fix the test or report the backend behavior:
@@ -528,7 +528,7 @@ A failing check looks like this; fix the test or report the backend behavior:
 ```text
   ✗ Read the note  GET  200  12.4ms  /api/notes/42
       ✓ $.id == 42
-      ✗ $.title == "Foxify note k3x9q2ab"  actual "Untitled"
+      ✗ $.title == "tinyprobe note k3x9q2ab"  actual "Untitled"
 ```
 
 ## 12. Checklist before you finish

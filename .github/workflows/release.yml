@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - run: dotnet test Foxify.slnx -c Release
+      - run: dotnet test Tinyprobe.slnx -c Release
 
   build:
     name: Build (${{ matrix.rid }})
@@ -52,28 +52,28 @@ jobs:
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          dotnet publish src/Foxify.Cli/Foxify.Cli.csproj -c Release -r ${{ matrix.rid }} -o publish -p:Version="$VERSION"
+          dotnet publish src/Tinyprobe.Cli/Tinyprobe.Cli.csproj -c Release -r ${{ matrix.rid }} -o publish -p:Version="$VERSION"
 
       - name: Smoke test
         shell: bash
-        run: ./publish/foxify --version
+        run: ./publish/tinyprobe --version
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Compress-Archive -Path publish/foxify.exe -DestinationPath dist/foxify-${{ matrix.rid }}.zip
+          Compress-Archive -Path publish/tinyprobe.exe -DestinationPath dist/tinyprobe-${{ matrix.rid }}.zip
 
       - name: Package (Linux / macOS)
         if: runner.os != 'Windows'
         run: |
           mkdir -p dist
-          tar -czf dist/foxify-${{ matrix.rid }}.tar.gz -C publish foxify
+          tar -czf dist/tinyprobe-${{ matrix.rid }}.tar.gz -C publish tinyprobe
 
       - uses: actions/upload-artifact@v4
         with:
-          name: foxify-${{ matrix.rid }}
+          name: tinyprobe-${{ matrix.rid }}
           path: dist/*
 
   release:
@@ -99,7 +99,7 @@ jobs:
 
       - name: Checksums
         working-directory: dist
-        run: sha256sum foxify-* > SHA256SUMS && cat SHA256SUMS
+        run: sha256sum tinyprobe-* > SHA256SUMS && cat SHA256SUMS
 
       - uses: softprops/action-gh-release@v2
         with:

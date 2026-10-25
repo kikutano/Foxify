@@ -1,22 +1,22 @@
 <p align="center">
-  <img src="logo.jpg" alt="foxify logo">
+  <img src="logo.jpg" alt="tinyprobe logo">
 </p>
 
-# ⚡ Foxify 
+# ⚡ tinyprobe 
 
-[![CI](https://github.com/kikutano/foxify/actions/workflows/ci.yml/badge.svg)](https://github.com/kikutano/foxify/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/kikutano/foxify?include_prereleases)](https://github.com/kikutano/foxify/releases)
+[![CI](https://github.com/kikutano/tinyprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/kikutano/tinyprobe/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/kikutano/tinyprobe?include_prereleases)](https://github.com/kikutano/tinyprobe/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](License.md)
-[![VS Code extension](https://img.shields.io/github/v/release/kikutano/foxify-vscode?label=VS%20Code%20extension&color=orange)](https://github.com/kikutano/foxify-vscode)
+[![VS Code extension](https://img.shields.io/github/v/release/kikutano/tinyprobe-vscode?label=VS%20Code%20extension&color=orange)](https://github.com/kikutano/tinyprobe-vscode)
 
 **[Install](#install)** · **[VS Code extension](#vs-code-extension)** · **[Try the example](#try-the-example)** · [Workflow format](docs/workflow-format.md) · [Guide for coding agents](docs/llm-guide.md) · [Roadmap](ROADMAP.md)
 
-**Tired of paying for Postman?** Try Foxify: fast, light, and your favorite AI writes the endpoints and the end-to-end tests of your API, then runs them against your environment. Describe test flows in YAML files and make sure your API never breaks again.
+**Tired of paying for Postman?** Try tinyprobe: fast, light, and your favorite AI writes the endpoints and the end-to-end tests of your API, then runs them against your environment. Describe test flows in YAML files and make sure your API never breaks again.
 
-Foxify is API testing from the command line. Describe your endpoints once in YAML, then write workflows that call them like functions, pass arguments and check the responses. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
+tinyprobe is API testing from the command line. Describe your endpoints once in YAML, then write workflows that call them like functions, pass arguments and check the responses. tinyprobe is a single Native AOT binary: no runtime to install, and it starts instantly.
 
 <p align="center">
-  <img src="screen.png" alt="foxify run output in the terminal" width="640">
+  <img src="screen.png" alt="tinyprobe run output in the terminal" width="640">
 </p>
 
 ## Install
@@ -24,61 +24,61 @@ Foxify is API testing from the command line. Describe your endpoints once in YAM
 **Linux / macOS**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kikutano/foxify/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.sh | sh
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-irm https://raw.githubusercontent.com/kikutano/foxify/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.ps1 | iex
 ```
 
-Or download the archive for your platform from [Releases](https://github.com/kikutano/foxify/releases) (`win-x64`, `linux-x64`, `linux-arm64`, `osx-arm64`) and put `foxify` on your `PATH`.
+Or download the archive for your platform from [Releases](https://github.com/kikutano/tinyprobe/releases) (`win-x64`, `linux-x64`, `linux-arm64`, `osx-arm64`) and put `tinyprobe` on your `PATH`.
 
 Check that it works:
 
 ```bash
-foxify --version
+tinyprobe --version
 ```
 
 ### Update
 
 ```bash
-foxify update
+tinyprobe update
 ```
 
-It downloads the latest release for your platform, verifies its SHA-256 checksum and replaces the binary in place. `foxify update --check` only tells you whether a newer version exists. Re-running the install script works too, and `FOXIFY_VERSION=0.1.0` pins a specific version.
+It downloads the latest release for your platform, verifies its SHA-256 checksum and replaces the binary in place. `tinyprobe update --check` only tells you whether a newer version exists. Re-running the install script works too, and `TINYPROBE_VERSION=0.10.0` pins a specific version.
 
 ## VS Code extension
 
-[**Foxify for VS Code**](https://github.com/kikutano/foxify-vscode) runs the same files from the editor:
+[**tinyprobe for VS Code**](https://github.com/kikutano/tinyprobe-vscode) runs the same files from the editor:
 
 <p align="center">
-  <a href="https://github.com/kikutano/foxify-vscode">
-    <img src="https://raw.githubusercontent.com/kikutano/foxify-vscode/main/media/screen.png" alt="A Foxify workflow open in VS Code: a Run workflow link above it, a green check next to each step, and the run view with the steps, the checks of the selected step and its response" width="800">
+  <a href="https://github.com/kikutano/tinyprobe-vscode">
+    <img src="https://raw.githubusercontent.com/kikutano/tinyprobe-vscode/main/media/screen.png" alt="A tinyprobe workflow open in VS Code: a Run workflow link above it, a green check next to each step, and the run view with the steps, the checks of the selected step and its response" width="800">
   </a>
 </p>
 
-- problems underlined as you save, with the suggestions of `foxify`;
+- problems underlined as you save, with the suggestions of `tinyprobe`;
 - **▶ Call** above every endpoint: it asks for the arguments and shows the response;
 - **▶ Run workflow**, and workflows in the Test Explorer, one test per step;
 - the request and response of every step, and the environment file picked in the status bar.
 
 ```bash
-curl -fsSLO https://github.com/kikutano/foxify-vscode/releases/latest/download/foxify-vscode.vsix
-code --install-extension foxify-vscode.vsix
+curl -fsSLO https://github.com/kikutano/tinyprobe-vscode/releases/latest/download/tinyprobe-vscode.vsix
+code --install-extension tinyprobe-vscode.vsix
 ```
 
-It needs `foxify` installed as above.
+It needs `tinyprobe` installed as above.
 
 ## Try the example
 
 [example/](example/) is a small, complete project that tests [JSONPlaceholder](https://jsonplaceholder.typicode.com), a free fake REST API: nothing to start, nothing else to install. Three short, commented workflows show reads, writes and every kind of check.
 
 ```bash
-git clone https://github.com/kikutano/foxify.git
-cd foxify/example
-foxify run workflows/01-read.yaml -e environment.yaml
+git clone https://github.com/kikutano/tinyprobe.git
+cd tinyprobe/example
+tinyprobe run workflows/01-read.yaml -e environment.yaml
 ```
 
 Or open the `example` folder in VS Code and click **▶ Run workflow**. See [example/README.md](example/README.md).
@@ -88,7 +88,7 @@ Or open the `example` folder in VS Code and click **▶ Run workflow**. See [exa
 `hello.yaml`:
 
 ```yaml
-name: Hello Foxify
+name: Hello tinyprobe
 base_url: https://jsonplaceholder.typicode.com
 
 endpoints:
@@ -127,13 +127,13 @@ steps:
 Run it:
 
 ```bash
-foxify run hello.yaml
+tinyprobe run hello.yaml
 ```
 
 ```text
-  ⚡ foxify 0.9.0
+  ⚡ tinyprobe 0.10.0
 
-  workflow : Hello Foxify
+  workflow : Hello tinyprobe
   file     : hello.yaml
   steps    : 2
 
@@ -171,29 +171,29 @@ A mistake in the YAML is reported before any request is sent, with every problem
 
 ## Generate tests with a coding agent
 
-Let a coding agent (Claude Code, Cursor, Copilot, Codex, ...) read your backend and write the Foxify files for you. Give it [`docs/llm-guide.md`](docs/llm-guide.md): the format, the rules that are easy to get wrong, a step-by-step procedure and a complete example. Then paste a prompt like this:
+Let a coding agent (Claude Code, Cursor, Copilot, Codex, ...) read your backend and write the tinyprobe files for you. Give it [`docs/llm-guide.md`](docs/llm-guide.md): the format, the rules that are easy to get wrong, a step-by-step procedure and a complete example. Then paste a prompt like this:
 
 ```text
-Read https://raw.githubusercontent.com/kikutano/foxify/main/docs/llm-guide.md (or run `foxify guide`)
-and follow it: look at this backend's routes, authentication and seed data, write the Foxify API
-file and workflows in foxify/, then run them with foxify until they pass. Put credentials only in
-foxify/env.local.yaml and add it to .gitignore. Tell me which failures look like backend bugs.
+Read https://raw.githubusercontent.com/kikutano/tinyprobe/main/docs/llm-guide.md (or run `tinyprobe guide`)
+and follow it: look at this backend's routes, authentication and seed data, write the tinyprobe API
+file and workflows in tinyprobe/, then run them with tinyprobe until they pass. Put credentials only in
+tinyprobe/env.local.yaml and add it to .gitignore. Tell me which failures look like backend bugs.
 ```
 
-`foxify guide` prints the same guide from the installed binary, so it always matches your version, also offline. If the agent cannot open links, paste the file into the chat.
+`tinyprobe guide` prints the same guide from the installed binary, so it always matches your version, also offline. If the agent cannot open links, paste the file into the chat.
 
 The agent can check its own work: an invalid file is reported with `file:line:column` and a suggestion before any request is sent, and a failing check shows the actual value.
 
 ## Usage
 
 ```text
-  foxify run <workflow.yaml> [options]
-  foxify call <file.yaml> <endpoint> [--with name=value]... [options]
-  foxify inspect <file.yaml> [--json]
-  foxify update [--check] [--force]
-  foxify guide       Print the guide for coding agents (LLMs) that write Foxify files.
-  foxify --help
-  foxify --version
+  tinyprobe run <workflow.yaml> [options]
+  tinyprobe call <file.yaml> <endpoint> [--with name=value]... [options]
+  tinyprobe inspect <file.yaml> [--json]
+  tinyprobe update [--check] [--force]
+  tinyprobe guide       Print the guide for coding agents (LLMs) that write tinyprobe files.
+  tinyprobe --help
+  tinyprobe --version
 
 'call' sends one request to an endpoint of an API or workflow file and prints the response.
 'inspect' validates a file and lists its endpoints, variables and steps.
@@ -226,25 +226,25 @@ Exit codes ('run', 'call', 'inspect'):
   2  invalid arguments, file not found or invalid file
 ```
 
-Execution stops at the first failing step. The exit code makes Foxify easy to use in CI. When the output is not a terminal (CI logs, pipes) the spinner is turned off and each step is printed on its own line.
+Execution stops at the first failing step. The exit code makes tinyprobe easy to use in CI. When the output is not a terminal (CI logs, pipes) the spinner is turned off and each step is printed on its own line.
 
 ### Explore an API
 
 `inspect` lists what a file defines, and `call` sends a single request and prints the whole response, without writing a workflow:
 
 ```bash
-foxify inspect docs/example/api/testserver.yaml
-foxify call docs/example/api/testserver.yaml status --with code=404 -e docs/environment.yaml
+tinyprobe inspect docs/example/api/testserver.yaml
+tinyprobe call docs/example/api/testserver.yaml status --with code=404 -e docs/environment.yaml
 ```
 
 `call` accepts any status, so a `404` is shown, not reported as a failure. Arguments are validated like a step's `with`: a missing required param or a misspelled name is an error.
 
-### Use Foxify from other tools
+### Use tinyprobe from other tools
 
 `inspect --json` and `run --reporter ndjson` (also `call`) print JSON for programs: editors, CI dashboards, a local UI. The format is versioned and documented in [docs/protocol.md](docs/protocol.md).
 
 ```bash
-foxify run docs/example/workflows/users.yaml -e docs/environment.yaml --var baseUrl=http://127.0.0.1:5122/ --reporter ndjson
+tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --var baseUrl=http://127.0.0.1:5122/ --reporter ndjson
 ```
 
 ## Workflow format
@@ -316,12 +316,12 @@ steps:
 
 ```bash
 # terminal 1: start the test server on http://localhost:5122
-dotnet run --project tests/Foxify.RealServer.Tests
+dotnet run --project tests/Tinyprobe.RealServer.Tests
 ```
 
 ```bash
 # terminal 2: run a workflow
-foxify run docs/example/workflows/users.yaml -e docs/environment.yaml
+tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml
 ```
 
 The workflows leave the server's data as they found it, so they can be run again without restarting it.
@@ -331,15 +331,15 @@ The workflows leave the server's data as they found it, so they can be run again
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download). Native AOT also needs the platform toolchain: the "Desktop development with C++" workload on Windows, `clang` and `zlib1g-dev` on Linux, Xcode command line tools on macOS.
 
 ```bash
-git clone https://github.com/kikutano/foxify.git
-cd foxify
-dotnet test Foxify.slnx
+git clone https://github.com/kikutano/tinyprobe.git
+cd tinyprobe
+dotnet test Tinyprobe.slnx
 
 # run without installing
-dotnet run --project src/Foxify.Cli -- run docs/example/workflows/users.yaml -e docs/environment.yaml
+dotnet run --project src/Tinyprobe.Cli -- run docs/example/workflows/users.yaml -e docs/environment.yaml
 
 # build the native binary (use your RID: win-x64, linux-x64, linux-arm64, osx-arm64)
-dotnet publish src/Foxify.Cli/Foxify.Cli.csproj -c Release -r linux-x64 -o publish
+dotnet publish src/Tinyprobe.Cli/Tinyprobe.Cli.csproj -c Release -r linux-x64 -o publish
 ```
 
 ## Releasing
@@ -349,7 +349,7 @@ Push a SemVer tag. The [Release workflow](.github/workflows/release.yml) runs th
 To put your own notes on top of the generated ones (a breaking change, highlights), write them in an annotated tag. The first line is the title; everything after it goes into the release notes:
 
 ```markdown
-Foxify 0.10.0
+tinyprobe 0.10.0
 
 ## Breaking change
 

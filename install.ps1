@@ -1,20 +1,20 @@
-# Foxify installer for Windows.
+# tinyprobe installer for Windows.
 #
-#   irm https://raw.githubusercontent.com/kikutano/foxify/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.ps1 | iex
 #
 # Environment variables:
-#   FOXIFY_VERSION      version to install, e.g. 0.1.0 (default: latest release)
-#   FOXIFY_INSTALL_DIR  target directory (default: %LOCALAPPDATA%\Programs\foxify)
+#   TINYPROBE_VERSION      version to install, e.g. 0.10.0 (default: latest release)
+#   TINYPROBE_INSTALL_DIR  target directory (default: %LOCALAPPDATA%\Programs\tinyprobe)
 $ErrorActionPreference = 'Stop'
 
-$repo = 'kikutano/foxify'
-$installDir = if ($env:FOXIFY_INSTALL_DIR) { $env:FOXIFY_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\foxify' }
+$repo = 'kikutano/tinyprobe'
+$installDir = if ($env:TINYPROBE_INSTALL_DIR) { $env:TINYPROBE_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\tinyprobe' }
 
 # win-x64 also runs on Windows on ARM through x64 emulation.
-$archive = 'foxify-win-x64.zip'
+$archive = 'tinyprobe-win-x64.zip'
 
-$baseUrl = if ($env:FOXIFY_VERSION) {
-    "https://github.com/$repo/releases/download/v$($env:FOXIFY_VERSION.TrimStart('v'))"
+$baseUrl = if ($env:TINYPROBE_VERSION) {
+    "https://github.com/$repo/releases/download/v$($env:TINYPROBE_VERSION.TrimStart('v'))"
 } else {
     "https://github.com/$repo/releases/latest/download"
 }
@@ -49,5 +49,5 @@ if (($userPath -split ';') -notcontains $installDir) {
     Write-Host "Added $installDir to your user PATH (restart the terminal to pick it up)."
 }
 
-Write-Host "Installed $(& (Join-Path $installDir 'foxify.exe') --version) to $installDir"
-Write-Host 'Update later with: foxify update'
+Write-Host "Installed $(& (Join-Path $installDir 'tinyprobe.exe') --version) to $installDir"
+Write-Host 'Update later with: tinyprobe update'

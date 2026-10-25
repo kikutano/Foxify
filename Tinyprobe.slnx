@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="src/Tinyprobe.Core/Tinyprobe.Core.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Tinyprobe.Cli.Tests/Tinyprobe.Cli.Tests.csproj" />
+    <Project Path="tests/Tinyprobe.Core.Tests/Tinyprobe.Core.Tests.csproj" />
+    <Project Path="tests/Tinyprobe.RealServer.Tests/Tinyprobe.RealServer.Tests.csproj" Id="ca52d5d3-e279-437e-8044-9a69c140bc5d" />
+  </Folder>
+  <Project Path="src/Tinyprobe.Cli/Tinyprobe.Cli.csproj" />
+</Solution>

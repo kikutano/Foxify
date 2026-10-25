@@ -5,7 +5,7 @@ import: [../api/jsonplaceholder.yaml]
 
 variables:
   # A generated value, resolved once per run: the same title in every step.
-  title: "Hello from Foxify ${$randomString}"
+  title: "Hello from tinyprobe ${$randomString}"
 
 steps:
   - name: Create a post
@@ -17,7 +17,7 @@ steps:
       body:
         $.id: 101                   # the id JSONPlaceholder gives to a new post
         $.title: ${title}
-        $.body: Written with Foxify
+        $.body: Written with tinyprobe
         $.userId: 1
 
   - name: Replace a post
@@ -29,7 +29,7 @@ steps:
       body:
         $.id: 1
         $.title: ${title}
-        $.body: Replaced with Foxify
+        $.body: Replaced with tinyprobe
 
   - name: Rename a post
     call: rename_post
