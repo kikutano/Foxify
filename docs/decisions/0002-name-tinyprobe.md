@@ -27,4 +27,4 @@ Checked on 2026-10-25:
 ## Consequences
 
 - Binary, release assets, install scripts, namespaces, the extension id, its commands and settings, and the repositories (`kikutano/tinyprobe`, `kikutano/tinyprobe-vscode`) all use the name.
-- The current logo is a fox, which doesn't match the name: it needs a new logo (ROADMAP M0-9).
+- The logo is a shell prompt followed by a check mark, in ink and orange (ROADMAP M0-9): a command-line tool whose job is a passing run.

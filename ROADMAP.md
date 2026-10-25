@@ -40,7 +40,7 @@ Clean up the project before inviting people in.
 - [x] **M0-6** `repo` `CONTRIBUTING.md` (how to build, test and propose a feature with a spec), issue and PR templates, in both repositories.
 - [ ] **M0-7** `ext` Publish on the VS Code Marketplace and Open VSX; the release workflow publishes every tag. Needs the publisher accounts and tokens. *Done when:* "tinyprobe" can be installed from the Extensions view of VS Code and VSCodium, and the READMEs show that as the main way to install it.
 - [x] **M0-8** `repo` Use the name tinyprobe everywhere, in both repositories: binary, install scripts, release assets, namespaces, docs, the extension id, commands and settings, the GitHub repositories. PRs #13, and #1 in tinyprobe-vscode.
-- [ ] **M0-9** `repo` A logo and an extension icon for tinyprobe (the current ones are a fox and a lightning bolt). *Done when:* README, social preview image and the extension use them.
+- [x] **M0-9** `repo` A logo and an extension icon for tinyprobe: a shell prompt followed by a check mark (`media/` in both repositories). The social preview image `media/social-preview.png` is uploaded by hand in the repository settings.
 
 ## M1 — Migrate with your AI
 

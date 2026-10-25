@@ -1,8 +1,11 @@
 <p align="center">
-  <img src="logo.jpg" alt="tinyprobe logo">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="media/logo-dark.svg">
+    <img src="media/logo-light.svg" alt="tinyprobe logo: a shell prompt followed by a check mark" width="124">
+  </picture>
 </p>
 
-# ⚡ tinyprobe 
+# tinyprobe
 
 [![CI](https://github.com/kikutano/tinyprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/kikutano/tinyprobe/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/kikutano/tinyprobe?include_prereleases)](https://github.com/kikutano/tinyprobe/releases)
