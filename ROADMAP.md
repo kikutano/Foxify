@@ -10,7 +10,7 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 
 ## Where we are
 
-Released under the old name Foxify: **0.9.0** and the extension **0.1.0**. Next: **tinyprobe 0.10.0** and the extension **0.2.0**, the same features under the new name (M0-8).
+Released: **tinyprobe 0.10.0** and the extension **0.2.0**.
 
 - Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
 - CLI: `run`, `call`, `inspect`, `update`, `guide`; console and ndjson reporters; Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
@@ -36,10 +36,10 @@ Clean up the project before inviting people in.
 - [x] **M0-2** `repo` Development tooling in both repositories: `scripts/dev.sh`, `CLAUDE.md`, the `/add-feature`, `/release` and `/spec` skills. Commits 05f6f55, and 45bcb6c in tinyprobe-vscode.
 - [x] **M0-3** `repo` Remove `Modelfile` (a personal Ollama configuration) from the repository.
 - [x] **M0-4** `repo` README: fix the opening sentence ("Tired of paying for Postman?"), refresh the sample output (it still shows 0.4.0), link this roadmap.
-- [x] **M0-5** `repo` Check that the name "Foxify" is free for a developer tool (GitHub, npm, VS Code Marketplace, Open VSX, trademarks). Outcome: the name is crowded, the project is renamed **tinyprobe** ([decision 0002](docs/decisions/0002-name-tinyprobe.md)).
+- [x] **M0-5** `repo` Choose a name that is free for a developer tool (GitHub, npm, VS Code Marketplace, Open VSX, trademarks): **tinyprobe**, [decision 0002](docs/decisions/0002-name-tinyprobe.md).
 - [x] **M0-6** `repo` `CONTRIBUTING.md` (how to build, test and propose a feature with a spec), issue and PR templates, in both repositories.
 - [ ] **M0-7** `ext` Publish on the VS Code Marketplace and Open VSX; the release workflow publishes every tag. Needs the publisher accounts and tokens. *Done when:* "tinyprobe" can be installed from the Extensions view of VS Code and VSCodium, and the READMEs show that as the main way to install it.
-- [~] **M0-8** `repo` Rename Foxify to tinyprobe in both repositories: binary, install scripts, release assets, namespaces, docs, the extension id, commands and settings, the GitHub repositories. Spec: [0001](docs/specs/0001-rename-to-tinyprobe.md).
+- [x] **M0-8** `repo` Use the name tinyprobe everywhere, in both repositories: binary, install scripts, release assets, namespaces, docs, the extension id, commands and settings, the GitHub repositories. PRs #13, and #1 in tinyprobe-vscode.
 - [ ] **M0-9** `repo` A logo and an extension icon for tinyprobe (the current ones are a fox and a lightning bolt). *Done when:* README, social preview image and the extension use them.
 
 ## M1 — Migrate with your AI

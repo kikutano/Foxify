@@ -51,9 +51,3 @@ if (($userPath -split ';') -notcontains $installDir) {
 
 Write-Host "Installed $(& (Join-Path $installDir 'tinyprobe.exe') --version) to $installDir"
 Write-Host 'Update later with: tinyprobe update'
-
-# tinyprobe was called Foxify until 0.9.0, and its binary is not replaced by this one.
-$oldDir = Join-Path $env:LOCALAPPDATA 'Programs\foxify'
-if (Test-Path (Join-Path $oldDir 'foxify.exe')) {
-    Write-Host "Found the old Foxify binary: delete it with  Remove-Item -Recurse '$oldDir'"
-}

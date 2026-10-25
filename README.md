@@ -49,10 +49,6 @@ tinyprobe update
 
 It downloads the latest release for your platform, verifies its SHA-256 checksum and replaces the binary in place. `tinyprobe update --check` only tells you whether a newer version exists. Re-running the install script works too, and `TINYPROBE_VERSION=0.10.0` pins a specific version.
 
-### Coming from Foxify
-
-tinyprobe was called Foxify until 0.9.0: same format, same commands, same files. `foxify update` cannot cross the rename, so install tinyprobe with the script above, then delete the old `foxify` binary (the script tells you where it is). In VS Code, uninstall the "Foxify" extension and install "tinyprobe"; settings are now `tinyprobe.*`.
-
 ## VS Code extension
 
 [**tinyprobe for VS Code**](https://github.com/kikutano/tinyprobe-vscode) runs the same files from the editor:

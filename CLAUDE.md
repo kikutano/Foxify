@@ -1,7 +1,7 @@
 # tinyprobe (CLI)
 
 API testing from the command line: endpoints and workflows in YAML, one Native AOT binary (.NET 10).
-GitHub: `kikutano/tinyprobe`. Until 0.9.0 the project was called Foxify ([decision 0002](docs/decisions/0002-name-tinyprobe.md)): old URLs redirect, and this clone may live in a folder with an old name.
+GitHub: `kikutano/tinyprobe`. This clone may live in a folder with another name.
 The VS Code extension lives in the sibling repository `../tinyprobe-vscode` and drives this binary through the JSON protocol.
 
 ## Commands

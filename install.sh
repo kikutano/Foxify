@@ -72,11 +72,6 @@ chmod +x "$INSTALL_DIR/tinyprobe"
 echo "Installed $("$INSTALL_DIR/tinyprobe" --version) to $INSTALL_DIR/tinyprobe"
 echo "Update later with: tinyprobe update"
 
-# tinyprobe was called Foxify until 0.9.0, and its binary is not replaced by this one.
-if [ -f "$INSTALL_DIR/foxify" ]; then
-  echo "Found the old Foxify binary: delete it with  rm \"$INSTALL_DIR/foxify\""
-fi
-
 case ":$PATH:" in
   *":$INSTALL_DIR:"*) ;;
   *) echo "Add $INSTALL_DIR to your PATH, e.g.: echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.profile" ;;
