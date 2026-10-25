@@ -1,0 +1,61 @@
+name: Agent mistake
+description: A coding agent wrote wrong Foxify files, or got stuck converting a collection, an OpenAPI document or a backend.
+labels: [agent mistake]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Foxify relies on your coding agent to write endpoints and workflows, and to convert what you already have. When an agent gets it wrong, the guide it reads (`foxify guide`, [docs/llm-guide.md](https://github.com/kikutano/Foxify/blob/main/docs/llm-guide.md)) can usually be improved. These reports are how we find out what to fix.
+  - type: input
+    id: agent
+    attributes:
+      label: Agent and model
+      placeholder: Claude Code with Claude Sonnet 5.5, Cursor with ..., GitHub Copilot with ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Foxify version
+      description: The output of `foxify --version`.
+      placeholder: 0.9.0
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: What the agent started from
+      options: [Backend code, Postman collection, OpenAPI / Swagger, Insomnia, Bruno, HAR or curl, A description in the chat, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: guide
+    attributes:
+      label: Did the agent read the guide?
+      options: [Yes (foxify guide or the link), "No", Not sure]
+    validations:
+      required: true
+  - type: textarea
+    id: prompt
+    attributes:
+      label: Prompt
+      description: What you asked the agent.
+      render: text
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What the agent wrote
+      description: The wrong YAML, and the error or failing check if Foxify reported one.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: right
+    attributes:
+      label: What it should have written
+      description: If you know. Otherwise, what you expected it to do.
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: How many attempts it took, whether it fixed the mistake by itself, what it skipped.

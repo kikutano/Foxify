@@ -37,7 +37,7 @@ Clean up the project before inviting people in.
 - [x] **M0-3** `repo` Remove `Modelfile` (a personal Ollama configuration) from the repository.
 - [x] **M0-4** `repo` README: fix the opening sentence ("Tired of paying for Postman?"), refresh the sample output (it still shows 0.4.0), link this roadmap.
 - [?] **M0-5** `repo` Check that the name "Foxify" is free for a developer tool (GitHub, npm, VS Code Marketplace, Open VSX, trademarks). Record the outcome as a decision. *Done when:* we keep the name or have chosen a new one before the public launch.
-- [ ] **M0-6** `repo` `CONTRIBUTING.md` (how to build, test and propose a feature with a spec), issue and PR templates, in both repositories.
+- [x] **M0-6** `repo` `CONTRIBUTING.md` (how to build, test and propose a feature with a spec), issue and PR templates, in both repositories.
 - [ ] **M0-7** `ext` Publish on the VS Code Marketplace and Open VSX; the release workflow publishes every tag. Needs the publisher accounts and tokens. *Done when:* "Foxify" can be installed from the Extensions view of VS Code and VSCodium, and the READMEs show that as the main way to install it.
 
 ## M1 — Migrate with your AI

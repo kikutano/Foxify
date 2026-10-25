@@ -1,0 +1,46 @@
+name: Bug report
+description: Foxify does something different from what the docs say, reports a wrong error, or crashes.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Foxify version
+      description: The output of `foxify --version`.
+      placeholder: 0.9.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Linux x64, Linux arm64, macOS (Apple Silicon), Windows x64, Other]
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: foxify run workflows/users.yaml -e env.local.yaml
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files
+      description: The smallest API and workflow files that show the problem. Remove secrets and real hosts.
+      render: yaml
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The output, with `-v` if it helps.
+      render: text
+    validations:
+      required: true
