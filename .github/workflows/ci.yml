@@ -25,13 +25,13 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore Foxify.slnx
+        run: dotnet restore Tinyprobe.slnx
 
       - name: Build
-        run: dotnet build Foxify.slnx -c Release --no-restore
+        run: dotnet build Tinyprobe.slnx -c Release --no-restore
 
       - name: Unit tests
-        run: dotnet test Foxify.slnx -c Release --no-build
+        run: dotnet test Tinyprobe.slnx -c Release --no-build
 
       # Publish the same Native AOT binary users get from a release, then run the
       # full example workflow with it against the local test server.
@@ -39,11 +39,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
 
       - name: Publish Native AOT CLI
-        run: dotnet publish src/Foxify.Cli/Foxify.Cli.csproj -c Release -r linux-x64 -o publish
+        run: dotnet publish src/Tinyprobe.Cli/Tinyprobe.Cli.csproj -c Release -r linux-x64 -o publish
 
       - name: Start test server
         run: |
-          dotnet run --project tests/Foxify.RealServer.Tests -c Release --no-build --urls http://localhost:5122 > server.log 2>&1 &
+          dotnet run --project tests/Tinyprobe.RealServer.Tests -c Release --no-build --urls http://localhost:5122 > server.log 2>&1 &
           for i in $(seq 1 60); do
             curl -sf -o /dev/null http://localhost:5122/api/public && exit 0
             sleep 1
@@ -53,16 +53,16 @@ jobs:
       - name: End-to-end (docs/example/workflows)
         run: |
           for workflow in docs/example/workflows/*.yaml; do
-            ./publish/foxify run "$workflow" -e docs/environment.yaml
+            ./publish/tinyprobe run "$workflow" -e docs/environment.yaml
           done
 
       # The JSON protocol (docs/protocol.md) read by tools, on the Native AOT binary.
       - name: End-to-end (inspect, call, ndjson)
         run: |
-          ./publish/foxify inspect docs/example/api/testserver.yaml
-          ./publish/foxify inspect docs/example/workflows/users.yaml --json | jq -e '.valid and .kind == "workflow" and (.steps | length) > 0'
-          ./publish/foxify call docs/example/api/testserver.yaml status --with code=404 -e docs/environment.yaml
-          ./publish/foxify run docs/example/workflows/users.yaml -e docs/environment.yaml --reporter ndjson > events.ndjson
+          ./publish/tinyprobe inspect docs/example/api/testserver.yaml
+          ./publish/tinyprobe inspect docs/example/workflows/users.yaml --json | jq -e '.valid and .kind == "workflow" and (.steps | length) > 0'
+          ./publish/tinyprobe call docs/example/api/testserver.yaml status --with code=404 -e docs/environment.yaml
+          ./publish/tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --reporter ndjson > events.ndjson
           jq -e -s '.[0].event == "run_started" and .[-1].event == "run_finished" and .[-1].success' events.ndjson
 
       - name: Test server log

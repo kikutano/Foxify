@@ -1,5 +1,5 @@
 #!/bin/sh
-# Development tasks for Foxify, the same steps CI runs, on your machine.
+# Development tasks for tinyprobe, the same steps CI runs, on your machine.
 #
 #   scripts/dev.sh <command>
 #
@@ -11,20 +11,20 @@
 #             development binary, against the test server (started and stopped if needed).
 #   example   Run the workflows of example/ against JSONPlaceholder (needs internet).
 #   check     build + test + e2e: run it before opening a pull request.
-#   install   Publish a development binary to .dev/foxify and link it as foxify-dev
-#             in $HOME/.local/bin. The VS Code extension can use it with foxify.path.
+#   install   Publish a development binary to .dev/tinyprobe and link it as tinyprobe-dev
+#             in $HOME/.local/bin. The VS Code extension can use it with tinyprobe.path.
 #   aot       Publish the Native AOT binary to publish/, like a release (needs clang, zlib).
 #
 # Environment variables:
-#   FOXIFY_PORT   port of the test server (default: 5122)
+#   TINYPROBE_PORT   port of the test server (default: 5122)
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-PORT="${FOXIFY_PORT:-5122}"
+PORT="${TINYPROBE_PORT:-5122}"
 BASE_URL="http://localhost:$PORT"
 DEV_DIR="$ROOT/.dev"
-DEV_BIN="$DEV_DIR/foxify/foxify"
-SERVER_PROJECT="$ROOT/tests/Foxify.RealServer.Tests"
+DEV_BIN="$DEV_DIR/tinyprobe/tinyprobe"
+SERVER_PROJECT="$ROOT/tests/Tinyprobe.RealServer.Tests"
 
 fail() { echo "dev: $*" >&2; exit 1; }
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
@@ -45,19 +45,19 @@ rid() {
 
 build() {
   step "Build"
-  dotnet build "$ROOT/Foxify.slnx" -nologo -v quiet
+  dotnet build "$ROOT/Tinyprobe.slnx" -nologo -v quiet
 }
 
 unit_tests() {
   step "Unit tests"
-  dotnet test "$ROOT/Foxify.slnx" --no-build -nologo -v quiet
+  dotnet test "$ROOT/Tinyprobe.slnx" --no-build -nologo -v quiet
 }
 
 # A framework-dependent build of the CLI: fast, no native toolchain needed, version 0.0.0-dev.
 publish_dev() {
   step "Development binary"
-  dotnet publish "$ROOT/src/Foxify.Cli/Foxify.Cli.csproj" -c Release -p:PublishAot=false \
-    -o "$DEV_DIR/foxify" -nologo -v quiet
+  dotnet publish "$ROOT/src/Tinyprobe.Cli/Tinyprobe.Cli.csproj" -c Release -p:PublishAot=false \
+    -o "$DEV_DIR/tinyprobe" -nologo -v quiet
   echo "$DEV_BIN"
 }
 
@@ -126,15 +126,15 @@ example() {
 install_dev() {
   publish_dev
   mkdir -p "$HOME/.local/bin"
-  ln -sf "$DEV_BIN" "$HOME/.local/bin/foxify-dev"
-  echo "Linked $HOME/.local/bin/foxify-dev -> $DEV_BIN"
+  ln -sf "$DEV_BIN" "$HOME/.local/bin/tinyprobe-dev"
+  echo "Linked $HOME/.local/bin/tinyprobe-dev -> $DEV_BIN"
 }
 
 aot() {
   command -v clang > /dev/null || fail "Native AOT needs clang and zlib (Debian/Ubuntu: sudo apt-get install clang zlib1g-dev)."
   step "Native AOT ($(rid))"
-  dotnet publish "$ROOT/src/Foxify.Cli/Foxify.Cli.csproj" -c Release -r "$(rid)" -o "$ROOT/publish" -nologo
-  ls -lh "$ROOT/publish/foxify"
+  dotnet publish "$ROOT/src/Tinyprobe.Cli/Tinyprobe.Cli.csproj" -c Release -r "$(rid)" -o "$ROOT/publish" -nologo
+  ls -lh "$ROOT/publish/tinyprobe"
 }
 
 case "${1:-}" in

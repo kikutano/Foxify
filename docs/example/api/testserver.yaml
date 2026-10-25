@@ -1,4 +1,4 @@
-# API definition of the bundled test server (tests/Foxify.RealServer.Tests).
+# API definition of the bundled test server (tests/Tinyprobe.RealServer.Tests).
 # Endpoints only: no expectations here. Workflows import this file and call
 # the endpoints by name, passing arguments with `with:`.
 

@@ -19,12 +19,12 @@ steps:
   - name: Echo returns what was sent
     call: echo
     with:
-      source: foxify
+      source: tinyprobe
       mode: test
       customHeader: custom-value
-      correlationId: foxify-test-001
+      correlationId: tinyprobe-test-001
       payload:
-        message: Hello from foxify
+        message: Hello from tinyprobe
         nested:
           enabled: true
           values: [1, 2, 3]
@@ -32,9 +32,9 @@ steps:
       status: 200
       body:
         $.method: POST
-        $.query.source: foxify
+        $.query.source: tinyprobe
         $.headers.X-Custom-Header: custom-value
-        $.headers.X-Correlation-Id: foxify-test-001
+        $.headers.X-Correlation-Id: tinyprobe-test-001
 
   - name: Response headers
     call: response_headers

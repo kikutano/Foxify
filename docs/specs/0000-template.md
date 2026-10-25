@@ -2,7 +2,7 @@
 
 - **Status:** Draft | Approved | Implemented | Rejected
 - **Roadmap:** M?-?
-- **Repositories:** foxify, foxify-vscode
+- **Repositories:** tinyprobe, tinyprobe-vscode
 - **PRs:** —
 
 ## Problem
@@ -18,7 +18,7 @@ What the user writes and sees. Start with examples, then rules.
 ```
 
 ```text
-$ foxify ...
+$ tinyprobe ...
 the console output
 ```
 
@@ -38,7 +38,7 @@ New keys in `inspect --json` and in the ndjson events, with examples. New keys o
 
 ## Extension
 
-What foxify-vscode shows or sends differently. Whether it needs a newer `MINIMUM_VERSION`.
+What tinyprobe-vscode shows or sends differently. Whether it needs a newer `MINIMUM_VERSION`.
 
 ## Docs
 
@@ -54,7 +54,7 @@ What this spec does not do, and where it might go later.
 ## Acceptance criteria
 
 - [ ] ...
-- [ ] `scripts/dev.sh check` passes (and in foxify-vscode if it changed)
+- [ ] `scripts/dev.sh check` passes (and in tinyprobe-vscode if it changed)
 
 ## Open questions
 

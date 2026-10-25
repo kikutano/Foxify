@@ -1,13 +1,13 @@
 name: Bug report
-description: Foxify does something different from what the docs say, reports a wrong error, or crashes.
+description: tinyprobe does something different from what the docs say, reports a wrong error, or crashes.
 labels: [bug]
 body:
   - type: input
     id: version
     attributes:
-      label: Foxify version
-      description: The output of `foxify --version`.
-      placeholder: 0.9.0
+      label: tinyprobe version
+      description: The output of `tinyprobe --version`.
+      placeholder: 0.10.0
     validations:
       required: true
   - type: dropdown
@@ -21,7 +21,7 @@ body:
     id: command
     attributes:
       label: Command
-      placeholder: foxify run workflows/users.yaml -e env.local.yaml
+      placeholder: tinyprobe run workflows/users.yaml -e env.local.yaml
     validations:
       required: true
   - type: textarea

@@ -1,9 +1,9 @@
 ---
 name: spec
-description: Write or update a feature spec in docs/specs/ (from the template) for a ROADMAP task that changes the Foxify YAML format, the CLI surface or the JSON protocol, and link it from ROADMAP.md. Use when asked to spec, design or plan a feature, or before /add-feature on such a task.
+description: Write or update a feature spec in docs/specs/ (from the template) for a ROADMAP task that changes the tinyprobe YAML format, the CLI surface or the JSON protocol, and link it from ROADMAP.md. Use when asked to spec, design or plan a feature, or before /add-feature on such a task.
 ---
 
-# Write a Foxify spec
+# Write a tinyprobe spec
 
 Arguments: a roadmap task id (`M1-7`) or a short description of the feature.
 

@@ -1,11 +1,11 @@
 name: Feature request
-description: Something Foxify can't do yet, in the format, the CLI or the guide for agents.
+description: Something tinyprobe can't do yet, in the format, the CLI or the guide for agents.
 labels: [enhancement]
 body:
   - type: markdown
     attributes:
       value: |
-        Check the [roadmap](https://github.com/kikutano/Foxify/blob/main/ROADMAP.md) first: it may be planned already. If so, comment on what you need from it here.
+        Check the [roadmap](https://github.com/kikutano/tinyprobe/blob/main/ROADMAP.md) first: it may be planned already. If so, comment on what you need from it here.
   - type: textarea
     id: problem
     attributes:

@@ -1,17 +1,17 @@
 #!/bin/sh
-# Foxify installer for Linux and macOS.
+# tinyprobe installer for Linux and macOS.
 #
-#   curl -fsSL https://raw.githubusercontent.com/kikutano/foxify/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.sh | sh
 #
 # Environment variables:
-#   FOXIFY_VERSION      version to install, e.g. 0.1.0 (default: latest release)
-#   FOXIFY_INSTALL_DIR  target directory (default: $HOME/.local/bin)
+#   TINYPROBE_VERSION      version to install, e.g. 0.10.0 (default: latest release)
+#   TINYPROBE_INSTALL_DIR  target directory (default: $HOME/.local/bin)
 set -eu
 
-REPO="kikutano/foxify"
-INSTALL_DIR="${FOXIFY_INSTALL_DIR:-$HOME/.local/bin}"
+REPO="kikutano/tinyprobe"
+INSTALL_DIR="${TINYPROBE_INSTALL_DIR:-$HOME/.local/bin}"
 
-fail() { echo "foxify install: $*" >&2; exit 1; }
+fail() { echo "tinyprobe install: $*" >&2; exit 1; }
 
 case "$(uname -s)" in
   Linux)  os="linux" ;;
@@ -31,13 +31,13 @@ case "$rid" in
   *) fail "no prebuilt binary for $rid. Build from source: https://github.com/$REPO#build-from-source" ;;
 esac
 
-if [ -n "${FOXIFY_VERSION:-}" ]; then
-  base_url="https://github.com/$REPO/releases/download/v${FOXIFY_VERSION#v}"
+if [ -n "${TINYPROBE_VERSION:-}" ]; then
+  base_url="https://github.com/$REPO/releases/download/v${TINYPROBE_VERSION#v}"
 else
   base_url="https://github.com/$REPO/releases/latest/download"
 fi
 
-archive="foxify-$rid.tar.gz"
+archive="tinyprobe-$rid.tar.gz"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -66,11 +66,16 @@ fi
 
 tar -xzf "$tmp/$archive" -C "$tmp"
 mkdir -p "$INSTALL_DIR"
-mv "$tmp/foxify" "$INSTALL_DIR/foxify"
-chmod +x "$INSTALL_DIR/foxify"
+mv "$tmp/tinyprobe" "$INSTALL_DIR/tinyprobe"
+chmod +x "$INSTALL_DIR/tinyprobe"
 
-echo "Installed $("$INSTALL_DIR/foxify" --version) to $INSTALL_DIR/foxify"
-echo "Update later with: foxify update"
+echo "Installed $("$INSTALL_DIR/tinyprobe" --version) to $INSTALL_DIR/tinyprobe"
+echo "Update later with: tinyprobe update"
+
+# tinyprobe was called Foxify until 0.9.0, and its binary is not replaced by this one.
+if [ -f "$INSTALL_DIR/foxify" ]; then
+  echo "Found the old Foxify binary: delete it with  rm \"$INSTALL_DIR/foxify\""
+fi
 
 case ":$PATH:" in
   *":$INSTALL_DIR:"*) ;;

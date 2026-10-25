@@ -17,7 +17,7 @@ steps:
     expect:
       status: 200
       body:
-        $.catalog.name: Tyfapi Test Catalog
+        $.catalog.name: tinyprobe Test Catalog
         $.catalog.metadata.created_by.username: admin
         $.catalog.categories[0].name: { in: [Hardware, Software] }
         $.catalog.categories[0].products[0].name: Keyboard

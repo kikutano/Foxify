@@ -11,4 +11,4 @@ Spec: <!-- docs/specs/NNNN-..., required for format, CLI surface or protocol cha
 - [ ] Tests for the new behavior, and for each new validation error
 - [ ] Docs updated: `docs/workflow-format.md`, `docs/llm-guide.md`, README, `docs/protocol.md` (whichever apply)
 - [ ] Roadmap task marked as done
-- [ ] foxify-vscode impact checked (new protocol keys, `MINIMUM_VERSION`)
+- [ ] tinyprobe-vscode impact checked (new protocol keys, `MINIMUM_VERSION`)
