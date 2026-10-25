@@ -1,199 +1,100 @@
-# Foxify — Development Roadmap & Task Tracker
+# Foxify roadmap
 
-> **Purpose.** This file is the single source of truth for Foxify development.
-> Every coding session starts here: pick the next unblocked task, implement it,
-> verify its acceptance criteria, flip its status, and append a Changelog entry.
+The plan for **both repositories**: this one (the `foxify` CLI, its format and the guide for coding agents) and [foxify-vscode](https://github.com/kikutano/foxify-vscode) (the VS Code extension). Every development session starts here.
 
-**Status legend:**
+## Principles
 
-- `[ ]` TODO
-- `[~]` IN PROGRESS
-- `[x]` DONE
-- `[-]` DEFERRED / DROPPED (reason recorded in Notes)
-- `[?]` NEEDS DECISION
+1. **The user's AI does the import.** Foxify ships no AI model and no direct importers. Users give their own coding agent (Claude Code, Cursor, Copilot, Codex, ...) their Postman collections, OpenAPI documents or backend code. Foxify provides what makes any agent good at it: the guide (`foxify guide`), validation with precise errors, and the `inspect` / `call` / `run` loop that lets the agent check its own work. See [decision 0001](docs/decisions/0001-ai-does-the-import.md).
+2. **One engine: the binary.** The extension and every other tool drive `foxify` through its [JSON protocol](docs/protocol.md) and never reimplement parsing or checks.
+3. **Plain text, Git and CI first.** Endpoints, workflows and environments are YAML files that live in the user's repository and run unchanged in CI.
 
-**Working rules for this file:**
+## Where we are
 
-1. Every task has a unique ID (`M<#>-<#>`), description, and acceptance criteria where relevant.
-2. A task may only be marked `[x]` when its acceptance criteria are met **and** `dotnet build` + `dotnet test` pass.
-3. Split tasks get decimal sub-IDs (e.g. `M1-3.1`).
-4. Scope changes and new tasks are added to this file (never tracked only in chat).
-5. All documentation created in this repo is written in **English**.
-6. When implementing, follow the binding conventions in §10 (from `cline.md` / `agent_ai.md`).
+Released: **foxify 0.9.0**, **foxify-vscode 0.1.0**.
 
----
+- Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
+- CLI: `run`, `call`, `inspect`, `update`, `guide`; console and ndjson reporters; Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
+- Extension: validation on save, ▶ Call, ▶ Run workflow, Test Explorer, run view, environment picker. Distributed as a `.vsix` from GitHub Releases only.
 
-## 1. Product Goals (from `README.md` — remain valid for the rewrite)
+## How we work
 
-- Next-generation, **Git-friendly, AI-first** API testing & traffic simulation tool.
-- **CLI-First Architecture:** one dependency-free **Native AOT** .NET (C#) binary — near-instant startup (<10ms), zero runtime dependencies, ~10–15MB footprint, CI/CD-friendly.
-- **UI layer (later milestones):** React/Svelte + Tailwind with Monaco editor, delivered as a VS Code extension (Webview) and a cloud web app.
-- **AI lifecycle:** OpenAPI/Swagger → AI generates flow file → developer tweaks (UI or text) → AOT CLI executes flow/bots → results stream to CI/CD & cloud → AI diagnostics explain failures and suggest fixes.
+- **Status:** `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (reason in the task) · `[?]` needs a decision.
+- **Areas:** `cli` this repository's code · `guide` `docs/llm-guide.md` and other docs for agents · `ext` foxify-vscode · `repo` project housekeeping.
+- **Specs before code** for every task that changes the YAML format, the CLI surface (commands, options, output) or the protocol. Use `/spec`: it writes `docs/specs/NNNN-name.md` from the [template](docs/specs/0000-template.md). Code starts when the spec is *Approved*; then `/add-feature`. Other tasks need no spec.
+- **Decisions** that constrain future work go in `docs/decisions/` as short records: context, decision, consequences.
+- **Done** means the acceptance criteria are met and `scripts/dev.sh check` passes in every repository touched. The task is marked `[x]` in the same PR, with a link to the PR.
+- **New ideas** go to the [Inbox](#inbox). We move them into a milestone when we plan the next one.
+- Milestones are in order, and tasks inside one are roughly in order. There are no dates.
 
 ---
 
-## 2. Baseline Assessment (v0.1 prototype — audited 2026-08-24)
+## M0 — Restart
 
-The existing code compiles, but is **rejected as a foundation** for these verified reasons:
+Clean up the project before inviting people in.
 
-| Area | Finding (evidence) |
-|---|---|
-| Entry point | Two `Main` methods (build warning CS7022); the *active* top-level `Program.cs` hardcodes absolute Windows paths; the documented usage `Foxify <flow.yaml>` is not wired (`FoxifyConsole.cs` is dead code) |
-| Native AOT | csproj sets `PublishAot=true`, but YamlDotNet deserialization is reflection-based (build warning IL3050) → an AOT `dotnet publish` would produce a broken binary |
-| Engine | No fail-fast: missing functions / unmet `depends_on` are silently skipped; no HTTP status validation; `settings.timeout` & `max_retries` parsed but unused; `FunctionDefinition.Baseurl` ignored (engine special-cases a `baseUrlDev` variable); Content-Type header stripped and never re-applied on POST bodies |
-| Variables | `metadata.variables` and environment files are never seeded into the engine; extraction coerces numbers/booleans to strings; no error on unknown `${var}` |
-| Tests | "Integration" tests construct a `FakeHttpMessageHandler` but **never inject it** (engine internally does `new HttpClient()` and hits real `http://localhost`); widespread `Assert.True(true)` smoke assertions |
-| Hygiene | Dead code, orphan `test_parsing.cs` / `test_variables.cs` at repo root, empty `docs/Foxify.json`, `docs/dev_credentials.json` with local URLs, ~15 nullable warnings |
+- [~] **M0-1** `repo` Replace the old roadmap: this file, `docs/specs/`, `docs/decisions/`, the `/spec` skill. `Milestone1.md` removed: it planned the pre-0.2 format (the old roadmap is in git history: `git show 0e2981c:ROADMAP.md`).
+- [~] **M0-2** `repo` Development tooling in both repositories: `scripts/dev.sh`, `CLAUDE.md`, the `/add-feature`, `/release` and `/spec` skills.
+- [ ] **M0-3** `repo` Remove `Modelfile` (a personal Ollama configuration) from the repository.
+- [ ] **M0-4** `repo` README: fix the opening sentence ("Tired of paying for Postman?"), refresh the sample output (it still shows 0.4.0), link this roadmap.
+- [?] **M0-5** `repo` Check that the name "Foxify" is free for a developer tool (GitHub, npm, VS Code Marketplace, Open VSX, trademarks). Record the outcome as a decision. *Done when:* we keep the name or have chosen a new one before the public launch.
+- [ ] **M0-6** `repo` `CONTRIBUTING.md` (how to build, test and propose a feature with a spec), issue and PR templates, in both repositories.
+- [ ] **M0-7** `ext` Publish on the VS Code Marketplace and Open VSX; the release workflow publishes every tag. Needs the publisher accounts and tokens. *Done when:* "Foxify" can be installed from the Extensions view of VS Code and VSCodium, and the READMEs show that as the main way to install it.
 
-**Decision (approved):** **full ground-up rewrite** of the CLI engine. The YAML flow *format* is kept (backward compatible with the samples in `docs/`); the C# implementation is not.
+## M1 — Migrate with your AI
 
----
+The adoption hook: a Postman user gives their collection to their agent and gets Foxify workflows that pass.
 
-## 3. Architecture Decisions (ADR-lite)
+- [ ] **M1-1** `guide` Migration from Postman: a section of `docs/llm-guide.md` mapping collection v2.1 and environments to Foxify. Covers `{{var}}` → `${var}`, environments and globals → env file, collection and folder auth → `auth` sets, folders → workflows, `pm.test` / `pm.expect` → `expect`, `pm.environment.set` from the response → `save`, dynamic variables → generated values, retry loops → `until`. It also tells the agent to merge request variants into one endpoint used with different `with`. *Spec needed.*
+- [ ] **M1-2** `guide` Other sources, a short mapping each: OpenAPI 3 / Swagger 2, Insomnia, Bruno, HAR, `curl` commands.
+- [ ] **M1-3** `guide` What cannot be translated, and the rule: never invent syntax; skip the request and list it in the report with the reason. Covers pre-request scripts with logic (signatures, computed values), `setNextRequest`, form-data and files, OAuth2 flows, cookies, non-JSON checks, unsupported JSONPath.
+- [ ] **M1-4** `guide` Large collections: inventory first (requests, folders, environments), convert one folder at a time, finish with a coverage report (requests → endpoints, workflows, skipped with reasons).
+- [ ] **M1-5** `repo` Ready-to-paste prompts in the README: migrate a Postman collection, start from an OpenAPI document, scan a backend (exists, review it).
+- [ ] **M1-6** `guide` Benchmark for the guide: a Postman collection of the test server with variables, scripts and variants (`docs/example/postman/`), a reference conversion, and a procedure to score an agent's conversion: rounds of `inspect` / `run` until it passes, requests covered, invented syntax. Run with at least two agents before and after M1-1…M1-4. *Done when:* the scores are recorded in the spec of M1-1.
+- [ ] **M1-7** `cli` `foxify run <folder>`: runs every workflow of a folder, one summary, exit code `1` if any failed. Agents and CI run a whole migration with one command. *Spec needed.*
+- [ ] **M1-8** `cli` `foxify init`: creates the `foxify/` layout of the guide (`api/`, `workflows/`, `env.example.yaml`), the `.gitignore` entries, and a short `AGENTS.md` section that points agents to `foxify guide`. *Spec needed.*
+- [ ] **M1-9** `ext` "Foxify: Migrate with AI": pick a collection or an OpenAPI file, build the migration prompt, and hand it to the editor's chat, or copy it to the clipboard when there is no chat.
 
-| ID | Status | Decision | Rationale |
-|---|---|---|---|
-| AD-1 | `[?]` NEEDS DECISION | AOT-safe deserialization: (a) YamlDotNet `StaticDeserializerBuilder` + CodeGen package, (b) JSON-first via `System.Text.Json` source generators with YAML as convenience layer, (c) drop AOT | README mandates Native AOT + zero reflection; must be settled in M0-4 with a real `dotnet publish` smoke test |
-| AD-2 | `[x]` | CLI binary is the single source of truth; UIs (M2/M4) shell out to it | CLI-first architecture per README |
-| AD-3 | `[x]` | Keep the flat YAML schema (`metadata` / `functions` / `workflow` / `settings`), extend where needed (per-function `baseurl`, `expected_status`, typed extract) | Existing `docs/*.yaml` samples are the AI-generation target; minimal nesting required |
-| AD-4 | `[x]` | Engine must be fully testable: HTTP handler, clock and output are injectable — no `new HttpClient()` inside engine code | Verified testability gap in v0.1 |
-| AD-5 | `[x]` | Variable precedence: `--set k=v` > env file > `metadata.variables` > extracted values (extraction always overwrites) | Deterministic runs, CI-friendly |
-| AD-6 | `[?]` NEEDS DECISION | `depends_on` semantics: strict validation + sequential order (M1) vs. topological sort + parallel execution (M3 bots) | Needed for the M1 error model; parallelism is a M3 concern |
+## M2 — Agents everywhere
 
----
+Make Foxify a tool that agents use directly, not only a format they write.
 
-## 4. Milestone 0 — Foundation Reset (greenfield)
+- [ ] **M2-1** `cli` `foxify mcp`: an MCP server over stdio with the tools `guide`, `inspect`, `call` and `run`, returning the protocol JSON. Native AOT-safe. *Spec needed.*
+- [ ] **M2-2** `guide` Ready-made agent packages: a Claude Code skill, Cursor rules, Copilot instructions and `llms.txt`, each a thin wrapper around `foxify guide`.
+- [ ] **M2-3** `ext` Completion and hover in Foxify files: keys, endpoint names after `call:`, params in `with`, from `inspect --json`. *Spec needed if the protocol needs new data.*
+- [ ] **M2-4** `ext` "Foxify: Generate from code": uses the VS Code Language Model API, so it runs on the model the user already has (Copilot or another provider), with the guide as instructions and `inspect` / `run` to check the result.
 
-> Goal: clean, compiling, AOT-publishable skeleton with a real command surface and zero dead code.
+## M3 — CI
 
-- [~] **M0-1** Remove prototype dead code and orphans: `FoxifyConsole.cs` (or absorb its logic), duplicate `Foxify/Program.cs`, root `test_parsing.cs`, `test_variables.cs`, empty `docs/Foxify.json`, `docs/dev_credentials.json`.
-  - *Status note (2026-09-03):* all listed files removed; CLI entry point now reads `args[0]` instead of a hardcoded path. Pending: confirm `dotnet build` + `dotnet test` pass locally (no .NET SDK available in this session) before flipping to `[x]`.
-  - *Accept:* no orphan `.cs` at repo root; exactly one entry point in the solution.
-- [~] **M0-2** New solution layout: `src/Foxify.Core` (AOT-safe core library), `src/Foxify.Cli` (thin executable), `tests/Foxify.Core.Tests`; proper `.gitignore` (`bin/`, `obj/`); remove committed build artifacts.
-  - *Status note (2026-09-03):* layout created (PascalCase project names to match .NET conventions, deviating from the lowercase names originally sketched here); root `Foxify.slnx` added referencing all three projects; namespaces reorganized (`Foxify.Core.Models` / `.Parsing` / `.Execution`, `Foxify.Cli`, `Foxify.Core.Tests.*`), one class per file; `WorkflowModels.cs` split into 5 files; `FoxifyEngine`/`FoxifyParser` renamed to `WorkflowEngine`/`WorkflowParser`. `.gitignore` rewritten to a standard recursive `bin/`/`obj/`/`.vs/` pattern. No build artifacts were actually committed (verified via `git ls-files`), so nothing to remove there. Pending: verify `dotnet build` + `dotnet test` locally.
-  - *Accept:* `dotnet build` clean; no `bin/obj` visible in git status.
-- [ ] **M0-3** CLI surface v1:
-  - `Foxify validate <flow.yaml>`
-  - `Foxify run <flow.yaml> [--env <env.yaml>] [--set k=v ...] [--timeout <s>] [--retries <n>] [--json-report]`
-  - *Exit codes:* `0` success · `1` execution failed · `2` validation failed · `3` usage error.
-  - *Accept:* both commands work from an arbitrary CWD; exit codes covered by tests.
-- [ ] **M0-4** Settle AD-1: prototype the chosen deserialization path and verify with `dotnet publish -c Release` + running `validate`/`run` from the **published** binary.
-  - *Accept:* published binary executes a flow with no reflection fallback; decision recorded in §3.
-- [ ] **M0-5** Build hygiene: `TreatWarningsAsErrors=true`, all nullable warnings resolved, reproducible release pipeline script (`build.ps1` / `build.sh`).
-  - *Accept:* zero warnings on a clean build.
+- [ ] **M3-1** `cli` JUnit XML report, read by every CI server. *Spec needed.*
+- [ ] **M3-2** `cli` An official GitHub Action: installs a pinned `foxify` and runs a folder of workflows, with a job summary.
+- [ ] **M3-3** `cli` A small Docker image with the static binary.
+- [ ] **M3-4** `cli` Failing steps as GitHub Actions annotations, at the step's line.
 
+## M4 — What Postman users miss
 
+- [ ] **M4-1** `cli` `multipart/form-data` bodies and file uploads. *Spec needed.*
+- [ ] **M4-2** `cli` Cookies: a cookie jar per run. *Spec needed.*
+- [ ] **M4-3** `cli` Basic auth and OAuth2 client credentials. *Spec needed.*
+- [ ] **M4-4** `cli` `for_each`: repeat a step over a list of arguments. *Spec needed.*
+- [ ] **M4-5** `cli` Reusable step sequences (a shared "log in"). *Spec needed.*
+- [ ] **M4-6** `cli` Namespaced imports (`call: server.login`). *Spec needed.*
+- [ ] **M4-7** `ext` Request history: the last calls with their responses, to send again.
+- [ ] **M4-8** `ext` Environment editor: see and edit the variables of the selected environment.
+- [ ] **M4-9** `ext` Visual request editor for people who prefer forms to YAML; it writes the YAML.
 
----
+## Parked
 
-## 5. Milestone 1 — Core Engine (CLI) & Syntax Definition
+Not planned now. We reconsider them after M4.
 
-### 5.1 Syntax & Validation
+- Load testing: N concurrent copies of a workflow, with throughput and latency percentiles.
+- A cloud service: shared workspaces, run history, dashboards.
 
-- [ ] **M1-1** Formal flow schema spec (JSON Schema + prose): `metadata` (name, description, environment, api_version, variables), `functions` (HTTP_REQUEST: method, baseurl, endpoint, headers, body, extract, expected_status), `workflow` (function steps with `depends_on`, `DELAY`), `settings` (timeout, max_retries). Keep flat and AI-friendly.
-  - *Accept:* spec doc in `docs/flow-schema.md`; all `docs/*.yaml` samples conform.
-- [ ] **M1-2** `Foxify validate`: full schema + semantic checks (unknown `function_name`, unknown/unsatisfiable `depends_on`, duplicate variable names, JSONPath syntax, valid HTTP methods, delay bounds). Human-readable errors with step/function context.
-  - *Accept:* each check covered by a test with an intentional error fixture.
-- [ ] **M1-3** AI-generation validation (README requirement): prompt GPT and Claude to convert 3+ real OpenAPI/Swagger specs into our flow format; `Foxify validate` + `run` them against the mock API with no manual fixes.
-  - *Accept:* ≥3 specs converted successfully; results recorded in `docs/ai-validation.md`.
-- [ ] **M1-4** Error model: `FlowValidationError`, `ExecutionError` (carries step id, request summary, response status/body); fail-fast: first failing step aborts the flow.
-  - *Accept:* no failure mode ends silently; exit code `1` with actionable message.
+## Dropped
 
-### 5.2 Execution Engine
+- [-] Direct importers (`foxify import postman` and similar), and an AI model or provider inside Foxify. The user's agent does both better; see [decision 0001](docs/decisions/0001-ai-does-the-import.md).
 
-- [ ] **M1-5** HTTP execution: GET/POST/PUT/DELETE (+PATCH/HEAD), correct Content-Type (from headers or JSON default), custom headers (incl. `Authorization`), per-function `baseurl`, shared `SocketsHttpHandler` for keep-alive.
-  - *Accept:* fake-handler tests assert exact method/URL/headers/body per request.
-- [ ] **M1-6** Variable engine: `${var}` substitution in endpoint, headers and body; precedence per AD-5; unknown variable → `ExecutionError` (no silent empty string).
-- [ ] **M1-7** Extraction engine: JSONPath `$.a.b`, array indexing `$.items[0].name`; **typed** extraction (numbers, booleans, strings, nested objects/arrays as JSON); clear error when path missing or response not JSON; multi-variable `extract` blocks.
-- [ ] **M1-8** `DELAY` steps: `duration_seconds` (decimal), cancellation-aware, no busy-wait.
-- [ ] **M1-9** `depends_on`: strict validation + sequential execution per AD-6 (parallelism deferred to M3).
-- [ ] **M1-10** `settings.timeout` (per-request + overall run) and `max_retries` (backoff on 429/5xx/timeout) actually wired and tested.
-- [ ] **M1-11** Response policy: per-function `expected_status` (default: any 2xx) → fail-fast on mismatch with response body included in the error (feeds M3 AI diagnostics).
-- [ ] **M1-12** Console UX: per-step progress (`step N/M · function · status · ms`), final summary (pass/fail, total time, extracted vars count), `--json-report` machine-readable output (foundation for M3/M4).
-- [ ] **M1-13** Bots-ready architecture (README "killer feature"): execution core is non-blocking, no static mutable state, executor safely instantiable N times for concurrent identical flows (load layer itself is M3).
+## Inbox
 
-### 5.3 Tests
+New ideas, not planned yet.
 
-- [ ] **M1-14** Unit tests: parser + validator (schema, every semantic check, JSONPath edge cases). No `Assert.True(true)` — assert concrete values.
-- [ ] **M1-15** Engine tests: injected fake `HttpMessageHandler` asserting exact outgoing requests; verify extracted variables reach subsequent steps (headers/body).
-- [ ] **M1-16** Integration tests: in-process `HttpListener` mock API (login → token → protected endpoint) driving the real `docs/*.yaml` fixtures end-to-end.
-- [ ] **M1-17** AOT gate: automated step running `dotnet publish -c Release -r <rid>` then executing a smoke flow with the **published** binary (regression guard for AD-1).
-- [ ] **M1-18** Coverage gate: coverlet, core engine ≥ 80% line coverage, enforced in the CI-ready pipeline script.
-
----
-
-## 6. Milestone 2 — VS Code Extension (AI-First Developer Experience)
-
-- [ ] **M2-1** Extension skeleton: CLI discovery + auto-download/install of the platform binary; graceful error when binary missing.
-- [ ] **M2-2** Webview UI (React/Svelte + Tailwind, Monaco editor) with two-way sync (UI ⇄ flow file) preserving YAML formatting.
-- [ ] **M2-3** In-editor AI agent: prompt → flow file generation → auto-rendered step list; per-step editing with live variable/type hints.
-- [ ] **M2-4** Run/validate from the UI (spawns CLI as child process), streaming per-step results into the panel.
-- [ ] **M2-5** Packaging & publish: VSIX build pipeline, marketplace page, README documentation with GIF of the flow.
-  - *Accept:* a user can install, create a flow via AI, run it, and see results without touching a terminal.
-
----
-
-## 7. Milestone 3 — CI/CD, Load Testing & AI Error Diagnostics
-
-- [ ] **M3-1** `run --bots N --duration <X>`: N concurrent clones of the flow (per AD-6, topological sort + parallel branches), isolated variable state per bot.
-  - *Accept:* sustained load for 5min at configurable RPS against the mock API.
-- [ ] **M3-2** Load-test metrics: RPS, latency percentiles (p50/p95/p99), error rate; JSON report compatible with M1-12 schema.
-- [ ] **M3-3** CI mode: `--fail-fast`, minimal output, stable exit codes (M0-3), JUnit/GitHub Actions annotations.
-- [ ] **M3-4** Distribution: official GitHub Action + slim Docker image (AOT static binary, Alpine/Distroless) + `install.sh` for arbitrary shells.
-- [ ] **M3-5** AI error diagnostics (README core feature): on failure, send payload/headers/response to a configurable LLM endpoint (opt-in, provider-agnostic); display explanation + suggested fix; never send secrets (redact `Authorization`).
-  - *Accept:* 10 seeded failure scenarios (bad JSON, wrong type, 401, 429, timeout…) each produce a correct, actionable explanation.
-- [ ] **M3-6** `depends_on` parallel execution if AD-6 chose topological sort (else document sequential-only for M3).
-
----
-
-## 8. Milestone 4 — Cloud Platform & Advanced Traffic Simulation
-
-- [ ] **M4-1** SaaS dashboard: auth, workspaces, shared specs, saved flows.
-- [ ] **M4-2** `--report-to-cloud` CLI sync + webhooks for CI events.
-- [ ] **M4-3** Reporting & analytics UI: reliability over time, latency trends, bot/load reports, team dashboards.
-- [ ] **M4-4** Distributed cloud load testing: multi-region bot fleets, geo-tagged latency, billing/metering.
-- [ ] **M4-5** AI diagnostics integrated into dashboards (failures pre-explained, fix PR-drafted suggestion where possible).
-
----
-
-## 9. Feature Checklist (README "Milestone 1 Features" — must all be covered)
-
-| Feature | Implemented by | Status |
-|---|---|---|
-| HTTP execution (GET, POST, PUT, DELETE) | M1-5 | `[ ]` |
-| Variable substitution `${var}` | M1-6 | `[ ]` |
-| Workflow with functions and delays | M1-8, M1-9 | `[ ]` |
-| Environment variables support | M1-6 (AD-5) | `[ ]` |
-| Basic JSON response parsing | M1-7 | `[ ]` |
-| Variable extraction from responses | M1-7 | `[ ]` |
-| Multi-variable extraction | M1-7 | `[ ]` |
-| Dependency tracking between functions | M1-9 | `[ ]` |
-
----
-
-## 10. Binding Conventions (from `cline.md` / `agent_ai.md`)
-
-**YAML flow files (AI-readability):**
-- Complete `metadata` (name, description, environment, api_version) and always a `settings` section (timeout, max_retries).
-- Always use `depends_on` arrays in the workflow; descriptive, meaningful names; minimal nesting / flat structure; JSONPath in `$.a.b` style.
-
-**C# / .NET (AOT-first):**
-- Native AOT compliant: zero reflection at runtime, source generators where needed (AD-1).
-- Meaningful, contextual errors (never silent, never generic).
-- `HttpClient` over shared `SocketsHttpHandler`; minimize heap allocations; thread-safe; `TreatWarningsAsErrors`.
-
-**Working rules (from `agent_ai.md`):**
-- Read files before editing; no assumptions about unverified code; verify `build` + `tests` after every change; non-interactive commands only; stay within the repo scope; update this roadmap as work progresses.
-
----
-
-## 11. Changelog
-
-| Date | Task ID | Change | Author |
-|---|---|---|---|
-| 2026-08-24 | — | Roadmap created; v0.1 baseline audited; full rewrite approved (format kept, code replaced); AD-1 & AD-6 flagged for decision | Cline |
-| 2026-08-24 | — | `README.md`: added "🎯 Purpose: What Problem Are We Solving?" section (Function / Flow / Environment model, one-click multi-env, AI-generated flows) | Cline |
-| 2026-08-24 | — | `README.md`: added minimal YAML flow example in Purpose (login → token extraction → protected resource), aligned with `docs/*.yaml` conventions | Cline |
-| 2026-09-03 | M0-1, M0-2 | Repo cleanup: removed dead/orphan files and `docs/dev_credentials.json`; fixed CLI to read the flow path from `args[0]`; restructured into `src/Foxify.Core` (library), `src/Foxify.Cli` (executable), `tests/Foxify.Core.Tests`; added root `Foxify.slnx`; reorganized namespaces and renamed files/classes (`FoxifyEngine`→`WorkflowEngine`, `FoxifyParser`→`WorkflowParser`, one class per file). Build/test verification still pending locally. | Claude |
-
-  - *Accept:* design note in `docs/architecture.md` + stress test running 20 concurrent executor instances against the mock API.
+- 
