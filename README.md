@@ -9,10 +9,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](License.md)
 [![VS Code extension](https://img.shields.io/github/v/release/kikutano/foxify-vscode?label=VS%20Code%20extension&color=orange)](https://github.com/kikutano/foxify-vscode)
 
-**[Install](#install)** · **[VS Code extension](#vs-code-extension)** · **[Try the example](#try-the-example)** · [Workflow format](docs/workflow-format.md) · [Guide for coding agents](docs/llm-guide.md)
+**[Install](#install)** · **[VS Code extension](#vs-code-extension)** · **[Try the example](#try-the-example)** · [Workflow format](docs/workflow-format.md) · [Guide for coding agents](docs/llm-guide.md) · [Roadmap](ROADMAP.md)
 
-Tired to pay Postman? Try this! Fast, light, use your favorite AI to create endpoints, E2E tests against your environment! Describe testing flows using YAML file and make sure your API will never break again!
-Foxify is an API testing from the command line. Describe your endpoints once in YAML, then write workflows that call them like functions, pass arguments and check the responses. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
+**Tired of paying for Postman?** Try Foxify: fast, light, and your favorite AI writes the endpoints and the end-to-end tests of your API, then runs them against your environment. Describe test flows in YAML files and make sure your API never breaks again.
+
+Foxify is API testing from the command line. Describe your endpoints once in YAML, then write workflows that call them like functions, pass arguments and check the responses. Foxify is a single Native AOT binary: no runtime to install, and it starts instantly.
 
 <p align="center">
   <img src="screen.png" alt="foxify run output in the terminal" width="640">
@@ -130,7 +131,7 @@ foxify run hello.yaml
 ```
 
 ```text
-  ⚡ foxify 0.4.0
+  ⚡ foxify 0.9.0
 
   workflow : Hello Foxify
   file     : hello.yaml
@@ -348,7 +349,7 @@ Push a SemVer tag. The [Release workflow](.github/workflows/release.yml) runs th
 To put your own notes on top of the generated ones (a breaking change, highlights), write them in an annotated tag. The first line is the title; everything after it goes into the release notes:
 
 ```markdown
-Foxify 0.5.0
+Foxify 0.10.0
 
 ## Breaking change
 
@@ -356,14 +357,14 @@ Describe what users must change.
 ```
 
 ```bash
-git tag -a v0.5.0 --cleanup=whitespace -F notes.md
+git tag -a v0.10.0 --cleanup=whitespace -F notes.md
 ```
 
 ```bash
-git push origin v0.5.0
+git push origin v0.10.0
 ```
 
-`--cleanup=whitespace` keeps Markdown headings: by default git drops lines that start with `#`. A plain `git tag v0.5.0` works too and publishes only the generated notes. Tags with a suffix, like `v0.6.0-beta.1`, are published as pre-releases.
+`--cleanup=whitespace` keeps Markdown headings: by default git drops lines that start with `#`. A plain `git tag v0.10.0` works too and publishes only the generated notes. Tags with a suffix, like `v0.11.0-beta.1`, are published as pre-releases.
 
 ## Roadmap
 
