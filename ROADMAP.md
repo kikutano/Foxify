@@ -32,9 +32,9 @@ Released: **foxify 0.9.0**, **foxify-vscode 0.1.0**.
 
 Clean up the project before inviting people in.
 
-- [~] **M0-1** `repo` Replace the old roadmap: this file, `docs/specs/`, `docs/decisions/`, the `/spec` skill. `Milestone1.md` removed: it planned the pre-0.2 format (the old roadmap is in git history: `git show 0e2981c:ROADMAP.md`).
-- [~] **M0-2** `repo` Development tooling in both repositories: `scripts/dev.sh`, `CLAUDE.md`, the `/add-feature`, `/release` and `/spec` skills.
-- [ ] **M0-3** `repo` Remove `Modelfile` (a personal Ollama configuration) from the repository.
+- [x] **M0-1** `repo` Replace the old roadmap: this file, `docs/specs/`, `docs/decisions/`, the `/spec` skill. `Milestone1.md` removed: it planned the pre-0.2 format (the old roadmap is in git history: `git show 0e2981c:ROADMAP.md`). Commit 41144ac.
+- [x] **M0-2** `repo` Development tooling in both repositories: `scripts/dev.sh`, `CLAUDE.md`, the `/add-feature`, `/release` and `/spec` skills. Commits 05f6f55, and 45bcb6c in foxify-vscode.
+- [x] **M0-3** `repo` Remove `Modelfile` (a personal Ollama configuration) from the repository.
 - [ ] **M0-4** `repo` README: fix the opening sentence ("Tired of paying for Postman?"), refresh the sample output (it still shows 0.4.0), link this roadmap.
 - [?] **M0-5** `repo` Check that the name "Foxify" is free for a developer tool (GitHub, npm, VS Code Marketplace, Open VSX, trademarks). Record the outcome as a decision. *Done when:* we keep the name or have chosen a new one before the public launch.
 - [ ] **M0-6** `repo` `CONTRIBUTING.md` (how to build, test and propose a feature with a spec), issue and PR templates, in both repositories.
