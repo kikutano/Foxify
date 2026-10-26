@@ -48,14 +48,14 @@ Clean up the project before inviting people in.
 The adoption hook: a Postman user gives their collection to their agent and gets tinyprobe workflows that pass.
 
 - [x] **M1-1** `guide` Migration from Postman: a section of `docs/llm-guide.md` mapping collection v2.1 and environments to tinyprobe. Covers `{{var}}` → `${var}`, environments and globals → env file, collection and folder auth → `auth` sets, folders → workflows, `pm.test` / `pm.expect` → `expect`, `pm.environment.set` from the response → `save`, dynamic variables → generated values, retry loops → `until`. It also tells the agent to merge request variants into one endpoint used with different `with`. Spec: [0002](docs/specs/0002-migrate-from-postman.md). PR #14.
-- [ ] **M1-2** `guide` Other sources, a short mapping each: OpenAPI 3 / Swagger 2, Insomnia, Bruno, HAR, `curl` commands.
+- [x] **M1-2** `guide` Other sources, a short mapping each: OpenAPI 3 / Swagger 2, Insomnia, Bruno, HAR, `curl` commands. Measured on an OpenAPI document of the test server (`docs/example/openapi/`). PR #15.
 - [x] **M1-3** `guide` What cannot be translated, and the rule: never invent syntax; skip the request and list it in the report with the reason. Covers pre-request scripts with logic (signatures, computed values), `setNextRequest`, form-data and files, OAuth2 flows, cookies, non-JSON checks, unsupported JSONPath. PR #14.
 - [x] **M1-4** `guide` Large collections: inventory first (requests, folders, environments), convert one folder at a time, finish with a coverage report (requests → endpoints, workflows, skipped with reasons). PR #14.
 - [x] **M1-5** `repo` Ready-to-paste prompts in the README: migrate a Postman collection, start from an OpenAPI document, scan a backend (exists, review it).
 - [x] **M1-6** `guide` Benchmark for the guide: a Postman collection of the test server with variables, scripts and variants (`docs/example/postman/`), a reference conversion, and a procedure to score an agent's conversion: rounds of `inspect` / `run` until it passes, requests covered, invented syntax. Run with at least two agents before and after M1-1…M1-4. *Done when:* the scores are recorded in the spec of M1-1. Run with Claude Code (Sonnet and Haiku); other agents can be added by hand. PR #14.
 - [x] **M1-7** `cli` `tinyprobe run <folder>`: runs every workflow of a folder, one summary, exit code `1` if any failed. Agents and CI run a whole migration with one command. Spec: [0003](docs/specs/0003-run-a-folder.md). PR #16.
-- [x] **M1-8** `cli` `tinyprobe init`: creates the `tinyprobe/` layout of the guide (`api/`, `workflows/`, `env.example.yaml`), the `.gitignore` entries, and a short `AGENTS.md` section that points agents to `tinyprobe guide`. Spec: [0004](docs/specs/0004-init.md) PR #17.
-- [ ] **M1-9** `ext` "tinyprobe: Migrate with AI": pick a collection or an OpenAPI file, build the migration prompt, and hand it to the editor's chat, or copy it to the clipboard when there is no chat.
+- [x] **M1-8** `cli` `tinyprobe init`: creates the `tinyprobe/` layout of the guide (`api/`, `workflows/`, `env.example.yaml`), the `.gitignore` entries, and a short `AGENTS.md` section that points agents to `tinyprobe guide`. Spec: [0004](docs/specs/0004-init.md). PR #17.
+- [~] **M1-9** `ext` "tinyprobe: Migrate with AI": pick a collection or an OpenAPI file, build the migration prompt, and hand it to the editor's chat, or copy it to the clipboard when there is no chat. tinyprobe-vscode PR #2.
 
 ## M2 — Agents everywhere
 

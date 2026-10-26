@@ -250,7 +250,7 @@ A flat map of variable names to values. Put here everything that changes between
 
 Follow these steps in order. If the user gives you a Postman collection or the exports of another API tool, follow section 12 instead.
 
-1. **Find the endpoints.** Prefer an OpenAPI/Swagger document if the project has one. Otherwise read the route definitions, for example:
+1. **Find the endpoints.** Prefer an OpenAPI/Swagger document if the project has one (mapping in section 12.5). Otherwise read the route definitions, for example:
    - ASP.NET: `app.MapGet/MapPost(...)`, `[HttpGet]`, `[Route]` on controllers
    - Express / Fastify / NestJS: `app.get(...)`, `router.post(...)`, `@Get()`, `@Post()`
    - FastAPI / Flask / Django: `@app.get`, `@router.post`, `@app.route`, `urls.py`
@@ -541,7 +541,7 @@ A failing check looks like this; fix the test or report the backend behavior:
 
 ## 12. Migrating from Postman and other tools
 
-Follow this section when the user gives you exports of another API tool (a Postman collection, its environments) instead of, or as well as, a backend to read. The mapping below is for Postman; for another tool, follow the same procedure and use the closest rows.
+Follow this section when the user gives you exports of another API tool (a Postman collection, its environments) instead of, or as well as, a backend to read. 12.1 to 12.4 are written for Postman: the procedure, the mapping, what cannot be translated and the coverage report. The procedure, the rules of 12.3 and the report apply to every source; 12.5 to 12.9 say what differs for OpenAPI, Insomnia, Bruno, HAR files and `curl` commands. For another tool, use the closest rows.
 
 ### 12.1 Procedure
 
@@ -770,6 +770,221 @@ Source: Shop.postman_collection.json (4 requests), environments: Local, Staging.
 
 Converted: 4 of 4 requests. Skipped: 0. Checks dropped: 0.
 ```
+
+### 12.5 OpenAPI and Swagger
+
+An OpenAPI document describes the endpoints but contains no tests. Use it as step 1 of section 8, in place of reading the routes, and follow section 8 from there: the workflows check what the document promises against the real backend. A document is OpenAPI 3 when it starts with `openapi: 3.`, Swagger 2 when it starts with `swagger: "2.0"`.
+
+| OpenAPI | tinyprobe |
+|---|---|
+| `servers[0].url` (3), `schemes` + `host` + `basePath` (2) | `baseUrl` in the env files, path included (`http://localhost:8080/v1`); `base_url: ${baseUrl}` in the API file |
+| an operation, `paths./notes/{id}.get` | an endpoint, named after `operationId` in snake_case (`getNote` → `get_note`), or after the method and the path when there is none |
+| `{id}` in the path | `${id}`, declared in `params` |
+| `in: query` parameters | `query: [name, ...]` |
+| `in: header` parameters | a header with a placeholder (`X-Tenant: ${tenant}`), and the param declared |
+| `in: cookie` parameters | report it (cookies are not supported yet) |
+| `requestBody` with `application/json` (3), the `in: body` parameter (2) | a YAML `body` with the schema's `required` properties, each from a param; optional properties only where a workflow needs them |
+| `application/x-www-form-urlencoded`, `multipart/form-data` | as `urlencoded` (12.2) and `formdata` (12.3) |
+| `securitySchemes` (3), `securityDefinitions` (2): `http` with `scheme: bearer`, `apiKey` with `in: header` | `auth` sets |
+| `apiKey` with `in: query` | a query parameter of each endpoint that needs it, passed as `api_key: ${apiKey}` in the steps' `with` |
+| `http` with `scheme: basic` (3), `type: basic` (2) | as `basic` auth in 12.2 |
+| `oauth2` with `clientCredentials` (3) or `flow: application` (2) | a token request as the first step, with `save` |
+| other `oauth2` flows, `openIdConnect` | ask the user for a token in `env.local.yaml` |
+| `security` at the top level, or on an operation; `security: []` | the endpoint's `auth`; no `auth` for `[]` |
+| the documented success response (`200`, `201`, `204`) | `expect.status` of the main step |
+| documented error responses (`400`, `401`, `404`, `422`) | a step for each, as in section 8, step 5 |
+| `required` properties of a response schema, an `enum` | `{ exists: true }`, `in: [...]` |
+| `example`, `examples`, `default` | the shape of the data, never the expected values: take values from the seed data and check them with `tinyprobe call` |
+| `$ref` | resolve it: `#/components/schemas/Note` in the same document; another file, by reading that file |
+| `deprecated: true` | convert it, and note it in `MIGRATION.md` |
+
+Write `tinyprobe/MIGRATION.md` (12.4) with a row per operation, the skipped ones included. For a large document, write one API file per `tag`, and convert one tag at a time like a Postman folder. When the backend does not do what the document says (another status, a missing field), keep the check and report the difference: either the document or the backend is wrong, and the user decides which.
+
+This operation:
+
+```yaml
+openapi: 3.0.3
+servers:
+  - url: http://localhost:8080/v1
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+security:
+  - bearerAuth: []
+paths:
+  /notes/{id}:
+    get:
+      operationId: getNote
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: The note
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, title, status]
+                properties:
+                  id: { type: integer }
+                  title: { type: string }
+                  status: { type: string, enum: [draft, published] }
+        "404":
+          description: No note with this id
+```
+
+becomes an endpoint and two steps (in a real workflow, after the login step of section 9):
+
+```yaml
+base_url: ${baseUrl}                  # baseUrl: http://localhost:8080/v1
+
+auth:
+  bearer:
+    Authorization: "Bearer ${token}"
+
+endpoints:
+  get_note:
+    path: /notes/${id}
+    params:
+      id:
+    auth: bearer
+
+steps:
+  - name: Read a note
+    call: get_note
+    with:
+      id: 1                           # a note of the seed data, not of the document's examples
+    expect:
+      status: 200
+      body:
+        $.id: 1
+        $.title: { exists: true }
+        $.status: { in: [draft, published] }
+
+  - name: A note that does not exist
+    call: get_note
+    with:
+      id: 999999
+    expect:
+      status: 404
+```
+
+### 12.6 Insomnia
+
+An Insomnia export is JSON with `"__export_format": 4` and a flat `resources` list, or YAML that starts with `type: collection.insomnia.rest/5.0`, with nested items. Follow the procedure of 12.1; what differs from Postman:
+
+| Insomnia | tinyprobe |
+|---|---|
+| `_type: request_group`, linked by `parentId` (v4), or nested items (v5) | folders, as in Postman |
+| `_type: request`: `method`, `url`, `headers`, `parameters`, `body` | an endpoint, as a Postman request |
+| `{{ _.baseUrl }}`, `{{ baseUrl }}` | `${baseUrl}` |
+| the base environment and its sub-environments | one env file per sub-environment, with the keys of the base environment merged in. A private sub-environment (`isPrivate: true`) and keys that look like credentials go only into `env.local.yaml` |
+| `authentication` of type `bearer`, `apikey`, `basic`, `oauth2` | as the Postman auth rows of 12.2 |
+| `body.mimeType`: `application/json`, `application/x-www-form-urlencoded`, `multipart/form-data` | as `raw` JSON and `urlencoded` (12.2), and `formdata` (12.3) |
+| `{% response 'body', 'req_…', 'b64::JC50b2tlbg==::46b', … %}` | a value taken from another request's response: that request becomes an earlier step, with `save`. After `b64::` is the path in base64: `JC50b2tlbg==` is `$.token` |
+| `{% uuid 'v4' %}`, `{% now 'iso-8601' %}`, `{% now 'unix' %}`, `{% faker … %}` | `${$uuid}`, `${$now}`, `${$timestamp}`, and as `$random…` in 12.2 |
+| other template tags (`{% now 'millis' %}`, `{% base64 … %}`, `{% hash … %}`, `{% prompt … %}`, `{% file … %}`) | report them (12.3) |
+| after-response scripts: `insomnia.test`, `insomnia.expect`, `insomnia.environment.set` | as `pm.test`, `pm.expect`, `pm.environment.set` in 12.2 |
+| unit test suites (`unit_test_suite`, `unit_test`): `insomnia.send()`, then `expect(response.status).to.equal(200)` | a workflow per suite, a step per test |
+
+### 12.7 Bruno
+
+A Bruno collection is a folder: `bruno.json`, one `.bru` file per request (subfolders are folders, `meta.seq` is the order), `collection.bru` and `folder.bru` for shared headers, auth and scripts, and `environments/<name>.bru`. A request:
+
+```text
+meta {
+  name: Get user
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/users/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: 1
+}
+
+assert {
+  res.status: eq 200
+  res.body.firstName: eq Gaetano
+  res.body.email: isString
+}
+
+vars:post-response {
+  userEmail: res.body.email
+}
+```
+
+| Bruno | tinyprobe |
+|---|---|
+| the `get`, `post`, ... block: `url` | the method and the path; `{{baseUrl}}` → `${baseUrl}`; `:id` with `params:path` → `${id}`, declared in `params` |
+| `params:query`, `headers` | `query`, `headers`. A line that starts with `~` is disabled: leave it out |
+| `auth: inherit` | the auth of `folder.bru`, else of `collection.bru` |
+| `auth:bearer`, `auth:apikey` (`placement: header`), `auth:basic` | as the Postman auth rows of 12.2 |
+| `body:json`, `body:form-urlencoded`, `body:multipart-form` | as `raw` JSON and `urlencoded` (12.2), and `formdata` (12.3) |
+| `vars:pre-request` | workflow `variables`, or the step's `with` |
+| `vars:post-response { userEmail: res.body.email }`, `bru.setVar("userEmail", res.body.email)` | `save: { userEmail: $.email }` |
+| `assert` `res.status: eq 200` | `status: 200` |
+| `assert` `res.body.a: eq 1`, and `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `contains` | `$.a: 1`, and `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `contains` |
+| `isDefined`, `isUndefined`, `isNull` | `{ exists: true }`, `{ exists: false }`, `null` |
+| `res.responseTime: lt 500` | `duration: { lt: 500ms }` |
+| `res.headers.x-id: isDefined` | `headers: { X-Id: { exists: true } }` |
+| `isString`, `isNumber`, `isJson`, `matches`, `length` | as type and regex checks (12.3), and `lengthOf` (12.2) |
+| `tests { test("...", function() { expect(res.getStatus()).to.equal(200); }); }` | as `pm.test` in 12.2; `res.getStatus()`, `res.getBody()`, `res.getHeader()` are the response |
+| `environments/<name>.bru`: `vars { ... }` | `env.<name>.yaml` |
+| `vars:secret [ password, apiKey ]` | only the names are in the file. Ask the user for the values, or read them from the collection's `.env` (`{{process.env.NAME}}`), and put them only in `env.local.yaml` |
+
+The request above becomes this step of the workflow (`get_user` with `path: /api/users/${id}`):
+
+```yaml
+- name: Get user
+  call: get_user
+  with:
+    id: 1
+  expect:
+    status: 200
+    body:
+      $.firstName: Gaetano
+      $.email: { exists: true }       # isString has no equivalent: report it
+  save:
+    userEmail: $.email
+```
+
+### 12.8 HAR files
+
+A HAR file (`log.entries[]`) is a recording of the requests of one session, from a browser or a proxy. It shows real requests and responses, not tests.
+
+- **It contains secrets.** Never copy the value of an `Authorization`, `Cookie` or `Set-Cookie` header, or of a credential field in a body, into a file. Tell the user not to commit the HAR.
+- **Keep only the API.** Drop requests to other hosts, `OPTIONS` preflights, and documents, scripts, styles, images and fonts (`response.content.mimeType`, `_resourceType`). Keep one of a series of identical polling requests.
+- **One endpoint per method and path pattern.** `/api/users/42` and `/api/users/7` are one endpoint, `path: /api/users/${id}`.
+- **Headers.** Keep `Content-Type`, `Accept` and the API's own headers. Drop the browser's (`User-Agent`, `Accept-Encoding`, `Origin`, `Referer`, `sec-*`, `Cookie`) and the HTTP/2 pseudo-headers (`:authority`, `:path`). `Authorization` becomes an `auth` set with a placeholder.
+- **The order is the flow.** Entries are in time order: a value that a response returned and a later request sent (an id in a URL, a token) becomes a `save`.
+- **Responses** (`response.content.text`, base64 when `encoding: base64`) show the shape for the checks. Don't copy volatile values (ids, dates) as expected values; check with `tinyprobe call`.
+- A session kept by cookies: report it (12.3).
+
+### 12.9 curl commands
+
+From a README, a script, or "Copy as cURL" in a browser.
+
+| curl | tinyprobe |
+|---|---|
+| the URL | `base_url` and `path`; the query string → `query`, with the values in the steps' `with` |
+| `-X POST`, `--request POST` | `method`; without `-X`, `GET`, or `POST` when there is `-d` |
+| `-H "Name: value"` | `headers`; `Authorization: Bearer …` → an `auth` set, and the token only in `env.local.yaml` |
+| `--json '{…}'`, or `-d` / `--data` / `--data-raw` with JSON and `Content-Type: application/json` | a YAML `body` |
+| `-d "a=1&b=2"` without a `Content-Type` | as `urlencoded` (12.2) |
+| `-G` with `-d` | `query` |
+| `-u user:password` | as `basic` auth in 12.2 |
+| `-F` | report it (multipart bodies are not supported yet) |
+| `-b`, `--cookie`, `-c` | report it (cookies are not supported yet) |
+| `-k`, `--insecure` | report it: tinyprobe always checks certificates |
+| `-s`, `-v`, `-i`, `-L`, `--compressed` | leave them out |
+| `$VAR`, `${VAR}` | keys of the env files |
+| `TOKEN=$(curl … \| jq -r .token)`, then `-H "Authorization: Bearer $TOKEN"` | a login step with `save: { token: $.token }`, then the steps that use it |
 
 ## 13. Checklist before you finish
 
