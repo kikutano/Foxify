@@ -1,0 +1,270 @@
+openapi: 3.0.3
+info:
+  title: tinyprobe test server
+  version: 1.0.0
+  description: |
+    Authentication and users of the tinyprobe test server, as a backend team would document them.
+    Local development credentials: username `admin`, password `password`; API key `tinyprobe-test-api-key`.
+servers:
+  - url: http://localhost:5122
+tags:
+  - name: auth
+  - name: users
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    Address:
+      type: object
+      required: [street, city, country]
+      properties:
+        street: { type: string }
+        city: { type: string }
+        country: { type: string }
+    User:
+      type: object
+      required: [id, firstName, lastName, email, active, address]
+      properties:
+        id: { type: integer }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        active: { type: boolean }
+        address: { $ref: "#/components/schemas/Address" }
+      example:
+        id: 42
+        firstName: Jane
+        lastName: Smith
+        email: jane.smith@example.com
+        active: true
+        address: { street: 10 Downing Street, city: London, country: United Kingdom }
+    NewUser:
+      type: object
+      required: [firstName, lastName, email, address]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        address: { $ref: "#/components/schemas/Address" }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        message: { type: string }
+        field: { type: string }
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/public:
+    get:
+      tags: [auth]
+      operationId: getPublic
+      security: []
+      responses:
+        "200":
+          description: Always available
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, authenticated]
+                properties:
+                  message: { type: string }
+                  authenticated: { type: boolean, enum: [false] }
+
+  /api/login:
+    post:
+      tags: [auth]
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: A bearer token
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [access_token, token_type, expires_in]
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string, enum: [Bearer] }
+                  expires_in: { type: integer }
+        "401":
+          description: Wrong username or password
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/auth/bearer:
+    get:
+      tags: [auth]
+      operationId: checkBearer
+      responses:
+        "200": { description: The token is valid }
+        "401": { description: Missing or invalid token }
+
+  /api/auth/apikey:
+    get:
+      tags: [auth]
+      operationId: checkApiKey
+      security:
+        - apiKeyAuth: []
+      responses:
+        "200": { description: The key is valid }
+        "401": { description: Missing or invalid key }
+
+  /api/users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      parameters:
+        - { name: active, in: query, schema: { type: boolean } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 10, maximum: 100 } }
+      responses:
+        "200":
+          description: A page of users
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/User" }
+                  pagination:
+                    type: object
+                    required: [page, page_size, total, total_pages]
+                    properties:
+                      page: { type: integer }
+                      page_size: { type: integer }
+                      total: { type: integer }
+                      total_pages: { type: integer }
+        "401": { description: Missing or invalid token }
+    post:
+      tags: [users]
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewUser" }
+      responses:
+        "201":
+          description: Created
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "422":
+          description: Invalid data, for example an empty email
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/users/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [users]
+      operationId: getUser
+      responses:
+        "200":
+          description: The user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "404":
+          description: No user with this id
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    put:
+      tags: [users]
+      operationId: replaceUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: "#/components/schemas/NewUser" }
+                - type: object
+                  required: [active]
+                  properties:
+                    active: { type: boolean }
+      responses:
+        "200":
+          description: The replaced user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "404": { description: No user with this id }
+    patch:
+      tags: [users]
+      operationId: updateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+                email: { type: string }
+                active: { type: boolean }
+      responses:
+        "200":
+          description: The updated user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "404": { description: No user with this id }
+    delete:
+      tags: [users]
+      operationId: deleteUser
+      responses:
+        "204": { description: Deleted }
+        "404": { description: No user with this id }
+
+  /api/users/{id}/avatar:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    put:
+      tags: [users]
+      operationId: uploadAvatar
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "204": { description: Stored }
