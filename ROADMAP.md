@@ -11,10 +11,10 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 
 ## Where we are
 
-Released: **tinyprobe 0.12.0** and the extension **0.3.0**. M1 is done.
+Released: **tinyprobe 0.13.0** and the extension **0.3.0**. M1 is done; M2 is in progress.
 
 - Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
-- CLI: `run` (one workflow, or a folder as a suite), `call`, `inspect`, `init`, `update`, `guide`; console and ndjson reporters; Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
+- CLI: `run` (one workflow, or a folder as a suite), `call`, `inspect`, `init`, `mcp` (an MCP server for agents), `update`, `guide`; console and ndjson reporters; Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
 - Extension: validation on save, ▶ Call, ▶ Run workflow, Test Explorer, run view, environment picker, Migrate with AI. On the VS Code Marketplace, on Open VSX (namespace claim pending) and as a `.vsix` in GitHub Releases.
 
 ## How we work
@@ -65,7 +65,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [ ] **M2-2** `guide` Ready-made agent packages: a Claude Code skill, Cursor rules, Copilot instructions and `llms.txt`, each a thin wrapper around `tinyprobe guide`.
 - [ ] **M2-3** `ext` Completion and hover in tinyprobe files: keys, endpoint names after `call:`, params in `with`, from `inspect --json`. *Spec needed if the protocol needs new data.*
 - [ ] **M2-4** `ext` "tinyprobe: Generate from code": uses the VS Code Language Model API, so it runs on the model the user already has (Copilot or another provider), with the guide as instructions and `inspect` / `run` to check the result.
-- [ ] **M2-5** `ext` Register the tinyprobe MCP server with VS Code (`vscode.lm.registerMcpServerDefinitionProvider`), so Copilot and other chat agents in the editor get the tools without configuration. Needs M2-1.
+- [~] **M2-5** `ext` Register the tinyprobe MCP server with VS Code (`vscode.lm.registerMcpServerDefinitionProvider`), so Copilot and other chat agents in the editor get the tools without configuration. Needs M2-1. tinyprobe-vscode PR #3.
 
 ## M3 — CI
 
