@@ -321,6 +321,20 @@ public class ProtocolJsonTests
     }
 
     [Fact]
+    public void Invalid_ListsTheEndpointsFound_WhenGiven()
+    {
+        var api = WorkflowLoader.Parse("base_url: https://api.test\nendpoints:\n  ping: { path: /ping }\nsteps:\n  - call: ping\n", "w.yaml");
+        var problems = new List<LoadProblem> { new("w.yaml", 5, 11, "unknown endpoint 'pign' (did you mean 'ping'?)") };
+
+        var withEndpoints = Parse(ProtocolJson.Invalid("1.2.3", "w.yaml", problems, endpoints: api.Endpoints));
+        var without = Parse(ProtocolJson.Invalid("1.2.3", "w.yaml", problems));
+
+        Assert.Equal("ping", withEndpoints.GetProperty("endpoints")[0].GetProperty("name").GetString());
+        Assert.Equal("/ping", withEndpoints.GetProperty("endpoints")[0].GetProperty("path").GetString());
+        Assert.False(without.TryGetProperty("endpoints", out _));
+    }
+
+    [Fact]
     public void SuiteEvents_ListTheFiles_AndTheTotals()
     {
         var passed = new Models.WorkflowReport();

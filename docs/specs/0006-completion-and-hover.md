@@ -1,9 +1,9 @@
 # 0006 — Completion and hover in tinyprobe files
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M2-3
 - **Repositories:** tinyprobe, tinyprobe-vscode
-- **PRs:** —
+- **PRs:** [#20](https://github.com/kikutano/tinyprobe/pull/20) (CLI)
 
 ## Problem
 
@@ -100,8 +100,12 @@ Completion and hover providers for YAML files that are tinyprobe files. `MINIMUM
 - [ ] Extension: unit tests for the section at the cursor; integration tests for key completion in a step, `call:` and `with:` completion, and hover on a key and on an endpoint.
 - [ ] `scripts/dev.sh check` passes in both repositories.
 
-## Open questions
+## Decisions
 
-1. **Also use the YAML extension?** Recommended: no for now. The extension's own providers work without any other extension; the schema is there for people who prefer the YAML extension, with the modeline. The alternative is `contributes.yamlValidation`, which adds the schema to the YAML extension when it is installed, but then the keys are completed twice.
-2. **Where the schema is published.** Recommended: in the repository (`docs/schema/`, raw URL on `main`) and in every release as an asset. The alternative is [SchemaStore](https://www.schemastore.org), which editors find on their own by file name; it does not fit, because tinyprobe files are found by content, not by a name pattern.
-3. **The command name.** Recommended: `tinyprobe schema`. The alternative is `tinyprobe inspect --schema`.
+Approved on 2026-10-26 with the recommendations:
+
+1. The extension uses its own providers, not the YAML extension; the schema is there for people who prefer the YAML extension, with the modeline.
+2. The schema is published in the repository (`docs/schema/`) and as an asset of every release; not on SchemaStore.
+3. The command is `tinyprobe schema`.
+
+A check in the schema is either conditions (only operators) or a value to compare, but not an object that mixes the two, which the loader rejects: the schema catches `{ gte: 1, betwen: 2 }`.

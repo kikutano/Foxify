@@ -97,6 +97,10 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # Editors and agents can pin the schema of the version they use (docs/specs/0006-completion-and-hover.md).
+      - name: JSON Schema of the format
+        run: cp docs/schema/tinyprobe.schema.json dist/
+
       - name: Checksums
         working-directory: dist
         run: sha256sum tinyprobe-* > SHA256SUMS && cat SHA256SUMS

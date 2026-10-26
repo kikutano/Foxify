@@ -24,6 +24,7 @@ const string Usage = """
       tinyprobe update [--check] [--force]
       tinyprobe guide       Print the guide for coding agents (LLMs) that write tinyprobe files.
       tinyprobe mcp         MCP server on stdin/stdout: the tools guide, inspect, call and run, for agents.
+      tinyprobe schema      Print the JSON Schema of tinyprobe files, for editors.
       tinyprobe --help
       tinyprobe --version
 
@@ -98,6 +99,14 @@ if (args[0] == "update")
     }
 
     return await UpdateCommand.RunAsync(CreateConsole(updateNoColor), GetVersion(), checkOnly, force);
+}
+
+if (args[0] == "schema")
+{
+    if (args.Length > 1)
+        return UsageError(args[1].StartsWith('-') ? $"Unknown option '{args[1]}' for 'schema'." : $"Unexpected argument '{args[1]}'.");
+    Console.Out.Write(FormatSchema.Json());
+    return ExitSuccess;
 }
 
 if (args[0] == "mcp")

@@ -58,8 +58,10 @@ public static class ProtocolJson
     });
 
     /// <summary>The problems of an invalid file; as a run event, <paramref name="eventName"/> is <c>invalid</c>.</summary>
+    /// <param name="endpoints">The endpoints found in an invalid workflow whose imports loaded, for editors.</param>
     public static string Invalid(string version, string file, IReadOnlyList<LoadProblem> problems,
-        string? eventName = null, bool indented = true) => Write(indented, w =>
+        string? eventName = null, bool indented = true,
+        IReadOnlyDictionary<string, EndpointDefinition>? endpoints = null) => Write(indented, w =>
     {
         if (eventName is not null)
             w.WriteString("event", eventName);
@@ -78,6 +80,14 @@ public static class ProtocolJson
             w.WriteEndObject();
         }
         w.WriteEndArray();
+
+        if (endpoints is not null)
+        {
+            w.WriteStartArray("endpoints");
+            foreach (var endpoint in endpoints.Values)
+                WriteEndpoint(w, endpoint);
+            w.WriteEndArray();
+        }
     });
 
     private static void WriteEndpoint(Utf8JsonWriter w, EndpointDefinition endpoint)

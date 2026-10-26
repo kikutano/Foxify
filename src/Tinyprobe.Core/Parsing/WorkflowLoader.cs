@@ -21,6 +21,12 @@ public sealed class WorkflowLoadException(IReadOnlyList<LoadProblem> problems)
 
     /// <summary>The problems as <c>file:line:column: message</c>.</summary>
     public IReadOnlyList<string> Errors { get; } = problems.Select(p => p.ToString()).ToList();
+
+    /// <summary>
+    /// The endpoints of an invalid workflow whose imports all loaded (its own and the imported ones), for editors
+    /// that complete endpoint names while the file is being written; null otherwise.
+    /// </summary>
+    public IReadOnlyDictionary<string, EndpointDefinition>? Endpoints { get; init; }
 }
 
 /// <summary>
@@ -76,15 +82,16 @@ public static class WorkflowLoader
 
 internal sealed partial class Loader
 {
-    private static readonly string[] ApiKeys = ["base_url", "headers", "auth", "endpoints"];
-    private static readonly string[] WorkflowKeys = ["name", "description", "import", "variables", "settings", "steps", .. ApiKeys];
-    private static readonly string[] EndpointKeys = ["method", "path", "query", "headers", "auth", "body", "params"];
-    private static readonly string[] StepKeys = ["name", "call", "with", "expect", "until", "save", "sleep"];
-    private static readonly string[] ExpectKeys = ["status", "headers", "body", "duration"];
-    private static readonly string[] UntilKeys = ["status", "headers", "body", "every", "timeout"];
-    private static readonly string[] SettingsKeys = ["timeout", "max_retries"];
+    // The keys of each section. FormatSchema builds `tinyprobe schema` from them: a new key needs a description there.
+    internal static readonly string[] ApiKeys = ["base_url", "headers", "auth", "endpoints"];
+    internal static readonly string[] WorkflowKeys = ["name", "description", "import", "variables", "settings", "steps", .. ApiKeys];
+    internal static readonly string[] EndpointKeys = ["method", "path", "query", "headers", "auth", "body", "params"];
+    internal static readonly string[] StepKeys = ["name", "call", "with", "expect", "until", "save", "sleep"];
+    internal static readonly string[] ExpectKeys = ["status", "headers", "body", "duration"];
+    internal static readonly string[] UntilKeys = ["status", "headers", "body", "every", "timeout"];
+    internal static readonly string[] SettingsKeys = ["timeout", "max_retries"];
 
-    private static readonly Dictionary<string, Operator> Operators = new()
+    internal static readonly Dictionary<string, Operator> Operators = new()
     {
         ["eq"] = Operator.Equal,
         ["ne"] = Operator.NotEqual,
@@ -98,7 +105,7 @@ internal sealed partial class Loader
         ["any"] = Operator.Any
     };
 
-    private static readonly string[] DurationOperators = ["gt", "gte", "lt", "lte"];
+    internal static readonly string[] DurationOperators = ["gt", "gte", "lt", "lte"];
 
     [GeneratedRegex(@"^[A-Za-z]+$")]
     private static partial Regex HttpMethod();
@@ -118,6 +125,7 @@ internal sealed partial class Loader
 
         var endpoints = new Dictionary<string, EndpointDefinition>();
         var imported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var problemsBeforeImports = _problems.Count;
         if (entries.TryGetValue("import", out var imports))
         {
             foreach (var item in Items(file, imports, "import"))
@@ -136,6 +144,10 @@ internal sealed partial class Loader
                     AddEndpoints(endpoints, LoadApiFile(importFullPath));
             }
         }
+
+        // An editor completes endpoint names while the workflow is still invalid: when every import loaded,
+        // the problems carry the endpoints found.
+        var importsLoaded = _problems.Count == problemsBeforeImports;
 
         // A workflow can also define its own endpoints, handy for small single-file tests.
         AddEndpoints(endpoints, ParseApi(file, entries));
@@ -161,7 +173,7 @@ internal sealed partial class Loader
         ValidateGeneratedValues(endpoints.Values, steps.OfType<CallStep>(), workflow.Variables.Values);
 
         if (_problems.Count > 0)
-            throw Problems();
+            throw Problems(importsLoaded ? endpoints : null);
 
         return workflow;
     }
@@ -788,12 +800,15 @@ internal sealed partial class Loader
     private void Report(SourceLocation location, string message) => _problems.Add((location, message));
 
     /// <summary>All problems, ordered by file (in the order the files were read) and position.</summary>
-    private WorkflowLoadException Problems() => new(_problems
+    private WorkflowLoadException Problems(IReadOnlyDictionary<string, EndpointDefinition>? endpoints = null) => new(_problems
         .OrderBy(p => _files.IndexOf(p.Location.File))
         .ThenBy(p => p.Location.Line)
         .ThenBy(p => p.Location.Column)
         .Select(p => new LoadProblem(p.Location.File, p.Location.Line, p.Location.Column, p.Message))
-        .ToList());
+        .ToList())
+    {
+        Endpoints = endpoints
+    };
 
     /// <summary>A path relative to the current directory when the file is inside it, otherwise the full path.</summary>
     private static string DisplayPath(string fullPath)

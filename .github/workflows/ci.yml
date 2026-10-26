@@ -64,6 +64,9 @@ jobs:
           ./publish/tinyprobe run docs/example -e docs/environment.yaml --reporter ndjson > suite.ndjson
           jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 4 and .[-1].event == "suite_finished" and .[-1].success' suite.ndjson
 
+      - name: End-to-end (schema)
+        run: ./publish/tinyprobe schema | jq -e '."$defs".step.properties.call and (.properties.steps.items."$ref" == "#/$defs/step")'
+
       # The MCP server (docs/specs/0005-mcp-server.md) on the Native AOT binary: a short session.
       - name: End-to-end (mcp)
         run: |
