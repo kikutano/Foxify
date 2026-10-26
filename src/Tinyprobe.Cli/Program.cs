@@ -19,6 +19,7 @@ const string Usage = """
       tinyprobe run <workflow.yaml | folder>... [options]
       tinyprobe call <file.yaml> <endpoint> [--with name=value]... [options]
       tinyprobe inspect <file.yaml> [--json]
+      tinyprobe init [folder] [--base-url <url>]
       tinyprobe update [--check] [--force]
       tinyprobe guide       Print the guide for coding agents (LLMs) that write tinyprobe files.
       tinyprobe --help
@@ -29,6 +30,8 @@ const string Usage = """
     starts from zero, a failing one does not stop the others, and a summary comes last.
     'call' sends one request to an endpoint of an API or workflow file and prints the response.
     'inspect' validates a file and lists its endpoints, variables and steps.
+    'init' creates the tinyprobe/ folder, the .gitignore lines and an AGENTS.md section for
+    coding agents, in the current folder or the one given. It never overwrites a file.
 
     Options for 'run' and 'call':
       -e, --env <file>        Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
@@ -44,6 +47,9 @@ const string Usage = """
     Options for 'inspect':
       --json                  Print JSON, for tools.
       --no-color              Disable colors.
+
+    Options for 'init':
+      --base-url <url>        baseUrl of the env files (default: http://localhost:8080).
 
     Options for 'update':
       --check                 Only tell whether a newer version is available.
@@ -90,6 +96,40 @@ if (args[0] == "update")
     }
 
     return await UpdateCommand.RunAsync(CreateConsole(updateNoColor), GetVersion(), checkOnly, force);
+}
+
+if (args[0] == "init")
+{
+    string? root = null;
+    string baseUrl = InitCommand.DefaultBaseUrl;
+    bool initNoColor = false;
+    for (int i = 1; i < args.Length; i++)
+    {
+        switch (args[i])
+        {
+            case "--no-color":
+                initNoColor = true;
+                break;
+            case "--base-url":
+                if (i + 1 >= args.Length)
+                    return UsageError("Option '--base-url' requires a value.");
+                baseUrl = args[++i];
+                break;
+            case var option when option.StartsWith('-'):
+                return UsageError($"Unknown option '{option}' for 'init'.");
+            case var folder when root is null:
+                root = folder;
+                break;
+            case var extra:
+                return UsageError($"Unexpected argument '{extra}'.");
+        }
+    }
+
+    root ??= ".";
+    if (!Directory.Exists(root))
+        return UsageError($"Folder not found: {root}");
+
+    return InitCommand.Run(CreateConsole(initNoColor), GetVersion(), root, baseUrl);
 }
 
 if (args[0] is not ("run" or "call" or "inspect"))

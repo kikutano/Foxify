@@ -54,7 +54,7 @@ The adoption hook: a Postman user gives their collection to their agent and gets
 - [x] **M1-5** `repo` Ready-to-paste prompts in the README: migrate a Postman collection, start from an OpenAPI document, scan a backend (exists, review it).
 - [x] **M1-6** `guide` Benchmark for the guide: a Postman collection of the test server with variables, scripts and variants (`docs/example/postman/`), a reference conversion, and a procedure to score an agent's conversion: rounds of `inspect` / `run` until it passes, requests covered, invented syntax. Run with at least two agents before and after M1-1…M1-4. *Done when:* the scores are recorded in the spec of M1-1. Run with Claude Code (Sonnet and Haiku); other agents can be added by hand. PR #14.
 - [x] **M1-7** `cli` `tinyprobe run <folder>`: runs every workflow of a folder, one summary, exit code `1` if any failed. Agents and CI run a whole migration with one command. Spec: [0003](docs/specs/0003-run-a-folder.md). PR #16.
-- [~] **M1-8** `cli` `tinyprobe init`: creates the `tinyprobe/` layout of the guide (`api/`, `workflows/`, `env.example.yaml`), the `.gitignore` entries, and a short `AGENTS.md` section that points agents to `tinyprobe guide`. Spec: [0004](docs/specs/0004-init.md) (draft).
+- [x] **M1-8** `cli` `tinyprobe init`: creates the `tinyprobe/` layout of the guide (`api/`, `workflows/`, `env.example.yaml`), the `.gitignore` entries, and a short `AGENTS.md` section that points agents to `tinyprobe guide`. Spec: [0004](docs/specs/0004-init.md) PR #17.
 - [ ] **M1-9** `ext` "tinyprobe: Migrate with AI": pick a collection or an OpenAPI file, build the migration prompt, and hand it to the editor's chat, or copy it to the clipboard when there is no chat.
 
 ## M2 — Agents everywhere
