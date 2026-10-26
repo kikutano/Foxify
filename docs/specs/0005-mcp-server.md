@@ -1,9 +1,9 @@
 # 0005 — `tinyprobe mcp`: tinyprobe as tools for agents
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M2-1
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#18](https://github.com/kikutano/tinyprobe/pull/18)
 
 ## Problem
 
@@ -51,15 +51,16 @@ claude mcp add tinyprobe -- tinyprobe mcp              # Claude Code
 - **`env_file`** is the environment file (`-e`). `vars` are set over it (`--var`).
 - **`run`** takes one or more paths, files or folders, like `tinyprobe run` (spec 0003): each workflow starts from zero, a failing one does not stop the others.
 
-Example of a `call` result (the text content of the tool result):
+Example of a `call` result (the text content of the tool result): the endpoint name, then the keys of a `step_completed` event of the protocol.
 
 ```json
 {
-  "success": true,
   "endpoint": "get_user",
+  "index": 0, "name": "get_user", "success": true, "failure": null,
+  "method": "GET", "url": "http://localhost:5122/api/users/1", "status": 200, "duration_ms": 4.2,
+  "assertions": [], "saved": {},
   "request": { "method": "GET", "url": "http://localhost:5122/api/users/1", "headers": [...], "body": null },
-  "response": { "status": 200, "reason": "OK", "headers": [...], "body": "{\"id\":1,\"firstName\":\"Gaetano\"}", "body_truncated": false },
-  "duration_ms": 4.2
+  "response": { "status": 200, "reason": "OK", "headers": [...], "body": "{\"id\":1,\"firstName\":\"Gaetano\"}", "body_truncated": false }
 }
 ```
 
@@ -140,8 +141,10 @@ No change needed. Later, a separate task: the extension registers the server wit
 - [ ] Tried by hand with Claude Code against the test server: the agent finds the tools and converts the Postman bench using them.
 - [ ] `scripts/dev.sh check` passes.
 
-## Open questions
+## Decisions
 
-1. **The shape of `run` results.** Recommended: request and response only for failed steps, as above, so a passing suite stays short. The alternative is every step in full, as in the ndjson events, which can run into megabytes of response bodies.
-2. **Structured content.** Recommended: return the JSON as text content, which every client reads; add `structuredContent` with an `outputSchema` later, when the clients we target use it. The alternative is both from the start.
-3. **Tool names.** Recommended: `guide`, `inspect`, `call`, `run`. Clients show them as `tinyprobe` + name (`mcp__tinyprobe__run`). The alternative is prefixed names (`tinyprobe_run`), for clients that mix the tools of many servers into one list.
+Approved on 2026-10-26 with the recommendations:
+
+1. `run` results have the request and the response of failed steps only.
+2. Results are JSON as text content; `structuredContent` later, if the clients we target use it.
+3. Tool names without a prefix: `guide`, `inspect`, `call`, `run`.

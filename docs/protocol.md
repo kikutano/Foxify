@@ -8,6 +8,7 @@ Programs (a local UI, an editor plugin, a CI dashboard) drive tinyprobe through 
 | `tinyprobe run <workflow.yaml> --reporter ndjson` | one JSON event per line, as the run goes |
 | `tinyprobe run <folder or files>... --reporter ndjson` | the same events for each workflow, between `suite_started` and `suite_finished` |
 | `tinyprobe call <file.yaml> <endpoint> --reporter ndjson` | the same events, for a single request |
+| `tinyprobe mcp` | an MCP server on standard input and output, with the tools below ([MCP](#mcp)) |
 
 ## Rules
 
@@ -160,3 +161,23 @@ A UI that lets people change the variables of a workflow passes them with `--var
 ## `call`
 
 `tinyprobe call <file.yaml> <endpoint> [--with name=value]...` runs a workflow of one step that calls the endpoint and accepts **any** status. `<file.yaml>` is an API file or a workflow; with a workflow, its variables and settings apply. `--with` values are typed like `--var`, and they can use variables: `--with 'id=${userId}'`. They are validated like a step's `with`: an unknown endpoint, a missing required param or an unknown argument is an `invalid` event with the file `command line`.
+
+## MCP
+
+`tinyprobe mcp` is an [MCP](https://modelcontextprotocol.io) server: JSON-RPC 2.0, one message per line, on standard input and output. It speaks the protocol versions `2025-06-18`, `2025-03-26` and `2024-11-05`, and offers tools only. It keeps nothing between calls: each one loads the files again. Standard output carries only MCP messages.
+
+| Tool | Arguments | Result |
+|---|---|---|
+| `guide` | none | the guide for agents, as text |
+| `inspect` | `file` | the JSON of `inspect --json` |
+| `call` | `file`, `endpoint`, `with`, `env_file`, `vars` | `endpoint`, then the keys of a `step_completed` event: `success`, `status`, `assertions`, `request`, `response`... |
+| `run` | `paths`, `env_file`, `vars` | `success`, and `workflows`: for each, `file`, `workflow`, `success`, `summary` (as in `run_finished`) and `steps` |
+
+- `with` and `vars` are JSON objects; their values keep their JSON type. `paths` is a list of workflow files and folders (one string is accepted too), read like `tinyprobe run`.
+- The result is the JSON as the text content of the tool result.
+- In `run`, passing steps have no `request` and `response`; failed steps have both.
+- `call` accepts any status, like `tinyprobe call`: a `500` is a result, not an error.
+- **Tool errors** (`isError: true`): an invalid file gives the JSON of an invalid `inspect` (problems of the arguments have the file `command line`); a wrong argument gives one sentence, such as `File not found: tinyprobe/api/backend.yml`. A failing step is not a tool error: the result has `success: false`.
+- **JSON-RPC errors**: `-32700` for a message that is not JSON, `-32600` for an invalid request, `-32601` for an unknown method, `-32602` for an unknown tool.
+- `guide` and `inspect` have `readOnlyHint: true`; `call` and `run` have `openWorldHint: true`, because they send requests to the backend.
+

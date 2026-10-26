@@ -185,6 +185,20 @@ Start with `tinyprobe init` at the root of your repository. It creates the `tiny
 
 The agent can check its own work: an invalid file is reported with `file:line:column` and a suggestion before any request is sent, and a failing check shows the actual value.
 
+### Give your agent the tinyprobe tools (MCP)
+
+`tinyprobe mcp` is an [MCP](https://modelcontextprotocol.io) server: your agent gets the tools `guide`, `inspect`, `call` and `run`, and uses them without a shell, with JSON arguments and JSON results. Add it once:
+
+```bash
+claude mcp add tinyprobe -- tinyprobe mcp          # Claude Code (--scope project shares it in .mcp.json)
+```
+
+```json
+{ "servers": { "tinyprobe": { "type": "stdio", "command": "tinyprobe", "args": ["mcp"] } } }
+```
+
+That is `.vscode/mcp.json` for VS Code. Cursor reads `.cursor/mcp.json` with `{ "mcpServers": { "tinyprobe": { "command": "tinyprobe", "args": ["mcp"] } } }`, Codex `~/.codex/config.toml` with `[mcp_servers.tinyprobe]`, `command = "tinyprobe"`, `args = ["mcp"]`. `call` and `run` send requests to your backend, so your agent may ask you before using them. The tools and their results are described in [docs/protocol.md](docs/protocol.md#mcp).
+
 ### From the backend code
 
 ```text
@@ -228,6 +242,7 @@ backend does not do what the document says.
   tinyprobe init [folder] [--base-url <url>]
   tinyprobe update [--check] [--force]
   tinyprobe guide       Print the guide for coding agents (LLMs) that write tinyprobe files.
+  tinyprobe mcp         MCP server on stdin/stdout: the tools guide, inspect, call and run, for agents.
   tinyprobe --help
   tinyprobe --version
 

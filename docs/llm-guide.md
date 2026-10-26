@@ -16,6 +16,8 @@ You are going to write API tests for a backend with **tinyprobe**, a command-lin
 
 Exit codes: `0` all steps passed, `1` a step failed, `2` invalid workflow or arguments (nothing was sent).
 
+**If you have the tinyprobe MCP tools** (`guide`, `inspect`, `call`, `run`, from `tinyprobe mcp`), use them instead of the shell. They take JSON arguments, so values keep their JSON type (`"with": { "id": 42 }` is a number, `{ "id": "42" }` a string), and return JSON: `inspect` the file you wrote, `call` an endpoint with `file`, `endpoint`, `with` and `env_file`, `run` with `paths` (files or folders) and `env_file`. An invalid file comes back as a tool error with every problem and its `file:line:column`.
+
 ## 2. Project layout
 
 Create the files in a `tinyprobe/` folder at the root of the user's repository, unless the user asks otherwise:

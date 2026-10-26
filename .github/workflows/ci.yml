@@ -64,6 +64,17 @@ jobs:
           ./publish/tinyprobe run docs/example -e docs/environment.yaml --reporter ndjson > suite.ndjson
           jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 4 and .[-1].event == "suite_finished" and .[-1].success' suite.ndjson
 
+      # The MCP server (docs/specs/0005-mcp-server.md) on the Native AOT binary: a short session.
+      - name: End-to-end (mcp)
+        run: |
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run","arguments":{"paths":["docs/example/workflows"],"env_file":"docs/environment.yaml"}}}' \
+            | ./publish/tinyprobe mcp > mcp.ndjson
+          jq -e -s 'length == 3 and .[0].result.serverInfo.name == "tinyprobe" and (.[1].result.tools | length) == 4 and (.[2].result.isError | not) and (.[2].result.content[0].text | fromjson | .success and (.workflows | length) == 4)' mcp.ndjson
+
       - name: End-to-end (init)
         run: |
           dir=$(mktemp -d)

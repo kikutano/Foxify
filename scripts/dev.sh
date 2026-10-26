@@ -115,6 +115,18 @@ e2e() {
     and .[-1].event == "suite_finished" and .[-1].success' "$DEV_DIR/suite.ndjson" > /dev/null
   echo "Protocol checks passed."
 
+  step "End-to-end (mcp)"
+  printf '%s\n' \
+    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}' \
+    '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+    '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+    "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"run\",\"arguments\":{\"paths\":[\"docs/example/workflows\"],\"env_file\":\"docs/environment.yaml\",\"vars\":{\"baseUrl\":\"$BASE_URL/\"}}}}" \
+    | "$DEV_BIN" mcp > "$DEV_DIR/mcp.ndjson"
+  jq -e -s 'length == 3 and .[0].result.serverInfo.name == "tinyprobe" and (.[1].result.tools | length) == 4
+    and (.[2].result.isError | not) and (.[2].result.content[0].text | fromjson | .success and (.workflows | length) == 4)' \
+    "$DEV_DIR/mcp.ndjson" > /dev/null
+  echo "MCP checks passed."
+
   step "End-to-end (init)"
   init_dir=$(mktemp -d)
   "$DEV_BIN" init "$init_dir" --no-color > /dev/null
