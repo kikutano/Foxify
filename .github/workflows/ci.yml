@@ -68,7 +68,7 @@ jobs:
         run: |
           dir=$(mktemp -d)
           ./publish/tinyprobe init "$dir"
-          ./publish/tinyprobe init "$dir" | grep -q '= tinyprobe/env.local.yaml'
+          ./publish/tinyprobe init "$dir" --no-color | grep -q '= tinyprobe/env.local.yaml'
           test -d "$dir/tinyprobe/workflows" && grep -q 'tinyprobe guide' "$dir/AGENTS.md" && grep -qx '!tinyprobe/env.example.yaml' "$dir/.gitignore"
 
       - name: Test server log
