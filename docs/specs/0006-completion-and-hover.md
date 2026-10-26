@@ -1,9 +1,9 @@
 # 0006 — Completion and hover in tinyprobe files
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M2-3
 - **Repositories:** tinyprobe, tinyprobe-vscode
-- **PRs:** [#20](https://github.com/kikutano/tinyprobe/pull/20) (CLI)
+- **PRs:** [#20](https://github.com/kikutano/tinyprobe/pull/20) (CLI), [tinyprobe-vscode #5](https://github.com/kikutano/tinyprobe-vscode/pull/5) (extension)
 
 ## Problem
 

@@ -11,11 +11,11 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 
 ## Where we are
 
-Released: **tinyprobe 0.13.0** and the extension **0.3.0**. M1 is done; M2 is in progress.
+Released: **tinyprobe 0.14.0** and the extension **0.5.0**. M1 and M2 are done.
 
 - Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
-- CLI: `run` (one workflow, or a folder as a suite), `call`, `inspect`, `init`, `mcp` (an MCP server for agents), `update`, `guide`; console and ndjson reporters; Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
-- Extension: validation on save, ▶ Call, ▶ Run workflow, Test Explorer, run view, environment picker, Migrate with AI. On the VS Code Marketplace, on Open VSX (namespace claim pending) and as a `.vsix` in GitHub Releases.
+- CLI: `run` (one workflow, or a folder as a suite), `call`, `inspect`, `init`, `mcp` (an MCP server for agents), `schema` (JSON Schema of the format), `update`, `guide`; console and ndjson reporters; Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
+- Extension: validation on save, completion and hover, ▶ Call, ▶ Run workflow, Test Explorer, run view, environment picker, Migrate with AI, Generate Tests with AI, the MCP tools in VS Code's chat. On the VS Code Marketplace, on Open VSX (namespace claim pending) and as a `.vsix` in GitHub Releases.
 
 ## How we work
 
@@ -63,7 +63,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 
 - [x] **M2-1** `cli` `tinyprobe mcp`: an MCP server over stdio with the tools `guide`, `inspect`, `call` and `run`, returning the protocol JSON. Native AOT-safe. Spec: [0005](docs/specs/0005-mcp-server.md) PR #18.
 - [x] **M2-2** `guide` Ready-made agent packages: a Claude Code skill, Cursor rules, Copilot instructions and `llms.txt`, each a thin wrapper around `tinyprobe guide`. In `agents/` and `llms.txt`; the Claude Code plugin installs from this repository as a marketplace. PR #19.
-- [~] **M2-3** `ext` Completion and hover in tinyprobe files: keys, endpoint names after `call:`, params in `with`, from `inspect --json`. Spec: [0006](docs/specs/0006-completion-and-hover.md) (draft).
+- [x] **M2-3** `ext` Completion and hover in tinyprobe files: keys, endpoint names after `call:`, params in `with`, from `inspect --json`. Spec: [0006](docs/specs/0006-completion-and-hover.md) PR #20, tinyprobe-vscode PR #5.
 - [x] **M2-4** `ext` "tinyprobe: Generate Tests with AI": runs on the model the user already has (Copilot or another provider), with the guide as instructions and `inspect` / `run` to check the result. Built on the editor's own agent instead of a loop of ours on the Language Model API: the command opens the chat in agent mode with the prompt for the backend's code, and the agent uses the tinyprobe MCP tools that M2-5 registers. tinyprobe-vscode PR #4.
 - [x] **M2-5** `ext` Register the tinyprobe MCP server with VS Code (`vscode.lm.registerMcpServerDefinitionProvider`), so Copilot and other chat agents in the editor get the tools without configuration. Needs M2-1. tinyprobe-vscode PR #3.
 
