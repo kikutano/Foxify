@@ -1,6 +1,6 @@
 # 0003 — Run every workflow of a folder
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M1-7
 - **Repositories:** tinyprobe
 - **PRs:** [#16](https://github.com/kikutano/tinyprobe/pull/16)
