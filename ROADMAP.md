@@ -11,11 +11,11 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 
 ## Where we are
 
-Released: **tinyprobe 0.11.0** and the extension **0.2.2**.
+Released: **tinyprobe 0.12.0** and the extension **0.3.0**. M1 is done.
 
 - Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
-- CLI: `run`, `call`, `inspect`, `update`, `guide`; console and ndjson reporters; Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
-- Extension: validation on save, ▶ Call, ▶ Run workflow, Test Explorer, run view, environment picker. On the VS Code Marketplace, on Open VSX (namespace claim pending) and as a `.vsix` in GitHub Releases.
+- CLI: `run` (one workflow, or a folder as a suite), `call`, `inspect`, `init`, `update`, `guide`; console and ndjson reporters; Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
+- Extension: validation on save, ▶ Call, ▶ Run workflow, Test Explorer, run view, environment picker, Migrate with AI. On the VS Code Marketplace, on Open VSX (namespace claim pending) and as a `.vsix` in GitHub Releases.
 
 ## How we work
 
