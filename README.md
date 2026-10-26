@@ -220,7 +220,7 @@ backend does not do what the document says.
 ## Usage
 
 ```text
-  tinyprobe run <workflow.yaml> [options]
+  tinyprobe run <workflow.yaml | folder>... [options]
   tinyprobe call <file.yaml> <endpoint> [--with name=value]... [options]
   tinyprobe inspect <file.yaml> [--json]
   tinyprobe update [--check] [--force]
@@ -228,6 +228,9 @@ backend does not do what the document says.
   tinyprobe --help
   tinyprobe --version
 
+'run' runs workflows. A folder is read recursively: every YAML file with a top-level
+'steps' key is a workflow, other files are skipped. With several workflows, each one
+starts from zero, a failing one does not stop the others, and a summary comes last.
 'call' sends one request to an endpoint of an API or workflow file and prints the response.
 'inspect' validates a file and lists its endpoints, variables and steps.
 
@@ -255,11 +258,17 @@ Options for 'update':
 
 Exit codes ('run', 'call', 'inspect'):
   0  all steps passed ('call': a response was received; 'inspect': the file is valid)
-  1  at least one step failed
-  2  invalid arguments, file not found or invalid file
+  1  at least one step failed (several workflows: at least one workflow failed)
+  2  invalid arguments, file not found, invalid file, or a folder without workflows
 ```
 
-Execution stops at the first failing step. The exit code makes tinyprobe easy to use in CI. When the output is not a terminal (CI logs, pipes) the spinner is turned off and each step is printed on its own line.
+A workflow stops at its first failing step. Given a folder or several files, `tinyprobe run` runs every workflow, also after a failing one, and ends with one summary of all of them; exit code `0` means every workflow passed:
+
+```bash
+tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml
+```
+
+A folder is read recursively, and only workflows run: API files and env files in it are skipped. Each workflow starts from zero, so values saved in one are not seen by the next. The exit code makes tinyprobe easy to use in CI. When the output is not a terminal (CI logs, pipes) the spinner is turned off and each step is printed on its own line.
 
 ### Explore an API
 
@@ -353,8 +362,9 @@ dotnet run --project tests/Tinyprobe.RealServer.Tests
 ```
 
 ```bash
-# terminal 2: run a workflow
+# terminal 2: run a workflow, or all of them
 tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml
+tinyprobe run docs/example/workflows -e docs/environment.yaml
 ```
 
 The workflows leave the server's data as they found it, so they can be run again without restarting it.

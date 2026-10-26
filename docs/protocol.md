@@ -6,6 +6,7 @@ Programs (a local UI, an editor plugin, a CI dashboard) drive tinyprobe through 
 |---|---|
 | `tinyprobe inspect <file.yaml> --json` | one JSON document: what the file defines, or its problems |
 | `tinyprobe run <workflow.yaml> --reporter ndjson` | one JSON event per line, as the run goes |
+| `tinyprobe run <folder or files>... --reporter ndjson` | the same events for each workflow, between `suite_started` and `suite_finished` |
 | `tinyprobe call <file.yaml> <endpoint> --reporter ndjson` | the same events, for a single request |
 
 ## Rules
@@ -14,7 +15,7 @@ Programs (a local UI, an editor plugin, a CI dashboard) drive tinyprobe through 
 - **Keys** are `snake_case`. **Durations** are milliseconds (`*_ms`), as numbers.
 - **YAML values** (variables, bodies, `with`, param defaults) are shown as JSON with their placeholders **unresolved**: `"${email}"`, `"smoke-${$uuid}@example.com"`. Only a run resolves them.
 - **Locations** are `{ "file", "line", "column" }`, 1-based. `file` is relative to the current directory when the file is inside it, otherwise absolute. Problems that concern a whole file have `line` 0. Problems with arguments given on the command line have the file `command line`.
-- **Exit codes** are the same as for people: `0` success, `1` a step failed, `2` invalid arguments or invalid file. Errors in the arguments themselves (unknown option, missing file) are plain text on standard error, with exit code `2` and no JSON.
+- **Exit codes** are the same as for people: `0` success, `1` a step failed (in a suite: a workflow failed), `2` invalid arguments or invalid file. Errors in the arguments themselves (unknown option, missing file) are plain text on standard error, with exit code `2` and no JSON.
 - **Encoding.** The output is UTF-8. Non-ASCII characters are written as `\uXXXX` escapes, so the bytes are plain ASCII.
 
 ## `inspect --json`
@@ -126,6 +127,29 @@ One JSON object per line on standard output, written and flushed as soon as it h
 - `http_req_duration_ms` is `null` when no request got a response.
 
 **Secrets.** Requests are shown as sent, `Authorization` headers and passwords included. The output is meant for a program on your machine: do not store it or publish it as it is.
+
+## Suites: a folder or several files
+
+`tinyprobe run` with a folder, or with more than one file, runs a suite. The events of each workflow are the ones above, unchanged, and two events wrap them:
+
+| Event | When |
+|---|---|
+| `suite_started` | every workflow is valid; the first one is about to run |
+| `suite_finished` | the last workflow ended; the last event of the suite |
+
+```json
+{"event":"suite_started","protocol":1,"version":"0.12.0","files":["/home/me/project/tinyprobe/workflows/auth.yaml","/home/me/project/tinyprobe/workflows/users.yaml"]}
+{"event":"run_started", ...}
+{"event":"run_finished", ...}
+{"event":"run_started", ...}
+{"event":"run_finished", ...}
+{"event":"suite_finished","success":false,"workflows":[{"file":"/home/me/project/tinyprobe/workflows/auth.yaml","success":true},{"file":"/home/me/project/tinyprobe/workflows/users.yaml","success":false}],"summary":{"total_workflows":2,"passed_workflows":1,"failed_workflows":1,"total_steps":19,"passed_steps":10,"failed_steps":1,"not_run_steps":8,"duration_ms":1430.2}}
+```
+
+- `files` are full paths, in the order the workflows run: files of a folder in ordinal order of their path, files given on the command line in the order given.
+- A failing workflow does not stop the suite: the next one starts with its own `run_started`.
+- If any workflow is invalid, nothing runs and the only event is `invalid`, with the problems of every file; its `file` is the first path of the command line.
+- With a single workflow file there are no suite events: the output is that of a single run.
 
 ## Variables from the command line
 

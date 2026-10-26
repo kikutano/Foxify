@@ -51,10 +51,7 @@ jobs:
           echo "Test server did not start"; cat server.log; exit 1
 
       - name: End-to-end (docs/example/workflows)
-        run: |
-          for workflow in docs/example/workflows/*.yaml; do
-            ./publish/tinyprobe run "$workflow" -e docs/environment.yaml
-          done
+        run: ./publish/tinyprobe run docs/example/workflows -e docs/environment.yaml
 
       # The JSON protocol (docs/protocol.md) read by tools, on the Native AOT binary.
       - name: End-to-end (inspect, call, ndjson)
@@ -64,6 +61,8 @@ jobs:
           ./publish/tinyprobe call docs/example/api/testserver.yaml status --with code=404 -e docs/environment.yaml
           ./publish/tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --reporter ndjson > events.ndjson
           jq -e -s '.[0].event == "run_started" and .[-1].event == "run_finished" and .[-1].success' events.ndjson
+          ./publish/tinyprobe run docs/example -e docs/environment.yaml --reporter ndjson > suite.ndjson
+          jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 4 and .[-1].event == "suite_finished" and .[-1].success' suite.ndjson
 
       - name: Test server log
         if: failure()

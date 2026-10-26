@@ -26,6 +26,12 @@ The endpoints are declared once, in `api/jsonplaceholder.yaml`, and every workfl
 tinyprobe run workflows/01-read.yaml -e environment.yaml
 ```
 
+Run every workflow of the folder, with one summary at the end:
+
+```bash
+tinyprobe run workflows -e environment.yaml
+```
+
 Call a single endpoint, with its arguments, and see the whole response:
 
 ```bash

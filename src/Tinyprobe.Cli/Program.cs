@@ -16,7 +16,7 @@ const int ExitUsageError = 2;
 
 const string Usage = """
     Usage:
-      tinyprobe run <workflow.yaml> [options]
+      tinyprobe run <workflow.yaml | folder>... [options]
       tinyprobe call <file.yaml> <endpoint> [--with name=value]... [options]
       tinyprobe inspect <file.yaml> [--json]
       tinyprobe update [--check] [--force]
@@ -24,6 +24,9 @@ const string Usage = """
       tinyprobe --help
       tinyprobe --version
 
+    'run' runs workflows. A folder is read recursively: every YAML file with a top-level
+    'steps' key is a workflow, other files are skipped. With several workflows, each one
+    starts from zero, a failing one does not stop the others, and a summary comes last.
     'call' sends one request to an endpoint of an API or workflow file and prints the response.
     'inspect' validates a file and lists its endpoints, variables and steps.
 
@@ -51,8 +54,8 @@ const string Usage = """
 
     Exit codes ('run', 'call', 'inspect'):
       0  all steps passed ('call': a response was received; 'inspect': the file is valid)
-      1  at least one step failed
-      2  invalid arguments, file not found or invalid file
+      1  at least one step failed (several workflows: at least one workflow failed)
+      2  invalid arguments, file not found, invalid file, or a folder without workflows
     """;
 
 UpdateCommand.CleanupPreviousVersion();
@@ -158,12 +161,28 @@ if (positional.Count < expectedPositional)
         "run" => "Missing workflow file.",
         _ => "Missing file."
     });
-if (positional.Count > expectedPositional)
+if (positional.Count > expectedPositional && command != "run")
     return UsageError($"Unexpected argument '{positional[expectedPositional]}'.");
 
 var filePath = positional[0];
-if (!File.Exists(filePath))
+// One workflow file keeps the output and the events it always had; a folder or several files are a suite.
+var suite = command == "run" && (positional.Count > 1 || Directory.Exists(filePath));
+IReadOnlyList<string> suiteFiles = [];
+if (suite)
+{
+    try
+    {
+        suiteFiles = WorkflowFiles.Find(positional);
+    }
+    catch (WorkflowFilesException ex)
+    {
+        return UsageError(ex.Message);
+    }
+}
+else if (!File.Exists(filePath))
+{
     return UsageError($"File not found: {filePath}");
+}
 
 if (envFilePath is not null && !File.Exists(envFilePath))
     return UsageError($"Environment file not found: {envFilePath}");
@@ -177,14 +196,18 @@ IRunReporter reporter = reporterName == "ndjson"
     // In verbose mode the engine's log is printed, so the spinner is disabled: it would interleave with it.
     : new ConsoleReporter(console, live: !verbose) { ShowResponse = command == "call" };
 
-WorkflowDefinition workflow;
+WorkflowDefinition? workflow = null;
 var environment = new Dictionary<string, JsonElement>();
 try
 {
     // Everything is validated before the first request: a typo is reported, not half-run.
-    workflow = command == "call"
-        ? WorkflowLoader.CreateCall(WorkflowLoader.LoadAny(filePath), positional[1], arguments)
-        : WorkflowLoader.Load(filePath);
+    // A suite loads its workflows in RunCommand, after the environment.
+    if (!suite)
+    {
+        workflow = command == "call"
+            ? WorkflowLoader.CreateCall(WorkflowLoader.LoadAny(filePath), positional[1], arguments)
+            : WorkflowLoader.Load(filePath);
+    }
     if (envFilePath is not null)
     {
         foreach (var (name, value) in WorkflowLoader.LoadEnvironment(envFilePath))
@@ -213,15 +236,24 @@ foreach (var (name, text) in variables)
 var log = !verbose ? TextWriter.Null : reporterName == "ndjson" ? Console.Error : Console.Out;
 if (verbose)
 {
-    log.WriteLine("Workflow variables:");
-    foreach (var (name, value) in workflow.Variables)
-        log.WriteLine($"  {name}: {value}");
+    if (workflow is not null)
+    {
+        log.WriteLine("Workflow variables:");
+        foreach (var (name, value) in workflow.Variables)
+            log.WriteLine($"  {name}: {value}");
+    }
     log.WriteLine("Environment variables:");
     foreach (var (name, value) in environment)
         log.WriteLine($"  {name}: {value.GetRawText()}");
 }
 
-using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout) };
+if (suite)
+{
+    return await RunCommand.RunSuiteAsync(reporter, GetVersion(), filePath, suiteFiles, envFilePath, environment, log,
+        recordExchanges: reporterName == "ndjson", createHandler: () => new HttpClientHandler());
+}
+
+using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(workflow!.Settings.Timeout) };
 var engine = new WorkflowEngine(httpClient, log)
 {
     RecordExchanges = reporterName == "ndjson" || command == "call"

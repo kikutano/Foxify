@@ -19,4 +19,13 @@ internal interface IRunReporter
         WorkflowEngine engine, WorkflowDefinition workflow, IReadOnlyDictionary<string, JsonElement> environment);
 
     void WriteSummary(WorkflowSummary summary, TimeSpan elapsed);
+
+    /// <summary>The problems of every invalid workflow of a suite: nothing was run.</summary>
+    void WriteSuiteLoadErrors(string target, IReadOnlyList<LoadProblem> problems);
+
+    /// <summary>Before the first workflow of a suite (a folder or several files).</summary>
+    void WriteSuiteStart(string version, IReadOnlyList<string> files);
+
+    /// <summary>After the last workflow of a suite.</summary>
+    void WriteSuiteSummary(SuiteSummary suite, TimeSpan elapsed);
 }

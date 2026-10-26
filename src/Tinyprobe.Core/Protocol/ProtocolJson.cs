@@ -363,6 +363,46 @@ public static class ProtocolJson
         w.WriteEndObject();
     });
 
+    // --- suite events (run on a folder or several files) -----------------------
+
+    /// <summary>Before the first workflow of a suite; the events of each workflow follow, unchanged.</summary>
+    public static string SuiteStarted(string version, IReadOnlyList<string> files) => Write(false, w =>
+    {
+        w.WriteString("event", "suite_started");
+        WriteHeader(w, version);
+        w.WriteStartArray("files");
+        foreach (var file in files)
+            w.WriteStringValue(Path.GetFullPath(file));
+        w.WriteEndArray();
+    });
+
+    /// <summary>The last event of a suite.</summary>
+    public static string SuiteFinished(SuiteSummary suite, TimeSpan elapsed) => Write(false, w =>
+    {
+        w.WriteString("event", "suite_finished");
+        w.WriteBoolean("success", suite.IsSuccess);
+        w.WriteStartArray("workflows");
+        foreach (var entry in suite.Entries)
+        {
+            w.WriteStartObject();
+            w.WriteString("file", Path.GetFullPath(entry.File));
+            w.WriteBoolean("success", entry.Summary.IsSuccess);
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+
+        w.WriteStartObject("summary");
+        w.WriteNumber("total_workflows", suite.TotalWorkflows);
+        w.WriteNumber("passed_workflows", suite.PassedWorkflows);
+        w.WriteNumber("failed_workflows", suite.FailedWorkflows);
+        w.WriteNumber("total_steps", suite.TotalSteps);
+        w.WriteNumber("passed_steps", suite.PassedSteps);
+        w.WriteNumber("failed_steps", suite.FailedSteps);
+        w.WriteNumber("not_run_steps", suite.NotRunSteps);
+        w.WriteNumber("duration_ms", Milliseconds(elapsed));
+        w.WriteEndObject();
+    });
+
     // --- helpers ---------------------------------------------------------------
 
     private static void WriteHeader(Utf8JsonWriter w, string version)

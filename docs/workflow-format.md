@@ -24,6 +24,7 @@ docs/example/
 
 ```bash
 tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml
+tinyprobe run docs/example/workflows -e docs/environment.yaml      # every workflow, one summary
 ```
 
 ## API file
@@ -295,6 +296,5 @@ The whole workflow, imports included, is checked before the first request. Every
 ## Not supported yet
 
 - Namespaced imports (`call: server.login`) — duplicate names are an error for now.
-- Running a whole folder (`tinyprobe run docs/example/workflows/`).
 - Repeating a step over a list of arguments (`for_each`).
 - Reusable step sequences (e.g. a shared "log in" block).
