@@ -62,7 +62,7 @@ The adoption hook: a Postman user gives their collection to their agent and gets
 Make tinyprobe a tool that agents use directly, not only a format they write.
 
 - [x] **M2-1** `cli` `tinyprobe mcp`: an MCP server over stdio with the tools `guide`, `inspect`, `call` and `run`, returning the protocol JSON. Native AOT-safe. Spec: [0005](docs/specs/0005-mcp-server.md) PR #18.
-- [ ] **M2-2** `guide` Ready-made agent packages: a Claude Code skill, Cursor rules, Copilot instructions and `llms.txt`, each a thin wrapper around `tinyprobe guide`.
+- [x] **M2-2** `guide` Ready-made agent packages: a Claude Code skill, Cursor rules, Copilot instructions and `llms.txt`, each a thin wrapper around `tinyprobe guide`. In `agents/` and `llms.txt`; the Claude Code plugin installs from this repository as a marketplace. PR #19.
 - [ ] **M2-3** `ext` Completion and hover in tinyprobe files: keys, endpoint names after `call:`, params in `with`, from `inspect --json`. *Spec needed if the protocol needs new data.*
 - [ ] **M2-4** `ext` "tinyprobe: Generate from code": uses the VS Code Language Model API, so it runs on the model the user already has (Copilot or another provider), with the guide as instructions and `inspect` / `run` to check the result.
 - [~] **M2-5** `ext` Register the tinyprobe MCP server with VS Code (`vscode.lm.registerMcpServerDefinitionProvider`), so Copilot and other chat agents in the editor get the tools without configuration. Needs M2-1. tinyprobe-vscode PR #3.

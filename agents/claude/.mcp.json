@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tinyprobe": {
+      "command": "tinyprobe",
+      "args": ["mcp"]
+    }
+  }
+}

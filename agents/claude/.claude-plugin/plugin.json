@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "tinyprobe",
+  "version": "0.13.0",
+  "description": "API tests in YAML with tinyprobe: a skill that sends Claude to the guide of the installed binary, and the tinyprobe MCP server (guide, inspect, call, run).",
+  "author": {
+    "name": "kikutano"
+  },
+  "homepage": "https://github.com/kikutano/tinyprobe",
+  "repository": "https://github.com/kikutano/tinyprobe",
+  "license": "MIT",
+  "keywords": [
+    "api",
+    "api testing",
+    "http",
+    "yaml",
+    "postman",
+    "openapi",
+    "mcp"
+  ]
+}
