@@ -1,6 +1,8 @@
 name: Read posts and users
 description: The basics. Call endpoints, check the responses, save values for the next steps.
 
+# The endpoints are declared once in the API file and called here by name, like functions.
+# 03-checks and 04-reuse call the same endpoints with other arguments.
 import: [../api/jsonplaceholder.yaml]
 
 steps:

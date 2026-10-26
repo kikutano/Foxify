@@ -1,0 +1,49 @@
+name: Another user, the same endpoints
+description: The endpoints of 01-read, called again with other arguments and in another order. Declare once, reuse everywhere.
+
+import: [../api/jsonplaceholder.yaml]
+
+steps:
+  - name: Read a user
+    call: get_user                  # the same endpoint as in 01-read, with another id
+    with:
+      id: 2
+    expect:
+      body:
+        $.name: Ervin Howell
+
+  - name: Their open todos
+    call: list_todos
+    with:
+      userId: 2                     # both query parameters this time
+      completed: false
+    expect:
+      body:
+        $[0].userId: 2
+        $[0].completed: false
+
+  - name: Their posts
+    call: list_posts
+    with:
+      userId: 2
+    expect:
+      body:
+        $[0].userId: 2
+    save:
+      postId: $[0].id               # the first post of this user
+
+  - name: Read that post
+    call: get_post
+    with:
+      id: ${postId}
+    expect:
+      body:
+        $.userId: 2
+
+  - name: Its comments
+    call: list_comments
+    with:
+      postId: ${postId}
+    expect:
+      body:
+        $[0].postId: ${postId}      # a saved value works in checks too

@@ -10,10 +10,13 @@ example/
 └── workflows/
     ├── 01-read.yaml          the basics: call, check, save a value for the next step
     ├── 02-write.yaml         POST, PUT, PATCH and DELETE with a body, a generated value
-    └── 03-checks.yaml        operators, OR conditions, headers, response time, polling
+    ├── 03-checks.yaml        operators, OR conditions, headers, response time, polling
+    └── 04-reuse.yaml         the endpoints of 01-read again, for another user
 ```
 
 Read them in order: each file is short and commented.
+
+The endpoints are declared once, in `api/jsonplaceholder.yaml`, and every workflow imports that file and calls them by name, with its own arguments: `get_post` is called by three workflows, `get_user` by three. The API file only describes requests; what runs, what is checked and what is saved for the next step is always in a workflow.
 
 ## Run it from the terminal
 
