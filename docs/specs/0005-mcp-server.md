@@ -141,6 +141,10 @@ No change needed. Later, a separate task: the extension registers the server wit
 - [ ] Tried by hand with Claude Code against the test server: the agent finds the tools and converts the Postman bench using them.
 - [ ] `scripts/dev.sh check` passes.
 
+## Tried
+
+2026-10-26, Claude Code (Sonnet) on the Postman bench (`docs/example/postman/`), with only the MCP tools for tinyprobe (`Bash(tinyprobe:*)` denied): the agent read `guide`, wrote the files, and used `run` 3 times. 18 of 18 translatable requests converted in 3 passing workflows, the 2 untranslatable requests skipped and reported in `MIGRATION.md`, no secret in a committed file. One invalid file came back as a tool error with its problems and was fixed at the next call. 25 turns, $0.50.
+
 ## Decisions
 
 Approved on 2026-10-26 with the recommendations:
