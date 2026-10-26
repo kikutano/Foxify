@@ -8,6 +8,7 @@ Programs (a local UI, an editor plugin, a CI dashboard) drive tinyprobe through 
 | `tinyprobe run <workflow.yaml> --reporter ndjson` | one JSON event per line, as the run goes |
 | `tinyprobe run <folder or files>... --reporter ndjson` | the same events for each workflow, between `suite_started` and `suite_finished` |
 | `tinyprobe call <file.yaml> <endpoint> --reporter ndjson` | the same events, for a single request |
+| `tinyprobe run … --junit <file>` | a JUnit XML report for CI servers, besides the output above ([JUnit report](#junit-report)) |
 | `tinyprobe schema` | the JSON Schema of tinyprobe files ([Schema](#schema)) |
 | `tinyprobe mcp` | an MCP server on standard input and output, with the tools below ([MCP](#mcp)) |
 
@@ -191,4 +192,17 @@ A UI that lets people change the variables of a workflow passes them with `--var
 - One schema for both kinds of file: a workflow has every key of an API file, plus its own.
 - `$defs` has `endpoint`, `step`, `expect`, `until`, `settings`, `condition` (the operators), `duration_condition` and `check` (conditions, or a value to compare).
 - The schema helps people type; it is not the validator. Imports, endpoint names, params, placeholders and JSONPath are checked only by `tinyprobe inspect` and `run`.
+
+## JUnit report
+
+`tinyprobe run … --junit <file>` also writes a JUnit XML report, for CI servers, when the run ends; the console output or the ndjson events don't change. It is not available for `call`.
+
+- `testsuites` has the totals: `tests`, `failures`, `errors`, `skipped`, `time` (seconds).
+- One `testsuite` per workflow: `name` (the workflow's name), `file`, the counts, `time`, `timestamp` (UTC), and the property `tinyprobe.version`.
+- One `testcase` per call step (sleeps are not tests): `name` (the step's name), `classname` (the workflow's name), `file`, `line` of the step, `time`.
+- A step whose response did not pass has a `failure`, with `type` `status`, `check` or `step` (for example a value that could not be saved). A step without a response (network error, timeout, undefined variable) has an `error` with `type` `request`. Their `message` is the first reason; their text is the request line, the status and every check with its actual value.
+- Steps after a failing one have `skipped` with the message `Not run: an earlier step failed`.
+- When files are invalid (exit `2`), the report has one `testsuite` per invalid file with a single `testcase` named `load`, whose `error` (`type` `invalid`) lists every problem.
+- No headers and no bodies are written.
+- `file` and `line` on `testcase`, and `skipped` on `testsuites`, are extensions that GitLab and the GitHub test-report actions read; apart from them, the report matches the JUnit schema of the Jenkins xUnit plugin.
 

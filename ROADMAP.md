@@ -69,7 +69,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 
 ## M3 — CI
 
-- [~] **M3-1** `cli` JUnit XML report, read by every CI server. Spec: [0007](docs/specs/0007-junit-report.md) (draft).
+- [x] **M3-1** `cli` JUnit XML report, read by every CI server. Spec: [0007](docs/specs/0007-junit-report.md). PR #21.
 - [ ] **M3-2** `cli` An official GitHub Action: installs a pinned `tinyprobe` and runs a folder of workflows, with a job summary.
 - [ ] **M3-3** `cli` A small Docker image with the static binary.
 - [ ] **M3-4** `cli` Failing steps as GitHub Actions annotations, at the step's line.

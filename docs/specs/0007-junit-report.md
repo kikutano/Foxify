@@ -1,9 +1,9 @@
 # 0007 — JUnit XML report
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M3-1
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#21](https://github.com/kikutano/tinyprobe/pull/21)
 
 ## Problem
 
@@ -91,8 +91,12 @@ None.
 - [ ] CI of this repository writes the report and uploads it as an artifact.
 - [ ] `scripts/dev.sh check` passes.
 
-## Open questions
+## Decisions
 
-1. **`--junit <file>` or `--reporter junit`?** Recommended: `--junit <file>`, an extra output. CI keeps the readable console log, and the report goes to a file, which is what CI servers read. The alternative is a third reporter on standard output, which replaces the console.
-2. **Bodies in failures?** Recommended: no, as above, for secrets. The alternative is the response body of failed steps, cut at 2 KB, which helps debugging but can leak a token from a login response.
-3. **`skipped` for steps that did not run?** Recommended: yes, so CI shows how many steps a failure hid. The alternative is to leave them out of the report.
+Approved on 2026-10-26 with the recommendations:
+
+1. `--junit <file>`, an extra output next to the console or the ndjson events.
+2. No bodies in failures, and no headers.
+3. Steps that did not run are `skipped`.
+
+Failures have a `type`: `status`, `check` or `step` (another reason, such as a value that could not be saved); errors have `request`, and invalid files `invalid`.
