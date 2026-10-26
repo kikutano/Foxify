@@ -1,9 +1,9 @@
 # 0002 — Migrating from Postman, in the guide for agents
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M1-1 (Postman mapping); proposed together with M1-3 (what cannot be translated) and M1-4 (large collections); measured with M1-6 (benchmark)
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#14](https://github.com/kikutano/tinyprobe/pull/14)
 
 ## Problem
 

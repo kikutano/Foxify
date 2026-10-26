@@ -16,6 +16,8 @@
 
 **Tired of paying for Postman?** Try tinyprobe: fast, light, and your favorite AI writes the endpoints and the end-to-end tests of your API, then runs them against your environment. Describe test flows in YAML files and make sure your API never breaks again.
 
+**Moving from Postman?** Your coding agent converts the collection and tells you what it could not convert: [one prompt](#from-a-postman-collection).
+
 tinyprobe is API testing from the command line. Describe your endpoints once in YAML, then write workflows that call them like functions, pass arguments and check the responses. tinyprobe is a single Native AOT binary: no runtime to install, and it starts instantly.
 
 <p align="center">
@@ -175,7 +177,13 @@ A mistake in the YAML is reported before any request is sent, with every problem
 
 ## Generate tests with a coding agent
 
-Let a coding agent (Claude Code, Cursor, Copilot, Codex, ...) read your backend and write the tinyprobe files for you. Give it [`docs/llm-guide.md`](docs/llm-guide.md): the format, the rules that are easy to get wrong, a step-by-step procedure and a complete example. Then paste a prompt like this:
+Let a coding agent (Claude Code, Cursor, Copilot, Codex, ...) write the tinyprobe files for you, from your backend's code, a Postman collection or an OpenAPI document. Give it [`docs/llm-guide.md`](docs/llm-guide.md): the format, the rules that are easy to get wrong, a step-by-step procedure and complete examples. Then paste one of the prompts below.
+
+`tinyprobe guide` prints the same guide from the installed binary, so it always matches your version, also offline. If the agent cannot open links, paste the file into the chat.
+
+The agent can check its own work: an invalid file is reported with `file:line:column` and a suggestion before any request is sent, and a failing check shows the actual value.
+
+### From the backend code
 
 ```text
 Read https://raw.githubusercontent.com/kikutano/tinyprobe/main/docs/llm-guide.md (or run `tinyprobe guide`)
@@ -184,9 +192,30 @@ file and workflows in tinyprobe/, then run them with tinyprobe until they pass. 
 tinyprobe/env.local.yaml and add it to .gitignore. Tell me which failures look like backend bugs.
 ```
 
-`tinyprobe guide` prints the same guide from the installed binary, so it always matches your version, also offline. If the agent cannot open links, paste the file into the chat.
+### From a Postman collection
 
-The agent can check its own work: an invalid file is reported with `file:line:column` and a suggestion before any request is sent, and a failing check shows the actual value.
+In Postman, export the collection (Collection v2.1) and each environment, and put the files in the repository, for example in `postman/`. Then:
+
+```text
+Read https://raw.githubusercontent.com/kikutano/tinyprobe/main/docs/llm-guide.md (or run `tinyprobe guide`)
+and follow its section on migrating from Postman: convert the collection and the environments in postman/
+to tinyprobe files in tinyprobe/, one folder at a time, and run each workflow until it passes. Put secrets
+only in tinyprobe/env.local.yaml and add it to .gitignore. Write tinyprobe/MIGRATION.md with what you
+converted, what you skipped and why, and tell me which failures look like backend bugs.
+```
+
+Variants of the same request ("Login", "Login - wrong password") become one endpoint called with different arguments, and the values your scripts saved become `save`. What has no equivalent yet (scripts that compute a signature, `pm.sendRequest`, form-data uploads, cookies) is not guessed: the agent lists it in `MIGRATION.md`, so you know what the tests do not cover. The same prompt works for the exports of Insomnia, Bruno or another API tool: name the folder and the tool.
+
+### From an OpenAPI document
+
+```text
+Read https://raw.githubusercontent.com/kikutano/tinyprobe/main/docs/llm-guide.md (or run `tinyprobe guide`)
+and follow it, starting from the OpenAPI document openapi.yaml: write one tinyprobe endpoint per operation
+and workflows that check the documented status codes and response fields, then run them against the
+local backend until they pass. Take test values from the seed data, not from the examples in the
+document. Put credentials only in tinyprobe/env.local.yaml and add it to .gitignore. Tell me where the
+backend does not do what the document says.
+```
 
 ## Usage
 
