@@ -34,6 +34,8 @@ tinyprobe/
 
 Add `tinyprobe/env.*.yaml` to `.gitignore`, except `env.example.yaml`.
 
+If `tinyprobe/` does not exist yet, run `tinyprobe init` first (`--base-url http://localhost:8080` sets `baseUrl` in the env files): it creates these folders and env files, the `.gitignore` lines, and a section in `AGENTS.md` for the next agent. It never overwrites a file.
+
 ## 3. API file
 
 ```yaml

@@ -64,6 +64,13 @@ jobs:
           ./publish/tinyprobe run docs/example -e docs/environment.yaml --reporter ndjson > suite.ndjson
           jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 4 and .[-1].event == "suite_finished" and .[-1].success' suite.ndjson
 
+      - name: End-to-end (init)
+        run: |
+          dir=$(mktemp -d)
+          ./publish/tinyprobe init "$dir"
+          ./publish/tinyprobe init "$dir" --no-color | grep -q '= tinyprobe/env.local.yaml'
+          test -d "$dir/tinyprobe/workflows" && grep -q 'tinyprobe guide' "$dir/AGENTS.md" && grep -qx '!tinyprobe/env.example.yaml' "$dir/.gitignore"
+
       - name: Test server log
         if: failure()
         run: cat server.log || true

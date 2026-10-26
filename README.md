@@ -181,6 +181,8 @@ Let a coding agent (Claude Code, Cursor, Copilot, Codex, ...) write the tinyprob
 
 `tinyprobe guide` prints the same guide from the installed binary, so it always matches your version, also offline. If the agent cannot open links, paste the file into the chat.
 
+Start with `tinyprobe init` at the root of your repository. It creates the `tinyprobe/` folder of the guide (`api/`, `workflows/`, the env files), adds the env files with credentials to `.gitignore`, and adds a section to `AGENTS.md` that tells every coding agent to run `tinyprobe guide` before touching the tests. It never overwrites a file.
+
 The agent can check its own work: an invalid file is reported with `file:line:column` and a suggestion before any request is sent, and a failing check shows the actual value.
 
 ### From the backend code
@@ -223,6 +225,7 @@ backend does not do what the document says.
   tinyprobe run <workflow.yaml | folder>... [options]
   tinyprobe call <file.yaml> <endpoint> [--with name=value]... [options]
   tinyprobe inspect <file.yaml> [--json]
+  tinyprobe init [folder] [--base-url <url>]
   tinyprobe update [--check] [--force]
   tinyprobe guide       Print the guide for coding agents (LLMs) that write tinyprobe files.
   tinyprobe --help
@@ -233,6 +236,8 @@ backend does not do what the document says.
 starts from zero, a failing one does not stop the others, and a summary comes last.
 'call' sends one request to an endpoint of an API or workflow file and prints the response.
 'inspect' validates a file and lists its endpoints, variables and steps.
+'init' creates the tinyprobe/ folder, the .gitignore lines and an AGENTS.md section for
+coding agents, in the current folder or the one given. It never overwrites a file.
 
 Options for 'run' and 'call':
   -e, --env <file>        Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
@@ -248,6 +253,9 @@ Values of --var and --with are typed like YAML: 42 is a number, true a boolean,
 Options for 'inspect':
   --json                  Print JSON, for tools.
   --no-color              Disable colors.
+
+Options for 'init':
+  --base-url <url>        baseUrl of the env files (default: http://localhost:8080).
 
 Options for 'update':
   --check                 Only tell whether a newer version is available.

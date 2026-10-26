@@ -114,6 +114,15 @@ e2e() {
   jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 4
     and .[-1].event == "suite_finished" and .[-1].success' "$DEV_DIR/suite.ndjson" > /dev/null
   echo "Protocol checks passed."
+
+  step "End-to-end (init)"
+  init_dir=$(mktemp -d)
+  "$DEV_BIN" init "$init_dir" --no-color > /dev/null
+  "$DEV_BIN" init "$init_dir" --no-color | grep -q '= tinyprobe/env.local.yaml'
+  test -d "$init_dir/tinyprobe/workflows" && grep -q 'tinyprobe guide' "$init_dir/AGENTS.md" \
+    && grep -qx '!tinyprobe/env.example.yaml' "$init_dir/.gitignore"
+  rm -rf "$init_dir"
+  echo "init checks passed."
 }
 
 example() {
