@@ -7,14 +7,15 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 1. **The user's AI does the import.** tinyprobe ships no AI model and no direct importers. Users give their own coding agent (Claude Code, Cursor, Copilot, Codex, ...) their Postman collections, OpenAPI documents or backend code. tinyprobe provides what makes any agent good at it: the guide (`tinyprobe guide`), validation with precise errors, and the `inspect` / `call` / `run` loop that lets the agent check its own work. See [decision 0001](docs/decisions/0001-ai-does-the-import.md).
 2. **One engine: the binary.** The extension and every other tool drive `tinyprobe` through its [JSON protocol](docs/protocol.md) and never reimplement parsing or checks.
 3. **Plain text, Git and CI first.** Endpoints, workflows and environments are YAML files that live in the user's repository and run unchanged in CI.
+4. **Endpoints declare, workflows run.** An API file only describes requests: no checks, no `save`, no state. Every value passed between requests is saved by a step of a workflow, and a single `call` remembers nothing. See [decision 0003](docs/decisions/0003-endpoints-declare-workflows-run.md).
 
 ## Where we are
 
-Released: **tinyprobe 0.10.0** and the extension **0.2.0**.
+Released: **tinyprobe 0.11.0** and the extension **0.2.2**.
 
 - Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
 - CLI: `run`, `call`, `inspect`, `update`, `guide`; console and ndjson reporters; Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
-- Extension: validation on save, ▶ Call, ▶ Run workflow, Test Explorer, run view, environment picker. Distributed as a `.vsix` from GitHub Releases only.
+- Extension: validation on save, ▶ Call, ▶ Run workflow, Test Explorer, run view, environment picker. On the VS Code Marketplace, on Open VSX (namespace claim pending) and as a `.vsix` in GitHub Releases.
 
 ## How we work
 
@@ -83,6 +84,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [ ] **M4-7** `ext` Request history: the last calls with their responses, to send again.
 - [ ] **M4-8** `ext` Environment editor: see and edit the variables of the selected environment.
 - [ ] **M4-9** `ext` Visual request editor for people who prefer forms to YAML; it writes the YAML.
+- [ ] **M4-10** `cli` `ext` Run to here: `tinyprobe run <workflow> --to <step>` runs the workflow up to that step and stops; in the extension, a ▶ Run to here on every step shows that step's response. Tries a flow one request at a time without state between single calls ([decision 0003](docs/decisions/0003-endpoints-declare-workflows-run.md)). *Spec needed.*
 
 ## Parked
 

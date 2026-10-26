@@ -9,6 +9,8 @@ Two kinds of file:
 | **API file** | endpoints with their parameters, base URL, auth header sets | any number of workflows |
 | **Workflow file** | steps that `call` endpoints `with` arguments, and what they `expect` and `save` | — |
 
+An API file is declarative: it has no checks and no `save`, and `tinyprobe call` of one endpoint remembers nothing for the next call. Everything that runs and every value passed from one request to the next is in a workflow ([decision 0003](decisions/0003-endpoints-declare-workflows-run.md)).
+
 ```text
 docs/example/
 ├── api/

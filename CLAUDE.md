@@ -46,7 +46,7 @@ YAML ──► Parsing/WorkflowLoader ──► Definitions (immutable model) �
 
 - `ROADMAP.md` is the single plan for this repository **and** tinyprobe-vscode: start every session there. Tasks have ids (`M1-7`) and areas (`cli`, `guide`, `ext`, `repo`).
 - A task that changes the YAML format, the CLI surface or the protocol needs an *Approved* spec in `docs/specs/` before code: `/spec` writes it, `/add-feature` implements it.
-- `docs/decisions/` records choices that constrain the work. Read them before proposing something they rule out: [0001](docs/decisions/0001-ai-does-the-import.md) means no direct importers and no AI model inside tinyprobe.
+- `docs/decisions/` records choices that constrain the work. Read them before proposing something they rule out: [0001](docs/decisions/0001-ai-does-the-import.md) means no direct importers and no AI model inside tinyprobe; [0003](docs/decisions/0003-endpoints-declare-workflows-run.md) means API files stay declarative (no `save`, no checks) and single calls keep no state.
 - Promotion plans are private and are not kept in this repository.
 
 ## Adding a feature (checklist)

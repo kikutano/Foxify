@@ -6,12 +6,12 @@ You are going to write API tests for a backend with **tinyprobe**, a command-lin
 
 ## 1. How tinyprobe works
 
-- **API files** declare the backend's endpoints once: method, path, query, headers, auth, body and parameters. No expectations.
-- **Workflow files** `import` API files and run **steps** in order. A step `call`s an endpoint `with` arguments, checks the response with `expect` and stores values with `save` for the next steps.
+- **API files** declare the backend's endpoints once: method, path, query, headers, auth, body and parameters. No expectations and no `save`: an API file describes requests and never runs or stores anything.
+- **Workflow files** `import` API files and run **steps** in order. A step `call`s an endpoint `with` arguments, checks the response with `expect` and stores values with `save` for the next steps. Every value that moves from one request to the next comes from a `save` in the same workflow.
 - **Environment files** hold per-environment values (base URL, credentials). Pass one with `-e`.
 - `tinyprobe run <workflow.yaml> -e <env.yaml>` validates the whole workflow and its imports, then runs it and stops at the first failing step.
 - `tinyprobe inspect <file.yaml>` validates an API or workflow file without sending anything, and lists its endpoints and steps.
-- `tinyprobe call <api.yaml> <endpoint> --with name=value -e <env.yaml>` sends one request and prints the whole response (status, headers, body), whatever the status. Use it to see the real shape of a response before writing checks.
+- `tinyprobe call <api.yaml> <endpoint> --with name=value -e <env.yaml>` sends one request and prints the whole response (status, headers, body), whatever the status. Use it to see the real shape of a response before writing checks. It remembers nothing: a token for a protected endpoint is passed with `--with` or `--var`.
 
 Exit codes: `0` all steps passed, `1` a step failed, `2` invalid workflow or arguments (nothing was sent).
 
