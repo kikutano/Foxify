@@ -276,6 +276,17 @@ expect:
       ✗ $.username in ["Bret","Antonette"]  actual "Samantha"
 ```
 
+## Editor support
+
+The [tinyprobe extension](https://github.com/kikutano/tinyprobe-vscode) for VS Code completes keys, endpoint names and params, and shows descriptions on hover. In other editors with the YAML language server (VS Code with the YAML extension, JetBrains IDEs, Neovim, Zed), the JSON Schema of the format (`tinyprobe schema`) gives completion and descriptions of the keys; point a file to it with a first line:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kikutano/tinyprobe/main/docs/schema/tinyprobe.schema.json
+name: Users
+steps:
+  - sleep: 1s
+```
+
 ## Validation before running
 
 The whole workflow, imports included, is checked before the first request. Every problem is reported at once, as `file:line:column: message`:

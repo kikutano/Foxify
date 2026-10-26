@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/kikutano/tinyprobe/main/docs/schema/tinyprobe.schema.json",
+  "title": "tinyprobe file",
+  "description": "A tinyprobe API file (endpoints) or workflow (steps). Validate with `tinyprobe inspect`; the format is in `tinyprobe guide`.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "Name of the workflow, shown in the report. Default: the file name.",
+      "type": "string"
+    },
+    "description": {
+      "description": "What the workflow tests, shown in the report.",
+      "type": "string"
+    },
+    "import": {
+      "description": "API files whose endpoints the steps can call, relative to this file: one path or a list.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "variables": {
+      "description": "Default variables of the workflow, `name: value`. Each is resolved once per run and may use the environment, other variables and generated values (`${$uuid}`). The environment file overrides them.",
+      "type": "object"
+    },
+    "settings": {
+      "description": "`timeout` (seconds per request) and `max_retries` (retries on network errors and timeouts).",
+      "$ref": "#/$defs/settings"
+    },
+    "steps": {
+      "description": "The steps, run in order. A step `call`s an endpoint or `sleep`s; the workflow stops at the first failing step.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "base_url": {
+      "description": "Prepended to every `path` of this file, usually `${baseUrl}` from the environment file.",
+      "type": "string"
+    },
+    "headers": {
+      "description": "Headers sent by every endpoint of this file, `Name: value`.",
+      "$ref": "#/$defs/headers"
+    },
+    "auth": {
+      "description": "Named sets of headers, such as `bearer: { Authorization: \"Bearer ${token}\" }`. An endpoint picks them with `auth:`.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/headers"
+      }
+    },
+    "endpoints": {
+      "description": "The endpoints, by name. Steps call them like functions: `call: <name>`, with arguments in `with`.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/endpoint"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "endpoint": {
+      "description": "An endpoint: what to send.",
+      "type": "object",
+      "properties": {
+        "method": {
+          "description": "HTTP method. Default: GET.",
+          "type": "string",
+          "pattern": "^[A-Za-z]+$",
+          "examples": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS"
+          ]
+        },
+        "path": {
+          "description": "Path, after the file's `base_url`; may contain placeholders, such as `/users/${id}`.",
+          "type": "string"
+        },
+        "query": {
+          "description": "Names of the query parameters. Each one is sent only when the step passes it in `with`.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "headers": {
+          "description": "Headers of this endpoint, `Name: value`, after the file's headers and auth sets.",
+          "$ref": "#/$defs/headers"
+        },
+        "auth": {
+          "description": "The auth set to send, or a list of them (`[bearer, apikey]`).",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "body": {
+          "description": "The request body: a YAML value sent as JSON, a string sent as is, or a single `${...}` placeholder."
+        },
+        "params": {
+          "description": "The arguments of the endpoint, `name: default`, or `name:` for a required one. Steps pass them in `with`; they never come from global variables.",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "step": {
+      "description": "A step: `call` an endpoint, or `sleep`.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Shown in the report. Default: the call and its path and query arguments.",
+          "type": "string"
+        },
+        "call": {
+          "description": "The endpoint to call, by name.",
+          "type": "string"
+        },
+        "with": {
+          "description": "Arguments of the endpoint, `name: value`. Values may use variables, such as `id: ${userId}`.",
+          "type": "object"
+        },
+        "expect": {
+          "description": "What the response must be: `status`, `headers`, `body` (by JSONPath) and `duration`. Without `status`, any 2xx passes.",
+          "$ref": "#/$defs/expect"
+        },
+        "until": {
+          "description": "Polling: repeat the call until these conditions pass, every `every`, at most `timeout`. Then `expect` is checked on the last response.",
+          "$ref": "#/$defs/until"
+        },
+        "save": {
+          "description": "Values of the response for the next steps, `variable: <JSONPath>`, saved after every check passed.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "sleep": {
+          "description": "A step of its own that waits, such as `500ms` or `2s`.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "call"
+          ]
+        },
+        {
+          "required": [
+            "sleep"
+          ]
+        }
+      ]
+    },
+    "expect": {
+      "description": "What the response must be.",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Expected status code, or a list of accepted ones (`[200, 204]`).",
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "headers": {
+          "description": "Checks on response headers, by name (case-insensitive): a value, or conditions such as `{ exists: true }`.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/check"
+          }
+        },
+        "body": {
+          "description": "Checks on the JSON body, by JSONPath (`$.id`, `$.items[0].name`): a value, or conditions such as `{ gt: 0 }`.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/check"
+          }
+        },
+        "duration": {
+          "description": "Check on the response time, such as `{ lt: 500ms }`.",
+          "$ref": "#/$defs/duration_condition"
+        }
+      },
+      "additionalProperties": false
+    },
+    "until": {
+      "description": "Polling conditions.",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Wait until the status is this code, or one of a list. Without it, any status is accepted while waiting.",
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        "headers": {
+          "description": "Wait until these header checks pass.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/check"
+          }
+        },
+        "body": {
+          "description": "Wait until these body checks pass, by JSONPath. Stop on every final state, then check the expected one in `expect`.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/check"
+          }
+        },
+        "every": {
+          "description": "Time between attempts. Default: 1s.",
+          "type": "string"
+        },
+        "timeout": {
+          "description": "Give up after this time. Default: 30s.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "settings": {
+      "description": "Settings of the workflow.",
+      "type": "object",
+      "properties": {
+        "timeout": {
+          "description": "Seconds per request. Default: 30.",
+          "type": "number"
+        },
+        "max_retries": {
+          "description": "Retries on network errors and timeouts. HTTP error statuses are never retried. Default: 0.",
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "condition": {
+      "description": "Conditions on a value; all must pass.",
+      "type": "object",
+      "properties": {
+        "eq": {
+          "description": "Equal to this value."
+        },
+        "ne": {
+          "description": "Not equal to this value."
+        },
+        "gt": {
+          "description": "Greater than this number, or this duration in `expect.duration`."
+        },
+        "gte": {
+          "description": "Greater than or equal to."
+        },
+        "lt": {
+          "description": "Less than this number, or this duration in `expect.duration`."
+        },
+        "lte": {
+          "description": "Less than or equal to."
+        },
+        "exists": {
+          "description": "`true`: the value is present; `false`: it is not.",
+          "type": "boolean"
+        },
+        "contains": {
+          "description": "A string contains this text, or a list contains this item."
+        },
+        "in": {
+          "description": "One of these values (OR).",
+          "type": "array"
+        },
+        "any": {
+          "description": "One of these conditions passes (OR), such as `[{ lt: 0 }, { gt: 100 }]`.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/check"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "duration_condition": {
+      "description": "Conditions on the response time, with durations such as `500ms`.",
+      "type": "object",
+      "properties": {
+        "gt": {
+          "description": "Greater than this number, or this duration in `expect.duration`."
+        },
+        "gte": {
+          "description": "Greater than or equal to."
+        },
+        "lt": {
+          "description": "Less than this number, or this duration in `expect.duration`."
+        },
+        "lte": {
+          "description": "Less than or equal to."
+        }
+      },
+      "additionalProperties": false
+    },
+    "check": {
+      "description": "A value (equal to it), or conditions such as `{ gt: 0, lt: 10 }`.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/condition"
+        },
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null",
+            "array"
+          ]
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "eq",
+                "ne",
+                "gt",
+                "gte",
+                "lt",
+                "lte",
+                "exists",
+                "contains",
+                "in",
+                "any"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "headers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
+    }
+  }
+}

@@ -251,6 +251,7 @@ backend does not do what the document says.
   tinyprobe update [--check] [--force]
   tinyprobe guide       Print the guide for coding agents (LLMs) that write tinyprobe files.
   tinyprobe mcp         MCP server on stdin/stdout: the tools guide, inspect, call and run, for agents.
+  tinyprobe schema      Print the JSON Schema of tinyprobe files, for editors.
   tinyprobe --help
   tinyprobe --version
 

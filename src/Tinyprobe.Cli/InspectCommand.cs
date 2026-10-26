@@ -19,7 +19,7 @@ internal static class InspectCommand
         catch (WorkflowLoadException ex)
         {
             if (json)
-                Console.WriteLine(ProtocolJson.Invalid(version, path, ex.Problems));
+                Console.WriteLine(ProtocolJson.Invalid(version, path, ex.Problems, endpoints: ex.Endpoints));
             else
                 ConsoleReporter.WriteLoadErrors(console, ex.Errors, "file");
             return 2;

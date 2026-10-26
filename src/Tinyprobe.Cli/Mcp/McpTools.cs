@@ -49,7 +49,7 @@ internal sealed class McpTools(string version, Func<HttpMessageHandler> createHa
         }
         catch (WorkflowLoadException ex)
         {
-            return (ProtocolJson.Invalid(version, file, ex.Problems, indented: false), true);
+            return (ProtocolJson.Invalid(version, file, ex.Problems, indented: false, endpoints: ex.Endpoints), true);
         }
     }
 

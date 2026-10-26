@@ -8,6 +8,7 @@ Programs (a local UI, an editor plugin, a CI dashboard) drive tinyprobe through 
 | `tinyprobe run <workflow.yaml> --reporter ndjson` | one JSON event per line, as the run goes |
 | `tinyprobe run <folder or files>... --reporter ndjson` | the same events for each workflow, between `suite_started` and `suite_finished` |
 | `tinyprobe call <file.yaml> <endpoint> --reporter ndjson` | the same events, for a single request |
+| `tinyprobe schema` | the JSON Schema of tinyprobe files ([Schema](#schema)) |
 | `tinyprobe mcp` | an MCP server on standard input and output, with the tools below ([MCP](#mcp)) |
 
 ## Rules
@@ -99,6 +100,8 @@ An invalid file gives exit code `2` and:
 }
 ```
 
+When the file is a workflow whose imports all loaded, the invalid JSON also has `endpoints`, with the same shape as in a valid inspection: the endpoints of the imports and of the workflow itself. Editors use them to complete endpoint names and params while the workflow is still being written. When an import is missing or invalid, `endpoints` is left out.
+
 ## `--reporter ndjson`
 
 One JSON object per line on standard output, written and flushed as soon as it happens. Every event has an `event` key. With `-v` the request log goes to standard error, so standard output stays valid NDJSON.
@@ -180,4 +183,12 @@ A UI that lets people change the variables of a workflow passes them with `--var
 - **Tool errors** (`isError: true`): an invalid file gives the JSON of an invalid `inspect` (problems of the arguments have the file `command line`); a wrong argument gives one sentence, such as `File not found: tinyprobe/api/backend.yml`. A failing step is not a tool error: the result has `success: false`.
 - **JSON-RPC errors**: `-32700` for a message that is not JSON, `-32600` for an invalid request, `-32601` for an unknown method, `-32602` for an unknown tool.
 - `guide` and `inspect` have `readOnlyHint: true`; `call` and `run` have `openWorldHint: true`, because they send requests to the backend.
+
+## Schema
+
+`tinyprobe schema` prints a [JSON Schema](https://json-schema.org) (draft 2020-12) of API files and workflows: the keys of every section, with a description each, their types, and the check operators. It is built from the keys the loader accepts, and the same text is in the repository as [`docs/schema/tinyprobe.schema.json`](schema/tinyprobe.schema.json) and in every release as an asset.
+
+- One schema for both kinds of file: a workflow has every key of an API file, plus its own.
+- `$defs` has `endpoint`, `step`, `expect`, `until`, `settings`, `condition` (the operators), `duration_condition` and `check` (conditions, or a value to compare).
+- The schema helps people type; it is not the validator. Imports, endpoint names, params, placeholders and JSONPath are checked only by `tinyprobe inspect` and `run`.
 

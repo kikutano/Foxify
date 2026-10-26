@@ -115,6 +115,10 @@ e2e() {
     and .[-1].event == "suite_finished" and .[-1].success' "$DEV_DIR/suite.ndjson" > /dev/null
   echo "Protocol checks passed."
 
+  step "End-to-end (schema)"
+  "$DEV_BIN" schema | jq -e '."$defs".step.properties.call and (.properties.steps.items."$ref" == "#/$defs/step")' > /dev/null
+  echo "Schema checks passed."
+
   step "End-to-end (mcp)"
   printf '%s\n' \
     '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}' \
