@@ -19,7 +19,7 @@ The console output (or `--reporter ndjson`) is unchanged; the report is written 
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
-<testsuites name="tinyprobe" tests="9" failures="1" errors="0" skipped="7" time="1.43">
+<testsuites name="tinyprobe" tests="5" failures="1" errors="0" skipped="1" time="1.43">
   <testsuite name="Authentication" file="tinyprobe/workflows/auth.yaml" tests="2" failures="0" errors="0" skipped="0" time="0.41" timestamp="2026-10-27T09:12:03Z">
     <properties>
       <property name="tinyprobe.version" value="0.15.0" />
@@ -27,7 +27,7 @@ The console output (or `--reporter ndjson`) is unchanged; the report is written 
     <testcase name="Login" classname="Authentication" file="tinyprobe/workflows/auth.yaml" line="7" time="0.012" />
     <testcase name="Wrong password" classname="Authentication" file="tinyprobe/workflows/auth.yaml" line="15" time="0.009" />
   </testsuite>
-  <testsuite name="Users" file="tinyprobe/workflows/users.yaml" tests="9" failures="1" errors="0" skipped="7" time="1.02" timestamp="2026-10-27T09:12:04Z">
+  <testsuite name="Users" file="tinyprobe/workflows/users.yaml" tests="3" failures="1" errors="0" skipped="1" time="1.02" timestamp="2026-10-27T09:12:04Z">
     <testcase name="List users" classname="Users" file="tinyprobe/workflows/users.yaml" line="9" time="0.020" />
     <testcase name="Create a user" classname="Users" file="tinyprobe/workflows/users.yaml" line="21" time="0.031">
       <failure message="Expected status 201, got 500" type="status">POST http://localhost:8080/api/users -> 500
