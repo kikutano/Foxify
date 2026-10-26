@@ -20,7 +20,7 @@ Released: **tinyprobe 0.12.0** and the extension **0.3.0**. M1 is done.
 ## How we work
 
 - **Status:** `[ ]` todo · `[~]` in progress · `[x]` done · `[-]` dropped (reason in the task) · `[?]` needs a decision.
-- **Areas:** `cli` this repository's code · `guide` `docs/llm-guide.md` and other docs for agents · `ext` tinyprobe-vscode · `repo` project housekeeping.
+- **Areas:** `cli` this repository's code · `guide` `docs/llm-guide.md` and other docs for agents · `ext` tinyprobe-vscode · `client` the standalone client (M5) · `repo` project housekeeping.
 - **Specs before code** for every task that changes the YAML format, the CLI surface (commands, options, output) or the protocol. Use `/spec`: it writes `docs/specs/NNNN-name.md` from the [template](docs/specs/0000-template.md). Code starts when the spec is *Approved*; then `/add-feature`. Other tasks need no spec.
 - **Decisions** that constrain future work go in `docs/decisions/` as short records: context, decision, consequences.
 - **Done** means the acceptance criteria are met and `scripts/dev.sh check` passes in every repository touched. The task is marked `[x]` in the same PR, with a link to the PR.
@@ -85,6 +85,13 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [ ] **M4-8** `ext` Environment editor: see and edit the variables of the selected environment.
 - [ ] **M4-9** `ext` Visual request editor for people who prefer forms to YAML; it writes the YAML.
 - [ ] **M4-10** `cli` `ext` Run to here: `tinyprobe run <workflow> --to <step>` runs the workflow up to that step and stops; in the extension, a ▶ Run to here on every step shows that step's response. Tries a flow one request at a time without state between single calls ([decision 0003](docs/decisions/0003-endpoints-declare-workflows-run.md)). *Spec needed.*
+
+## M5 — A client outside the editor
+
+A Postman-like app for people who don't work in VS Code, as light as the binary: no account, no cloud, the files of the repository.
+
+- [ ] **M5-1** `client` A standalone client in plain JavaScript on Node, with **no dependencies**: `node` serves a small local web UI and opens it in the browser. It lists the API files and workflows of a folder, calls an endpoint from a form (params, query, body), runs workflows with live results, and picks the environment. Like the extension, it has no engine of its own: it runs the `tinyprobe` binary and reads its [JSON protocol](docs/protocol.md), and it reuses the run view of the extension (`media/run-view.js`, which already renders ndjson events in any browser). *Spec needed:* where it lives (a third repository or a folder), how it is installed (`npx`, a single file), and what it shows first.
+- [ ] **M5-2** `client` Request history and an environment editor in the client, shared with the extension tasks M4-7 and M4-8 where the code can be the same.
 
 ## Parked
 
