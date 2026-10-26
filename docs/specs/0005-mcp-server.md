@@ -1,6 +1,6 @@
 # 0005 — `tinyprobe mcp`: tinyprobe as tools for agents
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M2-1
 - **Repositories:** tinyprobe
 - **PRs:** [#18](https://github.com/kikutano/tinyprobe/pull/18)
