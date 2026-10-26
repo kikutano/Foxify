@@ -1,6 +1,6 @@
 # 0007 — JUnit XML report
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M3-1
 - **Repositories:** tinyprobe
 - **PRs:** [#21](https://github.com/kikutano/tinyprobe/pull/21)
