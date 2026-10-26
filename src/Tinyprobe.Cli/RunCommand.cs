@@ -1,0 +1,65 @@
+using System.Diagnostics;
+using System.Text.Json;
+using Tinyprobe.Core.Definitions;
+using Tinyprobe.Core.Execution;
+using Tinyprobe.Core.Parsing;
+using Tinyprobe.Core.Reporting;
+
+namespace Tinyprobe.Cli;
+
+/// <summary><c>tinyprobe run</c> on a folder or several files: every workflow, then one summary.</summary>
+internal static class RunCommand
+{
+    /// <param name="target">The first path of the command line, named by the <c>invalid</c> event.</param>
+    /// <param name="createHandler">A new HTTP handler for each workflow.</param>
+    public static async Task<int> RunSuiteAsync(
+        IRunReporter reporter, string version, string target, IReadOnlyList<string> files,
+        string? envPath, IReadOnlyDictionary<string, JsonElement> environment,
+        TextWriter log, bool recordExchanges, Func<HttpMessageHandler> createHandler)
+    {
+        // Everything is validated before the first request, as for one workflow: a typo in the last
+        // file must not show up after the first files have already changed the backend's data.
+        var workflows = new List<(string File, WorkflowDefinition Workflow)>();
+        var problems = new List<LoadProblem>();
+        foreach (var file in files)
+        {
+            try
+            {
+                workflows.Add((file, WorkflowLoader.Load(file)));
+            }
+            catch (WorkflowLoadException ex)
+            {
+                problems.AddRange(ex.Problems);
+            }
+        }
+
+        if (problems.Count > 0)
+        {
+            reporter.WriteSuiteLoadErrors(target, problems);
+            return 2;
+        }
+
+        reporter.WriteSuiteStart(version, files);
+        var suiteStopwatch = Stopwatch.StartNew();
+        var entries = new List<SuiteEntry>();
+
+        foreach (var (file, workflow) in workflows)
+        {
+            // A new client and handler per workflow: each one starts from zero, cookies and connections
+            // included (decision 0003), and gets its own timeout setting.
+            using var httpClient = new HttpClient(createHandler()) { Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout) };
+            var engine = new WorkflowEngine(httpClient, log) { RecordExchanges = recordExchanges };
+
+            reporter.WriteHeader(version, file, envPath, workflow, environment);
+            var stopwatch = Stopwatch.StartNew();
+            var report = await reporter.RunAsync(engine, workflow, environment);
+            var entry = SuiteEntry.Create(file, workflow, report, stopwatch.Elapsed);
+            reporter.WriteSummary(entry.Summary, stopwatch.Elapsed);
+            entries.Add(entry);
+        }
+
+        var suite = new SuiteSummary(entries);
+        reporter.WriteSuiteSummary(suite, suiteStopwatch.Elapsed);
+        return suite.IsSuccess ? 0 : 1;
+    }
+}

@@ -10,7 +10,7 @@ namespace Tinyprobe.Cli;
 
 /// <summary>
 /// <c>--reporter ndjson</c>: one JSON event per line (run_started, step_started, step_completed,
-/// run_finished, or invalid), written as soon as it happens so a tool can follow the run live.
+/// run_finished, or invalid; suite_started and suite_finished around several workflows), written as soon as it happens so a tool can follow the run live.
 /// </summary>
 internal sealed class NdjsonReporter(TextWriter output, string version) : IRunReporter
 {
@@ -31,6 +31,15 @@ internal sealed class NdjsonReporter(TextWriter output, string version) : IRunRe
 
     public void WriteSummary(WorkflowSummary summary, TimeSpan elapsed) =>
         Emit(ProtocolJson.RunFinished(summary, elapsed));
+
+    public void WriteSuiteLoadErrors(string target, IReadOnlyList<LoadProblem> problems) =>
+        WriteLoadErrors(target, problems);
+
+    public void WriteSuiteStart(string version, IReadOnlyList<string> files) =>
+        Emit(ProtocolJson.SuiteStarted(version, files));
+
+    public void WriteSuiteSummary(SuiteSummary suite, TimeSpan elapsed) =>
+        Emit(ProtocolJson.SuiteFinished(suite, elapsed));
 
     private void Emit(string line)
     {

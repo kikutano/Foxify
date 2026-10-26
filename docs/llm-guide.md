@@ -10,6 +10,7 @@ You are going to write API tests for a backend with **tinyprobe**, a command-lin
 - **Workflow files** `import` API files and run **steps** in order. A step `call`s an endpoint `with` arguments, checks the response with `expect` and stores values with `save` for the next steps. Every value that moves from one request to the next comes from a `save` in the same workflow.
 - **Environment files** hold per-environment values (base URL, credentials). Pass one with `-e`.
 - `tinyprobe run <workflow.yaml> -e <env.yaml>` validates the whole workflow and its imports, then runs it and stops at the first failing step.
+- `tinyprobe run <folder> -e <env.yaml>` runs every workflow of the folder and its subfolders (API and env files are skipped), each from zero, also after a failing one, and ends with a summary. It validates every file before the first request. Exit `0` means every workflow passed.
 - `tinyprobe inspect <file.yaml>` validates an API or workflow file without sending anything, and lists its endpoints and steps.
 - `tinyprobe call <api.yaml> <endpoint> --with name=value -e <env.yaml>` sends one request and prints the whole response (status, headers, body), whatever the status. Use it to see the real shape of a response before writing checks. It remembers nothing: a token for a protected endpoint is passed with `--with` or `--var`.
 
@@ -264,7 +265,7 @@ Follow these steps in order. If the user gives you a Postman collection or the e
    - asynchronous results (status set by a job, a webhook, a queue): poll them with `until` (section 6b);
    - for each resource: **list and read** (including filters and pagination), **create** with valid data, **validation errors** (`400`/`422`, check the error field), **not found** (`404`), and the **full lifecycle** of a resource the workflow creates itself: create, save its id, read, update, delete, verify it is gone.
 6. **Write `env.example.yaml`**, and `env.local.yaml` with the local values if you know them.
-7. **Run every workflow**: `tinyprobe run tinyprobe/workflows/<name>.yaml -e tinyprobe/env.local.yaml`. The backend must be running locally; start it if you can, otherwise ask the user to.
+7. **Run the workflows**: one with `tinyprobe run tinyprobe/workflows/<name>.yaml -e tinyprobe/env.local.yaml` while you write it, then all of them with `tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml`. You are done when the whole folder exits `0`, or the remaining failures are backend bugs you report. The backend must be running locally; start it if you can, otherwise ask the user to.
    - Exit `2`: the YAML is invalid. Every problem is listed as `file:line:column: message`, with suggestions. Fix them and run again.
    - Exit `1`: a check failed. The report shows each check with its actual value. Decide whether **your test** is wrong (fix it) or **the backend** does not do what its code or documentation says (keep the test and report it to the user). Never weaken a check only to make it pass.
 8. **Report to the user**: the files you created, what each workflow covers, the endpoints you did not cover and why, and any failure that looks like a backend bug.
@@ -524,8 +525,8 @@ password: change-me
 Run:
 
 ```bash
-tinyprobe run tinyprobe/workflows/auth.yaml -e tinyprobe/env.local.yaml
-tinyprobe run tinyprobe/workflows/notes.yaml -e tinyprobe/env.local.yaml
+tinyprobe run tinyprobe/workflows/notes.yaml -e tinyprobe/env.local.yaml   # one workflow
+tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml              # all of them, with a summary
 ```
 
 A failing check looks like this; fix the test or report the backend behavior:
@@ -553,7 +554,7 @@ Follow this section when the user gives you exports of another API tool (a Postm
 3. **API file.** Group endpoints by resource, not by folder. Requests that differ only in their values (a wrong password, a missing field, another token) are **one endpoint**: declare its inputs as `params`, and each Postman request becomes a step with its own `with`.
 4. **Workflows.** One workflow per folder that tests a flow, with the steps in the folder's order. Each workflow logs in itself (section 9), even when Postman relied on an earlier folder to set the token.
 5. **One folder at a time.** For each folder: write its endpoints and its workflow, `tinyprobe inspect` them, `tinyprobe run` the workflow until it passes, and update `MIGRATION.md`. Then move to the next folder. Never convert everything first and validate at the end.
-6. **Coverage report.** Finish `MIGRATION.md` (section 12.4) and tell the user the totals: requests converted, requests skipped, checks dropped, failures that look like backend bugs.
+6. **Coverage report.** Run the whole folder once more (`tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml`), finish `MIGRATION.md` (section 12.4) and tell the user the totals: requests converted, requests skipped, checks dropped, failures that look like backend bugs.
 
 ### 12.2 Postman to tinyprobe
 
@@ -985,7 +986,7 @@ From a README, a script, or "Copy as cURL" in a browser.
 
 ## 13. Checklist before you finish
 
-- [ ] Every workflow runs with exit code `0` against the local backend, or the remaining failures are reported to the user as possible backend bugs.
+- [ ] `tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml` exits `0` against the local backend, or the remaining failures are reported to the user as possible backend bugs.
 - [ ] No real secret in API or workflow files; secrets are in `env.local.yaml`, which is in `.gitignore`.
 - [ ] Every endpoint name used by a step exists in an imported API file.
 - [ ] Workflows that create data delete it, and can run twice in a row.

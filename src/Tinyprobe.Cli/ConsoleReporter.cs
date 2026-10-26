@@ -24,6 +24,7 @@ internal sealed class ConsoleReporter : IRunReporter
     private readonly string _pass;
     private readonly string _fail;
     private int _nameWidth = MaxNameWidth;
+    private bool _bannerShown;
 
     /// <param name="live">Show a spinner while steps run; ignored when the output is not interactive (CI, pipes).</param>
     public ConsoleReporter(IAnsiConsole console, bool live)
@@ -41,9 +42,7 @@ internal sealed class ConsoleReporter : IRunReporter
         var steps = workflow.Steps.OfType<CallStep>().ToList();
         _nameWidth = Math.Clamp(steps.Select(s => s.Name.Length).DefaultIfEmpty(0).Max(), 4, MaxNameWidth);
 
-        _console.WriteLine();
-        _console.MarkupLine($"  [bold orange1]{(_unicode ? "⚡ " : "")}tinyprobe[/] [grey]{Escape(version)}[/]");
-        _console.WriteLine();
+        WriteBanner(version);
 
         if (ShowResponse)
             WriteHeaderRow("call", steps.Single().Call);
@@ -57,6 +56,18 @@ internal sealed class ConsoleReporter : IRunReporter
         if (!ShowResponse)
             WriteHeaderRow("steps", steps.Count.ToString(CultureInfo.InvariantCulture));
 
+        _console.WriteLine();
+    }
+
+    /// <summary>The first line of the output, once: a suite prints it before its first workflow.</summary>
+    private void WriteBanner(string version)
+    {
+        if (_bannerShown)
+            return;
+        _bannerShown = true;
+
+        _console.WriteLine();
+        _console.MarkupLine($"  [bold orange1]{(_unicode ? "⚡ " : "")}tinyprobe[/] [grey]{Escape(version)}[/]");
         _console.WriteLine();
     }
 
@@ -135,6 +146,46 @@ internal sealed class ConsoleReporter : IRunReporter
               + (summary.NotRunSteps > 0 ? $", {summary.NotRunSteps} not run" : ""));
         _console.WriteLine();
     }
+
+    public void WriteSuiteLoadErrors(string target, IReadOnlyList<LoadProblem> problems) =>
+        WriteLoadErrors(_console, problems.Select(p => p.ToString()).ToList(), "suite");
+
+    public void WriteSuiteStart(string version, IReadOnlyList<string> files) => WriteBanner(version);
+
+    /// <summary>One line per workflow, with the first failure of each failed one, then the totals.</summary>
+    public void WriteSuiteSummary(SuiteSummary suite, TimeSpan elapsed)
+    {
+        int fileWidth = suite.Entries.Max(e => e.File.Length);
+        int stepsWidth = suite.Entries.Max(e => StepsText(e).Length);
+
+        foreach (var entry in suite.Entries)
+        {
+            var passed = entry.Summary.IsSuccess;
+            var icon = passed ? $"[green]{_pass}[/]" : $"[red]{_fail}[/]";
+            var file = Escape(entry.File.PadRight(fileWidth));
+            var failure = entry.FirstFailure is null ? "" : $"   [red]{Escape(entry.FirstFailure)}[/]";
+            _console.MarkupLine(
+                $"  {icon} {(passed ? file : $"[red]{file}[/]")}   {StepsText(entry).PadRight(stepsWidth)}   " +
+                $"[grey]{FormatDuration(entry.Elapsed),8}[/]{failure}");
+        }
+
+        _console.WriteLine();
+        WriteMetric("workflows", $"{suite.PassedWorkflows}/{suite.TotalWorkflows} passed"
+            + (suite.FailedWorkflows > 0 ? $"  [red]{suite.FailedWorkflows} failed[/]" : ""));
+        WriteMetric("steps", $"{suite.PassedSteps}/{suite.TotalSteps} passed"
+            + (suite.FailedSteps > 0 ? $"  [red]{suite.FailedSteps} failed[/]" : "")
+            + (suite.NotRunSteps > 0 ? $"  [yellow]{suite.NotRunSteps} not run[/]" : ""));
+        WriteMetric("suite_duration", FormatDuration(elapsed));
+
+        _console.WriteLine();
+        _console.MarkupLine(suite.IsSuccess
+            ? $"  [bold black on green] PASSED [/]  {suite.TotalWorkflows} workflows"
+            : $"  [bold white on red] FAILED [/]  {suite.FailedWorkflows} of {suite.TotalWorkflows} workflows");
+        _console.WriteLine();
+    }
+
+    private static string StepsText(SuiteEntry entry) =>
+        $"{entry.Summary.PassedSteps}/{entry.Summary.TotalSteps} steps";
 
     private void WriteStep(StepReport step)
     {

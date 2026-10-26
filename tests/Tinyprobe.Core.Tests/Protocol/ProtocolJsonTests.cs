@@ -319,4 +319,41 @@ public class ProtocolJsonTests
         Assert.True(response.BodyTruncated);
         Assert.Equal(WorkflowEngine.MaxRecordedBodyBytes, response.Body.Length);
     }
+
+    [Fact]
+    public void SuiteEvents_ListTheFiles_AndTheTotals()
+    {
+        var passed = new Models.WorkflowReport();
+        passed.StepReports.Add(new Models.StepReport());
+        var failed = new Models.WorkflowReport();
+        failed.StepReports.Add(new Models.StepReport { StepName = "Create", IsSuccess = false, FailureReason = "Expected status 201, got 500" });
+        var oneStep = new WorkflowDefinition { Steps = [new CallStep { Name = "S", Call = "ping", Location = new("w.yaml", 1, 1) }] };
+        var twoSteps = new WorkflowDefinition { Steps = [.. oneStep.Steps, .. oneStep.Steps] };
+        var suite = new SuiteSummary([
+            SuiteEntry.Create("auth.yaml", oneStep, passed, TimeSpan.FromMilliseconds(5)),
+            SuiteEntry.Create("users.yaml", twoSteps, failed, TimeSpan.FromMilliseconds(7))
+        ]);
+
+        var started = Parse(ProtocolJson.SuiteStarted("1.2.3", ["auth.yaml", "users.yaml"]));
+        var finished = Parse(ProtocolJson.SuiteFinished(suite, TimeSpan.FromMilliseconds(12.5)));
+
+        Assert.Equal("suite_started", started.GetProperty("event").GetString());
+        Assert.Equal(ProtocolJson.Version, started.GetProperty("protocol").GetInt32());
+        Assert.Equal([Path.GetFullPath("auth.yaml"), Path.GetFullPath("users.yaml")],
+            started.GetProperty("files").EnumerateArray().Select(f => f.GetString()));
+
+        Assert.Equal("suite_finished", finished.GetProperty("event").GetString());
+        Assert.False(finished.GetProperty("success").GetBoolean());
+        Assert.Equal([true, false], finished.GetProperty("workflows").EnumerateArray().Select(w => w.GetProperty("success").GetBoolean()));
+        Assert.Equal(Path.GetFullPath("users.yaml"), finished.GetProperty("workflows")[1].GetProperty("file").GetString());
+        var summary = finished.GetProperty("summary");
+        Assert.Equal(2, summary.GetProperty("total_workflows").GetInt32());
+        Assert.Equal(1, summary.GetProperty("passed_workflows").GetInt32());
+        Assert.Equal(1, summary.GetProperty("failed_workflows").GetInt32());
+        Assert.Equal(3, summary.GetProperty("total_steps").GetInt32());
+        Assert.Equal(1, summary.GetProperty("passed_steps").GetInt32());
+        Assert.Equal(1, summary.GetProperty("failed_steps").GetInt32());
+        Assert.Equal(1, summary.GetProperty("not_run_steps").GetInt32());
+        Assert.Equal(12.5, summary.GetProperty("duration_ms").GetDouble());
+    }
 }

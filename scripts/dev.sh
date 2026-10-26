@@ -97,9 +97,7 @@ e2e() {
   cd "$ROOT"
 
   step "End-to-end (docs/example/workflows)"
-  for workflow in docs/example/workflows/*.yaml; do
-    "$DEV_BIN" run "$workflow" -e docs/environment.yaml --var "baseUrl=$BASE_URL/"
-  done
+  "$DEV_BIN" run docs/example/workflows -e docs/environment.yaml --var "baseUrl=$BASE_URL/"
 
   step "End-to-end (inspect, call, ndjson)"
   "$DEV_BIN" inspect docs/example/api/testserver.yaml
@@ -111,6 +109,10 @@ e2e() {
     --var "baseUrl=$BASE_URL/" --reporter ndjson > "$DEV_DIR/events.ndjson"
   jq -e -s '.[0].event == "run_started" and .[-1].event == "run_finished" and .[-1].success' \
     "$DEV_DIR/events.ndjson" > /dev/null
+  "$DEV_BIN" run docs/example -e docs/environment.yaml --var "baseUrl=$BASE_URL/" --reporter ndjson \
+    > "$DEV_DIR/suite.ndjson"
+  jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 4
+    and .[-1].event == "suite_finished" and .[-1].success' "$DEV_DIR/suite.ndjson" > /dev/null
   echo "Protocol checks passed."
 }
 

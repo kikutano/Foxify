@@ -1,9 +1,9 @@
 # 0003 — Run every workflow of a folder
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M1-7
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#16](https://github.com/kikutano/tinyprobe/pull/16)
 
 ## Problem
 
@@ -114,8 +114,10 @@ No change needed: the extension runs one workflow at a time. Later, the Test Exp
 - [ ] `scripts/dev.sh e2e` runs `docs/example/workflows` as one folder.
 - [ ] `scripts/dev.sh check` passes.
 
-## Open questions
+## Decisions
 
-1. **Recursive by default?** Recommended: yes, skipping non-workflow files, so `tinyprobe run tinyprobe` works from the layout of the guide. The alternative is only the files directly in the folder.
-2. **Several paths on the command line?** Recommended: yes. It costs little, and shell globs (`tinyprobe run tinyprobe/workflows/*.yaml`) then work too.
-3. **Continue after a failing workflow?** Recommended: yes, so one run shows every failure. `--fail-fast` can come later if CI needs it.
+Approved on 2026-10-26 with the recommendations:
+
+1. Folders are read recursively; files without a top-level `steps` key and folders whose name starts with `.` are skipped.
+2. Several paths are accepted, files and folders mixed.
+3. A failing workflow does not stop the suite.
