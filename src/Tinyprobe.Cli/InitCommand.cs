@@ -21,6 +21,7 @@ internal static class InitCommand
         The API tests are tinyprobe files in `tinyprobe/`: endpoints in `api/`, workflows in `workflows/`.
         Before you write or change them, run `tinyprobe guide` and follow it. Check a file with
         `tinyprobe inspect <file>`, and run the tests with `tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml`.
+        With the tinyprobe MCP server (`tinyprobe mcp`), use its tools `inspect`, `call` and `run` instead of the shell.
         Credentials go only in `tinyprobe/env.local.yaml`, which is not committed.
 
         """;

@@ -17,22 +17,7 @@ internal static class RunCommand
         string? envPath, IReadOnlyDictionary<string, JsonElement> environment,
         TextWriter log, bool recordExchanges, Func<HttpMessageHandler> createHandler)
     {
-        // Everything is validated before the first request, as for one workflow: a typo in the last
-        // file must not show up after the first files have already changed the backend's data.
-        var workflows = new List<(string File, WorkflowDefinition Workflow)>();
-        var problems = new List<LoadProblem>();
-        foreach (var file in files)
-        {
-            try
-            {
-                workflows.Add((file, WorkflowLoader.Load(file)));
-            }
-            catch (WorkflowLoadException ex)
-            {
-                problems.AddRange(ex.Problems);
-            }
-        }
-
+        var (workflows, problems) = LoadSuite(files);
         if (problems.Count > 0)
         {
             reporter.WriteSuiteLoadErrors(target, problems);
@@ -61,5 +46,28 @@ internal static class RunCommand
         var suite = new SuiteSummary(entries);
         reporter.WriteSuiteSummary(suite, suiteStopwatch.Elapsed);
         return suite.IsSuccess ? 0 : 1;
+    }
+
+    /// <summary>
+    /// Loads every workflow before the first request, as for one workflow: a typo in the last file must not
+    /// show up after the first files have already changed the backend's data.
+    /// </summary>
+    public static (List<(string File, WorkflowDefinition Workflow)> Workflows, List<LoadProblem> Problems) LoadSuite(
+        IReadOnlyList<string> files)
+    {
+        var workflows = new List<(string File, WorkflowDefinition Workflow)>();
+        var problems = new List<LoadProblem>();
+        foreach (var file in files)
+        {
+            try
+            {
+                workflows.Add((file, WorkflowLoader.Load(file)));
+            }
+            catch (WorkflowLoadException ex)
+            {
+                problems.AddRange(ex.Problems);
+            }
+        }
+        return (workflows, problems);
     }
 }

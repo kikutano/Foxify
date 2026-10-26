@@ -258,6 +258,12 @@ public static class ProtocolJson
     public static string StepCompleted(StepReport step) => Write(false, w =>
     {
         w.WriteString("event", "step_completed");
+        WriteStepFields(w, step, exchange: true);
+    });
+
+    /// <summary>The keys of a <c>step_completed</c> event; <paramref name="exchange"/> adds the request and the response.</summary>
+    private static void WriteStepFields(Utf8JsonWriter w, StepReport step, bool exchange)
+    {
         w.WriteNumber("index", step.Index);
         w.WriteString("name", step.StepName);
         w.WriteBoolean("success", step.IsSuccess);
@@ -299,6 +305,9 @@ public static class ProtocolJson
         }
         w.WriteEndObject();
 
+        if (!exchange)
+            return;
+
         if (step.Request is { } request)
         {
             w.WriteStartObject("request");
@@ -327,12 +336,17 @@ public static class ProtocolJson
         {
             w.WriteNull("response");
         }
-    });
+    }
 
     public static string RunFinished(WorkflowSummary summary, TimeSpan elapsed) => Write(false, w =>
     {
         w.WriteString("event", "run_finished");
         w.WriteBoolean("success", summary.IsSuccess);
+        WriteRunSummary(w, summary, elapsed);
+    });
+
+    private static void WriteRunSummary(Utf8JsonWriter w, WorkflowSummary summary, TimeSpan elapsed)
+    {
         w.WriteStartObject("summary");
         w.WriteNumber("total_steps", summary.TotalSteps);
         w.WriteNumber("passed_steps", summary.PassedSteps);
@@ -361,7 +375,7 @@ public static class ProtocolJson
             w.WriteNull("http_req_duration_ms");
         }
         w.WriteEndObject();
-    });
+    }
 
     // --- suite events (run on a folder or several files) -----------------------
 
@@ -401,6 +415,43 @@ public static class ProtocolJson
         w.WriteNumber("not_run_steps", suite.NotRunSteps);
         w.WriteNumber("duration_ms", Milliseconds(elapsed));
         w.WriteEndObject();
+    });
+
+    // --- MCP tool results (tinyprobe mcp) -------------------------------------------
+
+    /// <summary>The <c>call</c> tool: one step with its request and full response, whatever the status.</summary>
+    public static string McpCallResult(string endpoint, StepReport step) => Write(false, w =>
+    {
+        w.WriteString("endpoint", endpoint);
+        WriteStepFields(w, step, exchange: true);
+    });
+
+    /// <summary>
+    /// The <c>run</c> tool: every workflow with its summary and steps. Passing steps leave out the request and
+    /// the response, so a passing suite stays short in the agent's context.
+    /// </summary>
+    public static string McpRunResult(IReadOnlyList<McpWorkflowRun> runs) => Write(false, w =>
+    {
+        w.WriteBoolean("success", runs.All(r => r.Summary.IsSuccess));
+        w.WriteStartArray("workflows");
+        foreach (var run in runs)
+        {
+            w.WriteStartObject();
+            w.WriteString("file", run.Workflow.SourceFile);
+            w.WriteString("workflow", run.Workflow.Name);
+            w.WriteBoolean("success", run.Summary.IsSuccess);
+            WriteRunSummary(w, run.Summary, run.Elapsed);
+            w.WriteStartArray("steps");
+            foreach (var step in run.Report.StepReports)
+            {
+                w.WriteStartObject();
+                WriteStepFields(w, step, exchange: !step.IsSuccess);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
     });
 
     // --- helpers ---------------------------------------------------------------
@@ -461,3 +512,6 @@ public static class ProtocolJson
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 }
+
+/// <summary>One workflow run by the MCP <c>run</c> tool.</summary>
+public sealed record McpWorkflowRun(WorkflowDefinition Workflow, WorkflowReport Report, WorkflowSummary Summary, TimeSpan Elapsed);

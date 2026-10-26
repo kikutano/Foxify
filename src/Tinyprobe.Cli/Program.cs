@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Tinyprobe.Cli;
+using Tinyprobe.Cli.Mcp;
 using Tinyprobe.Core.Definitions;
 using Tinyprobe.Core.Execution;
 using Tinyprobe.Core.Parsing;
@@ -22,6 +23,7 @@ const string Usage = """
       tinyprobe init [folder] [--base-url <url>]
       tinyprobe update [--check] [--force]
       tinyprobe guide       Print the guide for coding agents (LLMs) that write tinyprobe files.
+      tinyprobe mcp         MCP server on stdin/stdout: the tools guide, inspect, call and run, for agents.
       tinyprobe --help
       tinyprobe --version
 
@@ -96,6 +98,19 @@ if (args[0] == "update")
     }
 
     return await UpdateCommand.RunAsync(CreateConsole(updateNoColor), GetVersion(), checkOnly, force);
+}
+
+if (args[0] == "mcp")
+{
+    if (args.Length > 1)
+        return UsageError(args[1].StartsWith('-') ? $"Unknown option '{args[1]}' for 'mcp'." : $"Unexpected argument '{args[1]}'.");
+
+    // Standard output carries only MCP messages, in UTF-8 without a BOM.
+    var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+    using var input = new StreamReader(Console.OpenStandardInput(), encoding);
+    using var output = new StreamWriter(Console.OpenStandardOutput(), encoding);
+    await new McpServer(GetVersion(), () => new HttpClientHandler()).RunAsync(input, output);
+    return ExitSuccess;
 }
 
 if (args[0] == "init")
