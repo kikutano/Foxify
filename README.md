@@ -199,6 +199,14 @@ claude mcp add tinyprobe -- tinyprobe mcp          # Claude Code (--scope projec
 
 That is `.vscode/mcp.json` for VS Code. Cursor reads `.cursor/mcp.json` with `{ "mcpServers": { "tinyprobe": { "command": "tinyprobe", "args": ["mcp"] } } }`, Codex `~/.codex/config.toml` with `[mcp_servers.tinyprobe]`, `command = "tinyprobe"`, `args = ["mcp"]`. `call` and `run` send requests to your backend, so your agent may ask you before using them. The tools and their results are described in [docs/protocol.md](docs/protocol.md#mcp).
 
+### Agent packages
+
+[agents/](agents/) has ready-made instructions that send an agent to `tinyprobe guide`: a Claude Code plugin with a skill and the MCP server, a Cursor rule, Copilot instructions, and [`llms.txt`](llms.txt). In Claude Code:
+
+```text
+/plugin install tinyprobe --marketplace kikutano/tinyprobe
+```
+
 ### From the backend code
 
 ```text

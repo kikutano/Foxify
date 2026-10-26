@@ -13,6 +13,7 @@ Pushing a tag publishes binaries to every user (`tinyprobe update`, install scri
 2. Version: `git describe --tags --abbrev=0` gives the last one. SemVer: before 1.0, a breaking format or protocol change bumps the minor and needs a "Breaking change" section.
 3. Notes from `git log <last-tag>..HEAD --oneline` (merged PRs): a title line `tinyprobe X.Y.Z`, then highlights for users with a short YAML example per new feature, then breaking changes with what users must change. Write them in the scratchpad as `notes.md`.
 4. Check that README examples do not show an old version string in sample output if the output changed.
+   Set `version` in `agents/claude/.claude-plugin/plugin.json` to the new version and commit it before tagging: Claude Code updates the plugin when that version changes.
 5. Show the notes and the tag command to the user. After approval:
    `git tag -a vX.Y.Z --cleanup=whitespace -F notes.md && git push origin vX.Y.Z`
    (`-beta.N` suffix → pre-release). The Release workflow builds win-x64, linux-x64, linux-arm64, osx-arm64 and publishes checksums.

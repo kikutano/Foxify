@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "tinyprobe",
+  "description": "tinyprobe for Claude Code: API tests in YAML, written and run by your agent.",
+  "owner": {
+    "name": "kikutano"
+  },
+  "plugins": [
+    {
+      "name": "tinyprobe",
+      "source": "./agents/claude",
+      "description": "API tests in YAML with tinyprobe: a skill that sends Claude to the guide of the installed binary, and the tinyprobe MCP server (guide, inspect, call, run)."
+    }
+  ]
+}

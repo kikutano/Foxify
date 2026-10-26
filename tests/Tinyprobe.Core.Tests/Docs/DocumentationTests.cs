@@ -137,6 +137,20 @@ public sealed partial class DocumentationTests : IDisposable
     }
 
     [Fact]
+    public void AgentPackages_ShareTheirText_AndSendAgentsToTheGuide()
+    {
+        // agents/: the Claude Code skill, the Cursor rule and the Copilot instructions. Only their front matter differs.
+        static string Body(string text) => text.ReplaceLineEndings("\n").Split("---\n", 3)[2];
+        var skill = Body(File.ReadAllText(RepositoryFile("agents/claude/skills/tinyprobe/SKILL.md")));
+
+        Assert.Equal(skill, Body(File.ReadAllText(RepositoryFile("agents/cursor/tinyprobe.mdc"))));
+        Assert.Equal(skill, Body(File.ReadAllText(RepositoryFile("agents/copilot/tinyprobe.instructions.md"))));
+        Assert.Contains("`tinyprobe guide`", skill);
+        Assert.Contains("tinyprobe/env.local.yaml", skill);
+        Assert.Contains("\"args\": [\"mcp\"]", File.ReadAllText(RepositoryFile("agents/claude/.mcp.json")));
+    }
+
+    [Fact]
     public void Readme_StandaloneWorkflows_AreValid()
     {
         var standalone = YamlBlocks("README.md").Where(b => IsWorkflow(b) && !b.Contains("import:")).ToList();

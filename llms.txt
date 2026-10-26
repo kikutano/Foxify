@@ -1,0 +1,21 @@
+# tinyprobe
+
+> API testing from the command line. Endpoints are declared once in YAML API files; workflows call them by name, check the responses and pass values between steps. One Native AOT binary (`tinyprobe`) validates and runs them, locally and in CI. Coding agents write the files by following the guide that ships with the binary (`tinyprobe guide`), and check them with `tinyprobe inspect`, `call` and `run`, or with the MCP server (`tinyprobe mcp`).
+
+The guide is the reference for agents: read it before writing tinyprobe files. `tinyprobe guide` prints the version that matches the installed binary.
+
+## Docs
+
+- [Guide for coding agents](https://raw.githubusercontent.com/kikutano/tinyprobe/main/docs/llm-guide.md): the format, the rules that are easy to get wrong, the procedures to test a backend and to migrate Postman, Insomnia, Bruno, OpenAPI, HAR and curl, a complete example and a checklist
+- [Workflow format](https://raw.githubusercontent.com/kikutano/tinyprobe/main/docs/workflow-format.md): the reference of API files, workflows, checks, variables, polling and generated values
+- [JSON protocol and MCP](https://raw.githubusercontent.com/kikutano/tinyprobe/main/docs/protocol.md): `inspect --json`, the ndjson events of `run` and `call`, and the tools of `tinyprobe mcp`
+
+## Agent packages
+
+- [Claude Code plugin](https://github.com/kikutano/tinyprobe/tree/main/agents/claude): a skill and the MCP server
+- [Cursor rule](https://raw.githubusercontent.com/kikutano/tinyprobe/main/agents/cursor/tinyprobe.mdc) and [Copilot instructions](https://raw.githubusercontent.com/kikutano/tinyprobe/main/agents/copilot/tinyprobe.instructions.md)
+
+## Optional
+
+- [README](https://raw.githubusercontent.com/kikutano/tinyprobe/main/README.md): install, quick start, ready-to-paste prompts for agents
+- [Examples](https://github.com/kikutano/tinyprobe/tree/main/docs/example): an API file and four workflows for the test server of the repository
