@@ -268,6 +268,7 @@ Options for 'run' and 'call':
   --var <name=value>      Set a variable, over the environment file. Repeatable.
   --with <name=value>     ('call' only) An argument of the endpoint, like a step's 'with'. Repeatable.
   --reporter <name>       console (default) or ndjson: one JSON event per line, for tools.
+  --junit <file>          ('run' only) Also write a JUnit XML report, for CI servers.
   -v, --verbose           Print variables, requests and responses while running.
   --no-color              Disable colors (also honored: the NO_COLOR environment variable).
 
@@ -301,6 +302,40 @@ tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml
 ```
 
 A folder is read recursively, and only workflows run: API files and env files in it are skipped. Each workflow starts from zero, so values saved in one are not seen by the next. The exit code makes tinyprobe easy to use in CI. When the output is not a terminal (CI logs, pipes) the spinner is turned off and each step is printed on its own line.
+
+### Run in CI
+
+Run the whole folder, and write a JUnit report that your CI server shows in its test tab: every step is a test, with its file and line, and a failed one shows the request line and every check with its actual value. The report has no headers and no bodies, since CI servers keep it and requests carry secrets.
+
+GitHub Actions:
+
+```yaml
+- name: API tests
+  run: |
+    curl -fsSL https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.sh | TINYPROBE_VERSION=0.15.0 sh
+    ~/.local/bin/tinyprobe run tinyprobe/workflows -e tinyprobe/env.ci.yaml --junit reports/tinyprobe.xml
+
+- name: Test report
+  if: always()
+  uses: mikepenz/action-junit-report@v5
+  with:
+    report_paths: reports/tinyprobe.xml
+```
+
+GitLab CI:
+
+```yaml
+api-tests:
+  script:
+    - curl -fsSL https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.sh | TINYPROBE_VERSION=0.15.0 sh
+    - ~/.local/bin/tinyprobe run tinyprobe/workflows -e tinyprobe/env.ci.yaml --junit reports/tinyprobe.xml
+  artifacts:
+    when: always
+    reports:
+      junit: reports/tinyprobe.xml
+```
+
+Pin the version, so a new release does not change your pipeline without you choosing it. Keep credentials in the CI's secrets and write `env.ci.yaml` from them, or pass them with `--var`.
 
 ### Explore an API
 

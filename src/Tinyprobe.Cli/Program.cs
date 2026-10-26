@@ -41,6 +41,7 @@ const string Usage = """
       --var <name=value>      Set a variable, over the environment file. Repeatable.
       --with <name=value>     ('call' only) An argument of the endpoint, like a step's 'with'. Repeatable.
       --reporter <name>       console (default) or ndjson: one JSON event per line, for tools.
+      --junit <file>          ('run' only) Also write a JUnit XML report, for CI servers.
       -v, --verbose           Print variables, requests and responses while running.
       --no-color              Disable colors (also honored: the NO_COLOR environment variable).
 
@@ -164,6 +165,7 @@ if (args[0] is not ("run" or "call" or "inspect"))
 var command = args[0];
 var positional = new List<string>();
 string? envFilePath = null;
+string? junitPath = null;
 string reporterName = "console";
 bool verbose = false, noColor = false, json = false;
 var variables = new List<KeyValuePair<string, string>>();
@@ -186,8 +188,11 @@ for (int i = 1; i < args.Length; i++)
         case "-v" or "--verbose" when command != "inspect":
             verbose = true;
             break;
+        case "--junit" when command == "call":
+            return UsageError("Option '--junit' is not available for 'call'.");
         case "-e" or "--env" or "--reporter" or "--var" when command != "inspect":
         case "--with" when command == "call":
+        case "--junit" when command == "run":
             if (i + 1 >= args.Length)
                 return UsageError($"Option '{option}' requires a value.");
             var value = args[++i];
@@ -195,6 +200,9 @@ for (int i = 1; i < args.Length; i++)
             {
                 case "-e" or "--env":
                     envFilePath = value;
+                    break;
+                case "--junit":
+                    junitPath = value;
                     break;
                 case "--reporter":
                     if (value is not ("console" or "ndjson"))
@@ -281,6 +289,9 @@ try
 catch (WorkflowLoadException ex)
 {
     reporter.WriteLoadErrors(filePath, ex.Problems);
+    // The CI server then shows why nothing ran, instead of a missing report.
+    if (junitPath is not null)
+        RunCommand.WriteJunit(junitPath, JunitReport.WriteInvalid(GetVersion(), ex.Problems));
     return ExitUsageError;
 }
 
@@ -314,7 +325,7 @@ if (verbose)
 if (suite)
 {
     return await RunCommand.RunSuiteAsync(reporter, GetVersion(), filePath, suiteFiles, envFilePath, environment, log,
-        recordExchanges: reporterName == "ndjson", createHandler: () => new HttpClientHandler());
+        recordExchanges: reporterName == "ndjson", createHandler: () => new HttpClientHandler(), junitPath: junitPath);
 }
 
 using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(workflow!.Settings.Timeout) };
@@ -325,10 +336,15 @@ var engine = new WorkflowEngine(httpClient, log)
 
 reporter.WriteHeader(GetVersion(), filePath, envFilePath, workflow, environment);
 
+var started = DateTime.UtcNow;
 var stopwatch = Stopwatch.StartNew();
 var report = await reporter.RunAsync(engine, workflow, environment);
 var summary = WorkflowSummary.Create(workflow, report);
 reporter.WriteSummary(summary, stopwatch.Elapsed);
+
+if (junitPath is not null
+    && !RunCommand.WriteJunit(junitPath, JunitReport.Write(GetVersion(), [new JunitRun(filePath, workflow, report, stopwatch.Elapsed, started)])))
+    return ExitUsageError;
 
 return summary.IsSuccess ? ExitSuccess : ExitWorkflowFailed;
 

@@ -14,6 +14,9 @@ jobs:
   build-and-test:
     name: Build, test & end-to-end
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write   # the JUnit report becomes a check with the test results
 
     steps:
       - name: Checkout
@@ -51,7 +54,22 @@ jobs:
           echo "Test server did not start"; cat server.log; exit 1
 
       - name: End-to-end (docs/example/workflows)
-        run: ./publish/tinyprobe run docs/example/workflows -e docs/environment.yaml
+        run: ./publish/tinyprobe run docs/example/workflows -e docs/environment.yaml --junit reports/tinyprobe.xml
+
+      # The JUnit report (docs/specs/0007-junit-report.md), read the way users' CI reads it.
+      - name: Upload the JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinyprobe-junit
+          path: reports/tinyprobe.xml
+
+      - name: Publish the JUnit report
+        if: always()
+        uses: mikepenz/action-junit-report@v5
+        with:
+          report_paths: reports/tinyprobe.xml
+          check_name: tinyprobe (docs/example)
 
       # The JSON protocol (docs/protocol.md) read by tools, on the Native AOT binary.
       - name: End-to-end (inspect, call, ndjson)

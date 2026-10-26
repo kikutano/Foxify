@@ -29,4 +29,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The JUnit schema of the Jenkins xUnit plugin (MIT), for JunitReportTests. -->
+    <None Include="Reporting/junit-10.xsd" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

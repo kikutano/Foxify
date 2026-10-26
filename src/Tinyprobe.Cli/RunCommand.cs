@@ -15,18 +15,21 @@ internal static class RunCommand
     public static async Task<int> RunSuiteAsync(
         IRunReporter reporter, string version, string target, IReadOnlyList<string> files,
         string? envPath, IReadOnlyDictionary<string, JsonElement> environment,
-        TextWriter log, bool recordExchanges, Func<HttpMessageHandler> createHandler)
+        TextWriter log, bool recordExchanges, Func<HttpMessageHandler> createHandler, string? junitPath = null)
     {
         var (workflows, problems) = LoadSuite(files);
         if (problems.Count > 0)
         {
             reporter.WriteSuiteLoadErrors(target, problems);
+            if (junitPath is not null)
+                WriteJunit(junitPath, JunitReport.WriteInvalid(version, problems));
             return 2;
         }
 
         reporter.WriteSuiteStart(version, files);
         var suiteStopwatch = Stopwatch.StartNew();
         var entries = new List<SuiteEntry>();
+        var junitRuns = new List<JunitRun>();
 
         foreach (var (file, workflow) in workflows)
         {
@@ -36,16 +39,37 @@ internal static class RunCommand
             var engine = new WorkflowEngine(httpClient, log) { RecordExchanges = recordExchanges };
 
             reporter.WriteHeader(version, file, envPath, workflow, environment);
+            var started = DateTime.UtcNow;
             var stopwatch = Stopwatch.StartNew();
             var report = await reporter.RunAsync(engine, workflow, environment);
             var entry = SuiteEntry.Create(file, workflow, report, stopwatch.Elapsed);
             reporter.WriteSummary(entry.Summary, stopwatch.Elapsed);
             entries.Add(entry);
+            junitRuns.Add(new JunitRun(file, workflow, report, stopwatch.Elapsed, started));
         }
 
         var suite = new SuiteSummary(entries);
         reporter.WriteSuiteSummary(suite, suiteStopwatch.Elapsed);
+        if (junitPath is not null && !WriteJunit(junitPath, JunitReport.Write(version, junitRuns)))
+            return 2;
         return suite.IsSuccess ? 0 : 1;
+    }
+
+    /// <summary>Writes the JUnit report, creating its folder; false (and a message) when it cannot be written.</summary>
+    public static bool WriteJunit(string path, string xml)
+    {
+        try
+        {
+            if (Path.GetDirectoryName(Path.GetFullPath(path)) is { } directory)
+                Directory.CreateDirectory(directory);
+            File.WriteAllText(path, xml);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"Error: Cannot write the JUnit report {path}: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>
