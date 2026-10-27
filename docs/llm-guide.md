@@ -274,7 +274,7 @@ Follow these steps in order. If the user gives you a Postman collection or the e
    - Exit `1`: a check failed. The report shows each check with its actual value. Decide whether **your test** is wrong (fix it) or **the backend** does not do what its code or documentation says (keep the test and report it to the user). Never weaken a check only to make it pass.
 8. **Report to the user**: the files you created, what each workflow covers, the endpoints you did not cover and why, and any failure that looks like a backend bug.
 
-When you write a CI job for the tests: on GitHub Actions use `uses: kikutano/tinyprobe@v<version>` with `path`, `env-file` and `vars` (credentials from `${{ secrets.NAME }}`); elsewhere install a pinned version (`TINYPROBE_VERSION`), run the folder with `--junit reports/tinyprobe.xml` and publish the report as the CI's test report.
+When you write a CI job for the tests: on GitHub Actions use `uses: kikutano/tinyprobe@v<version>` with `path`, `env-file` and `vars` (credentials from `${{ secrets.NAME }}`); on GitLab CI and other CIs that run jobs in a container use the image `ghcr.io/kikutano/tinyprobe:<version>` (on GitLab with `entrypoint: [""]`), or install a pinned version (`TINYPROBE_VERSION`); run the folder with `--junit reports/tinyprobe.xml` and publish the report as the CI's test report.
 
 Safety: run workflows only against a **local or test** environment, never against production unless the user explicitly asks. Workflows that create data must delete it, so they can run again.
 

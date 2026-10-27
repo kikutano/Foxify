@@ -11,7 +11,7 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 
 ## Where we are
 
-Released: **tinyprobe 0.15.0** and the extension **0.5.0**. M1 and M2 are done; M3 has the JUnit report and the GitHub Action, the Docker image is left.
+Released: **tinyprobe 0.15.0** and the extension **0.5.0**. M1, M2 and M3 are done; the Docker image and the Alpine binaries ship with the next release.
 
 - Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
 - CLI: `run` (one workflow, or a folder as a suite, with a JUnit report), `call`, `inspect`, `init`, `mcp` (an MCP server for agents), `schema` (JSON Schema of the format), `update`, `guide`; console and ndjson reporters; a GitHub Action (`kikutano/tinyprobe@vX.Y.Z`); Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
@@ -71,7 +71,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 
 - [x] **M3-1** `cli` JUnit XML report, read by every CI server. Spec: [0007](docs/specs/0007-junit-report.md). PR #21.
 - [x] **M3-2** `cli` An official GitHub Action: installs a pinned `tinyprobe` and runs a folder of workflows, with a job summary. In this repository (`action.yml`): `uses: kikutano/tinyprobe@v<version>` installs the binary of the same release. PR #22.
-- [ ] **M3-3** `cli` A small Docker image with the static binary.
+- [x] **M3-3** `cli` A small Docker image: `ghcr.io/kikutano/tinyprobe`, the release's Alpine (musl) binary on `runtime-deps` Alpine, amd64 and arm64, pushed by the Release workflow. Alpine binaries are release assets too (`install.sh` and `tinyprobe update` pick them on Alpine). PR #23.
 - [x] **M3-4** `cli` Failing steps as GitHub Actions annotations, at the step's line. Done by the GitHub Action, from the JUnit report (`annotations` input). PR #22.
 
 ## M4 — What Postman users miss
