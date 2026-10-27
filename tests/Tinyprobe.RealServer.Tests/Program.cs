@@ -361,6 +361,39 @@ app.MapGet("/api/users/{id:int}", (int id, HttpRequest request) =>
 });
 
 // -----------------------------------------------------------------------------
+// PUT /api/users/{id}/avatar
+//
+// A multipart/form-data body with a "file" part (docs/example/openapi). Nothing
+// is stored: 204 when the user exists and a non-empty file was sent.
+// -----------------------------------------------------------------------------
+
+app.MapPut("/api/users/{id:int}/avatar", async (int id, HttpRequest request) =>
+{
+    if (!IsBearerAuthenticated(request))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!users.ContainsKey(id))
+    {
+        return Results.NotFound(new { error = "user_not_found", message = $"User {id} was not found." });
+    }
+
+    if (!request.HasFormContentType)
+    {
+        return Results.BadRequest(new { error = "multipart_expected", message = "Send the avatar as multipart/form-data." });
+    }
+
+    var form = await request.ReadFormAsync();
+    if (form.Files.GetFile("file") is not { Length: > 0 })
+    {
+        return Results.BadRequest(new { error = "file_missing", message = "The 'file' part is missing or empty." });
+    }
+
+    return Results.NoContent();
+});
+
+// -----------------------------------------------------------------------------
 // POST /api/users
 // -----------------------------------------------------------------------------
 
@@ -683,6 +716,74 @@ app.MapPost("/api/echo", async (HttpRequest request) =>
         query,
         body
     });
+});
+
+// -----------------------------------------------------------------------------
+// POST /api/form
+//
+// An application/x-www-form-urlencoded body: the raw body and the decoded
+// fields, in the order they were sent.
+// -----------------------------------------------------------------------------
+
+app.MapPost("/api/form", async (HttpRequest request) =>
+{
+    using var reader = new StreamReader(request.Body);
+    var raw = await reader.ReadToEndAsync();
+
+    var fields = raw.Split('&', StringSplitOptions.RemoveEmptyEntries)
+        .Select(pair => pair.Split('=', 2))
+        .Select(pair => new
+        {
+            name = Uri.UnescapeDataString(pair[0].Replace('+', ' ')),
+            value = pair.Length > 1 ? Uri.UnescapeDataString(pair[1].Replace('+', ' ')) : ""
+        })
+        .ToList();
+
+    return Results.Ok(new { content_type = request.ContentType, raw, fields });
+});
+
+// -----------------------------------------------------------------------------
+// POST /api/files
+//
+// A multipart/form-data body: the text fields and the files, in the order
+// they were sent. Files are described (name, size, SHA-256), not returned.
+// -----------------------------------------------------------------------------
+
+app.MapPost("/api/files", async (HttpRequest request) =>
+{
+    var boundary = Microsoft.Net.Http.Headers.MediaTypeHeaderValue.Parse(request.ContentType ?? "").Boundary.ToString().Trim('"');
+    if (string.IsNullOrEmpty(boundary))
+        return Results.BadRequest(new { error = "Expected a multipart/form-data body" });
+
+    var fields = new List<object>();
+    var files = new List<object>();
+    var reader = new Microsoft.AspNetCore.WebUtilities.MultipartReader(boundary, request.Body);
+    while (await reader.ReadNextSectionAsync() is { } section)
+    {
+        var disposition = Microsoft.Net.Http.Headers.ContentDispositionHeaderValue.Parse(section.ContentDisposition);
+        var name = disposition.Name.ToString().Trim('"');
+        using var buffer = new MemoryStream();
+        await section.Body.CopyToAsync(buffer);
+        var bytes = buffer.ToArray();
+
+        if (disposition.FileName.HasValue)
+        {
+            files.Add(new
+            {
+                name,
+                filename = disposition.FileName.ToString().Trim('"'),
+                content_type = section.ContentType,
+                size = bytes.Length,
+                sha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes))
+            });
+        }
+        else
+        {
+            fields.Add(new { name, value = System.Text.Encoding.UTF8.GetString(bytes), content_type = section.ContentType });
+        }
+    }
+
+    return Results.Ok(new { content_type = request.ContentType, fields, files });
 });
 
 //

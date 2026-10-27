@@ -1,6 +1,6 @@
 # 0008 — Form and multipart bodies, file uploads
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M4-1
 - **Repositories:** tinyprobe
 - **PRs:** —
@@ -173,3 +173,12 @@ Nothing required: completion and hover read the keys from `tinyprobe schema`, so
 2. **`form` in this task.** M4-1 is about multipart. `form` is small and uses the same parsing, and it fixes the unencoded values of today's string bodies (which M4-3, OAuth2 client credentials, will use). *Recommendation: include it.*
 3. **Relative paths.** Relative to the file tinyprobe was given (workflow for `run`, API file for `call`), like `import` and like Hurl. The alternative is the current directory, like curl: simpler to explain, but a workflow then works only from the directory it was written for. *Recommendation: relative to the file.*
 4. **Files under MCP.** Limit files to the server's working directory. Without that, an MCP-only agent can upload any readable file. The limit applies only to `tinyprobe mcp`; `run` and `call` read what the user's own files point to, like curl. *Recommendation: limit.*
+
+## Decisions
+
+Approved on 2026-10-27 with the recommendations:
+
+1. Two keys, `form` and `multipart`.
+2. `form` is part of this task.
+3. Relative file paths are relative to the file tinyprobe was given.
+4. Under `tinyprobe mcp`, files must be inside the server's working directory.

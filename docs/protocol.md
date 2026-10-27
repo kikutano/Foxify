@@ -47,6 +47,8 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
       "query": [],
       "headers": [ { "name": "X-Client", "value": "tinyprobe" } ],
       "body": { "email": "${email}", "password": "${password}" },
+      "form": null,
+      "multipart": null,
       "params": [
         { "name": "email", "required": true, "default": null },
         { "name": "password", "required": false, "default": "secret" }
@@ -77,7 +79,14 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
 
 - `kind` is `workflow` or `api`. An API file has an empty `steps` and `variables`.
 - `headers` are the effective headers of the endpoint: file headers, then `auth` sets, then the endpoint's own, where a later one with the same name replaces an earlier one.
-- `arguments` are the names a call of the endpoint can pass with `--with` (or a step's `with`): its params, its query names and every placeholder of its base URL, path, headers and body. Generated values (`${$uuid}`) are not listed. A UI can build the form of an endpoint from `params` (required ones first) and `arguments`.
+- `body`, `form` and `multipart`: at most one is not `null`. `form` and `multipart` are the fields in order, one entry per field sent (a YAML list gives one entry per item): `{ "name", "value" }` for a text field, `{ "name", "file", "filename", "content_type" }` for a file, with `filename` and `content_type` `null` when they are not written. Values are the literal YAML, placeholders included, as in `body`:
+  ```json
+  "multipart": [
+    { "name": "description", "value": "Profile picture" },
+    { "name": "avatar", "file": "${avatar}", "filename": null, "content_type": null }
+  ]
+  ```
+- `arguments` are the names a call of the endpoint can pass with `--with` (or a step's `with`): its params, its query names and every placeholder of its base URL, path, headers, body, form and multipart fields. Generated values (`${$uuid}`) are not listed. A UI can build the form of an endpoint from `params` (required ones first) and `arguments`.
 - `until`, when present, has the same `status` and `checks` as `expect`, plus `every_ms` and `timeout_ms`.
 - `checks[].condition` is the text the report shows, such as `>= 3`, `in ["a","b"]`, `< 0 or > 100`.
 
@@ -126,7 +135,7 @@ One JSON object per line on standard output, written and flushed as soon as it h
 - `index` is the position of the step in the workflow, sleeps included, and matches `steps[].index` of `inspect` and `run_started`.
 - `step_completed` of a failed step has `success: false` and either `failure` (a status, network or variable problem) or failed `assertions`. Steps after it are not run: they are counted in `not_run_steps`.
 - `status` is `null` when no response was received, for example on a network error. Then `response` is `null` too, while `request` shows what was sent.
-- `request` and `response` belong to the last attempt. `headers` keep their order and include content headers. Bodies are text; a response body over 1 MiB is cut and has `body_truncated: true`. Headers set by the HTTP client itself (such as `Host`) are not listed.
+- `request` and `response` belong to the last attempt. `headers` keep their order and include content headers. Bodies are text; a response body over 1 MiB is cut and has `body_truncated: true`. A `multipart/form-data` request body is the body as sent with each file's content replaced by one line, `(file ../fixtures/avatar.png, 79 B)`, with `\n` line endings. Headers set by the HTTP client itself (such as `Host`) are not listed.
 - `saved` holds the values stored by `save` in this step, with their JSON type.
 - `assertions[].actual` is the actual value as JSON text, or `(missing)`.
 - `http_req_duration_ms` is `null` when no request got a response.

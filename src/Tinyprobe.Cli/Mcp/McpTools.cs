@@ -123,7 +123,8 @@ internal sealed class McpTools(string version, Func<HttpMessageHandler> createHa
     {
         // A new client and handler for each workflow, as in a suite: nothing is shared, cookies included.
         using var httpClient = new HttpClient(createHandler()) { Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout) };
-        var engine = new WorkflowEngine(httpClient, TextWriter.Null) { RecordExchanges = true };
+        // An agent connected only through MCP must not be able to upload any file the user can read.
+        var engine = new WorkflowEngine(httpClient, TextWriter.Null) { RecordExchanges = true, FileRoot = System.Environment.CurrentDirectory };
         var stopwatch = Stopwatch.StartNew();
         var report = await engine.ExecuteAsync(workflow, environment);
         return (report, stopwatch.Elapsed);

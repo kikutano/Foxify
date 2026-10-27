@@ -46,11 +46,18 @@ public sealed class WorkflowEngine
     /// <summary>Record the request and response of every call in <see cref="StepReport.Request"/> and <see cref="StepReport.Response"/>.</summary>
     public bool RecordExchanges { get; set; }
 
+    /// <summary>When set, multipart bodies may send only files inside this directory: set by the MCP server, for its workspace.</summary>
+    public string? FileRoot { get; set; }
+
     public async Task<WorkflowReport> ExecuteAsync(
         WorkflowDefinition workflow, IReadOnlyDictionary<string, JsonElement>? environment = null)
     {
         var report = new WorkflowReport { WorkflowName = workflow.Name };
         var globals = new GlobalVariables(workflow.Variables, environment ?? NoVariables);
+        // Files are relative to the file tinyprobe was given, as imports are: the workflow, or the API file of a call.
+        var files = new FileAccess(
+            string.IsNullOrEmpty(workflow.SourceFile) ? Environment.CurrentDirectory : Path.GetDirectoryName(workflow.SourceFile)!,
+            FileRoot);
 
         _log.WriteLine($"Executing workflow: {workflow.Name}");
 
@@ -68,7 +75,7 @@ public sealed class WorkflowEngine
             var stepReport = new StepReport { Index = index, StepName = call.Name };
             StepStarted?.Invoke(new StepProgress(index, call.Name));
 
-            await ExecuteCallAsync(call, globals, workflow.Settings, stepReport);
+            await ExecuteCallAsync(call, globals, workflow.Settings, files, stepReport);
 
             report.StepReports.Add(stepReport);
             StepCompleted?.Invoke(stepReport);
@@ -83,7 +90,8 @@ public sealed class WorkflowEngine
         return report;
     }
 
-    private async Task ExecuteCallAsync(CallStep step, GlobalVariables globals, WorkflowSettings settings, StepReport report)
+    private async Task ExecuteCallAsync(
+        CallStep step, GlobalVariables globals, WorkflowSettings settings, FileAccess files, StepReport report)
     {
         try
         {
@@ -96,7 +104,7 @@ public sealed class WorkflowEngine
             for (int attempt = 1; ; attempt++)
             {
                 report.Attempts = attempt;
-                using var response = await SendWithRetriesAsync(step.Endpoint, scope, settings.MaxRetries, report);
+                using var response = await SendWithRetriesAsync(step.Endpoint, scope, files, settings.MaxRetries, report);
                 // JSON is UTF-8 by definition (RFC 8259), so the body is decoded as UTF-8.
                 var body = await response.Content.ReadAsByteArrayAsync();
                 _log.WriteLine($"Response Status: {response.StatusCode} ({report.ExecutionTimeMilliseconds} ms)");
@@ -139,12 +147,12 @@ public sealed class WorkflowEngine
     /// they are a valid response, checked against <c>expect</c>.
     /// </summary>
     private async Task<HttpResponseMessage> SendWithRetriesAsync(
-        EndpointDefinition endpoint, CallScope scope, int maxRetries, StepReport report)
+        EndpointDefinition endpoint, CallScope scope, FileAccess files, int maxRetries, StepReport report)
     {
         for (int attempt = 0; ; attempt++)
         {
             // A request message can be sent only once, so it is rebuilt on every attempt.
-            using var request = RequestBuilder.Build(endpoint, scope);
+            using var request = RequestBuilder.Build(endpoint, scope, files);
             report.Method = request.Method.Method;
             report.Url = request.RequestUri;
             report.BytesSent = request.Content?.Headers.ContentLength ?? 0;
@@ -311,7 +319,9 @@ public sealed class WorkflowEngine
         Method = request.Method.Method,
         Url = request.RequestUri?.ToString() ?? "",
         Headers = Headers(request.Headers, request.Content?.Headers),
-        Body = request.Content is null ? null : await request.Content.ReadAsStringAsync()
+        Body = request.Options.TryGetValue(RequestBuilder.RecordedBody, out var recorded) ? recorded
+            : request.Content is null ? null
+            : await request.Content.ReadAsStringAsync()
     };
 
     private static RecordedResponse Record(HttpResponseMessage response, byte[] body) => new()

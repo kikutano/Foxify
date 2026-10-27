@@ -117,12 +117,52 @@
         "body": {
           "description": "The request body: a YAML value sent as JSON, a string sent as is, or a single `${...}` placeholder."
         },
+        "form": {
+          "description": "An `application/x-www-form-urlencoded` body, `field: value`, encoded by tinyprobe. A list sends the field once per value. Instead of `body`.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/form_value"
+          }
+        },
+        "multipart": {
+          "description": "A `multipart/form-data` body (file uploads), `field: value` or `field: { file: path }`. A list sends the field once per item. Instead of `body`.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/multipart_value"
+          }
+        },
         "params": {
           "description": "The arguments of the endpoint, `name: default`, or `name:` for a required one. Steps pass them in `with`; they never come from global variables.",
           "type": "object"
         }
       },
       "additionalProperties": false
+    },
+    "multipart_file": {
+      "description": "A file of a multipart body.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "The path of the file to send, relative to the file tinyprobe was given (the workflow, or the API file of a `call`). May be a placeholder.",
+          "type": "string"
+        },
+        "filename": {
+          "description": "The file name sent to the server. Default: the name of the file.",
+          "type": "string"
+        },
+        "content_type": {
+          "description": "The type of the file. Default: from its extension (`.png` is `image/png`), otherwise `application/octet-stream`.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "file"
+          ]
+        }
+      ]
     },
     "step": {
       "description": "A step: `call` an endpoint, or `sleep`.",
@@ -365,6 +405,62 @@
                 "any"
               ]
             }
+          }
+        }
+      ]
+    },
+    "form_value": {
+      "anyOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      ]
+    },
+    "multipart_value": {
+      "anyOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "$ref": "#/$defs/multipart_file"
+        },
+        {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              {
+                "$ref": "#/$defs/multipart_file"
+              }
+            ]
           }
         }
       ]

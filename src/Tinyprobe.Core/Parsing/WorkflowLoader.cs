@@ -85,7 +85,8 @@ internal sealed partial class Loader
     // The keys of each section. FormatSchema builds `tinyprobe schema` from them: a new key needs a description there.
     internal static readonly string[] ApiKeys = ["base_url", "headers", "auth", "endpoints"];
     internal static readonly string[] WorkflowKeys = ["name", "description", "import", "variables", "settings", "steps", .. ApiKeys];
-    internal static readonly string[] EndpointKeys = ["method", "path", "query", "headers", "auth", "body", "params"];
+    internal static readonly string[] EndpointKeys = ["method", "path", "query", "headers", "auth", "body", "form", "multipart", "params"];
+    internal static readonly string[] MultipartFileKeys = ["file", "filename", "content_type"];
     internal static readonly string[] StepKeys = ["name", "call", "with", "expect", "until", "save", "sleep"];
     internal static readonly string[] ExpectKeys = ["status", "headers", "body", "duration"];
     internal static readonly string[] UntilKeys = ["status", "headers", "body", "every", "timeout"];
@@ -381,8 +382,22 @@ internal sealed partial class Loader
             }
         }
 
-        if (entries.TryGetValue("headers", out var headersNode))
-            headers.AddRange(ParseHeaders(file, headersNode, $"headers of {what}"));
+        var ownHeaders = entries.TryGetValue("headers", out var headersNode) ? ParseHeaders(file, headersNode, $"headers of {what}") : [];
+        headers.AddRange(ownHeaders);
+
+        var bodyKeys = new[] { "body", "form", "multipart" }.Where(entries.ContainsKey).ToList();
+        if (bodyKeys.Count > 1)
+            Error(file, keyNode, $"{what} has both {bodyKeys[0]} and {bodyKeys[1]}: use one of body, form, multipart");
+
+        var form = entries.TryGetValue("form", out var formNode) ? ParseForm(file, formNode) : null;
+        var multipart = entries.TryGetValue("multipart", out var multipartNode) ? ParseMultipart(file, multipartNode) : null;
+
+        // These bodies set their own Content-Type (multipart with its boundary); a header would be ignored.
+        if (form is not null || multipart is not null)
+        {
+            foreach (var (headerName, value) in ownHeaders.Where(h => h.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase)))
+                Report(value.Location, $"{what} sets {headerName}, but a {(form is not null ? "form" : "multipart")} body sets its own: remove the header");
+        }
 
         Dictionary<string, Template?>? parameters = null;
         if (entries.TryGetValue("params", out var paramsNode))
@@ -401,10 +416,74 @@ internal sealed partial class Loader
             Query = query,
             Headers = headers,
             Body = entries.TryGetValue("body", out var bodyNode) ? Template(file, bodyNode) : null,
+            Form = form,
+            Multipart = multipart,
             Params = parameters,
             Location = At(file, keyNode)
         };
     }
+
+    /// <summary><c>form</c>: text fields; a list repeats the field.</summary>
+    private List<BodyField> ParseForm(FileContext file, YamlNode node)
+    {
+        var fields = new List<BodyField>();
+        foreach (var (name, _, value) in Entries(file, node, "form"))
+        {
+            foreach (var item in value is YamlSequenceNode sequence ? sequence.Children : [value])
+            {
+                if (item is YamlScalarNode)
+                    fields.Add(new BodyField { Name = name, Value = Template(file, item) });
+                else
+                    Error(file, item, $"form field '{name}' must be a value or a list of values");
+            }
+        }
+        return fields;
+    }
+
+    /// <summary><c>multipart</c>: text fields and files (<c>{ file: path }</c>); a list repeats the field.</summary>
+    private List<BodyField> ParseMultipart(FileContext file, YamlNode node)
+    {
+        var fields = new List<BodyField>();
+        foreach (var (name, _, value) in Entries(file, node, "multipart"))
+        {
+            foreach (var item in value is YamlSequenceNode sequence ? sequence.Children : [value])
+            {
+                switch (item)
+                {
+                    case YamlScalarNode:
+                        fields.Add(new BodyField { Name = name, Value = Template(file, item) });
+                        break;
+
+                    case YamlMappingNode:
+                        var entries = Collect(file, item, "a multipart file", MultipartFileKeys);
+                        if (!entries.ContainsKey("file"))
+                        {
+                            Error(file, item, "a multipart file needs file: the path of the file to send");
+                            break;
+                        }
+                        if (ScalarTemplate(file, entries, "file") is { } path)
+                        {
+                            fields.Add(new BodyField
+                            {
+                                Name = name,
+                                File = path,
+                                FileName = ScalarTemplate(file, entries, "filename"),
+                                ContentType = ScalarTemplate(file, entries, "content_type")
+                            });
+                        }
+                        break;
+
+                    default:
+                        Error(file, item, $"multipart field '{name}' must be a value, a file ({{ file: path }}) or a list of them");
+                        break;
+                }
+            }
+        }
+        return fields;
+    }
+
+    private Template? ScalarTemplate(FileContext file, Dictionary<string, YamlNode> entries, string key) =>
+        entries.TryGetValue(key, out var node) && Scalar(file, node, key) is not null ? Template(file, node) : null;
 
     private List<KeyValuePair<string, Template>> ParseHeaders(FileContext file, YamlNode node, string what)
     {
@@ -721,6 +800,7 @@ internal sealed partial class Loader
     private static IEnumerable<Template> EndpointTemplates(EndpointDefinition endpoint) =>
         new[] { endpoint.BaseUrl, endpoint.Path, endpoint.Body }
             .Concat(endpoint.Headers.Select(h => h.Value))
+            .Concat((endpoint.Form ?? []).Concat(endpoint.Multipart ?? []).SelectMany(f => f.Templates))
             .Concat(endpoint.Params?.Values ?? [])
             .OfType<Template>();
 

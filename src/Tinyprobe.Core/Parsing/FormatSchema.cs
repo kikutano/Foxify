@@ -34,7 +34,14 @@ public static class FormatSchema
         ["endpoint.headers"] = "Headers of this endpoint, `Name: value`, after the file's headers and auth sets.",
         ["endpoint.auth"] = "The auth set to send, or a list of them (`[bearer, apikey]`).",
         ["endpoint.body"] = "The request body: a YAML value sent as JSON, a string sent as is, or a single `${...}` placeholder.",
+        ["endpoint.form"] = "An `application/x-www-form-urlencoded` body, `field: value`, encoded by tinyprobe. A list sends the field once per value. Instead of `body`.",
+        ["endpoint.multipart"] = "A `multipart/form-data` body (file uploads), `field: value` or `field: { file: path }`. A list sends the field once per item. Instead of `body`.",
         ["endpoint.params"] = "The arguments of the endpoint, `name: default`, or `name:` for a required one. Steps pass them in `with`; they never come from global variables.",
+
+        // multipart file
+        ["multipart_file.file"] = "The path of the file to send, relative to the file tinyprobe was given (the workflow, or the API file of a `call`). May be a placeholder.",
+        ["multipart_file.filename"] = "The file name sent to the server. Default: the name of the file.",
+        ["multipart_file.content_type"] = "The type of the file. Default: from its extension (`.png` is `image/png`), otherwise `application/octet-stream`.",
 
         // step
         ["step.name"] = "Shown in the report. Default: the call and its path and query arguments.",
@@ -95,6 +102,7 @@ public static class FormatSchema
 
             w.WriteStartObject("$defs");
             Definition(w, "endpoint", "An endpoint: what to send.", Loader.EndpointKeys);
+            Definition(w, "multipart_file", "A file of a multipart body.", Loader.MultipartFileKeys, anyOfRequired: ["file"]);
             Definition(w, "step", "A step: `call` an endpoint, or `sleep`.", Loader.StepKeys, anyOfRequired: ["call", "sleep"]);
             Definition(w, "expect", "What the response must be.", Loader.ExpectKeys);
             Definition(w, "until", "Polling conditions.", Loader.UntilKeys);
@@ -124,6 +132,41 @@ public static class FormatSchema
                 w.WriteStringValue(op);
             w.WriteEndArray();
             w.WriteEndObject();
+            w.WriteEndObject();
+            w.WriteEndObject();
+            w.WriteEndArray();
+            w.WriteEndObject();
+
+            // A form or multipart field: a value, a file (multipart only), or a list of them.
+            w.WriteStartObject("form_value");
+            w.WriteStartArray("anyOf");
+            w.WriteStartObject();
+            Scalars(w);
+            w.WriteEndObject();
+            w.WriteStartObject();
+            w.WriteString("type", "array");
+            w.WriteStartObject("items");
+            Scalars(w);
+            w.WriteEndObject();
+            w.WriteEndObject();
+            w.WriteEndArray();
+            w.WriteEndObject();
+
+            w.WriteStartObject("multipart_value");
+            w.WriteStartArray("anyOf");
+            w.WriteStartObject();
+            Scalars(w);
+            w.WriteEndObject();
+            Ref(w, "multipart_file");
+            w.WriteStartObject();
+            w.WriteString("type", "array");
+            w.WriteStartObject("items");
+            w.WriteStartArray("anyOf");
+            w.WriteStartObject();
+            Scalars(w);
+            w.WriteEndObject();
+            Ref(w, "multipart_file");
+            w.WriteEndArray();
             w.WriteEndObject();
             w.WriteEndObject();
             w.WriteEndArray();
@@ -192,6 +235,7 @@ public static class FormatSchema
         switch ($"{section}.{key}")
         {
             case "file.name" or "file.description" or "file.base_url" or "endpoint.path"
+                or "multipart_file.file" or "multipart_file.filename" or "multipart_file.content_type"
                 or "step.name" or "step.call" or "step.sleep" or "until.every" or "until.timeout":
                 w.WriteString("type", "string");
                 break;
@@ -214,6 +258,12 @@ public static class FormatSchema
                 break;
             case "file.headers" or "endpoint.headers":
                 Ref(w, "headers", inline: true);
+                break;
+            case "endpoint.form":
+                MapOf(w, () => Ref(w, "form_value", inline: true));
+                break;
+            case "endpoint.multipart":
+                MapOf(w, () => Ref(w, "multipart_value", inline: true));
                 break;
             case "file.auth":
                 MapOf(w, () => Ref(w, "headers", inline: true));
@@ -283,6 +333,14 @@ public static class FormatSchema
                 // endpoint.body, condition.eq/ne/gt/gte/lt/lte/contains: any value.
                 break;
         }
+    }
+
+    private static void Scalars(Utf8JsonWriter w)
+    {
+        w.WriteStartArray("type");
+        foreach (var type in new[] { "string", "number", "boolean", "null" })
+            w.WriteStringValue(type);
+        w.WriteEndArray();
     }
 
     private static void StringOrList(Utf8JsonWriter w)

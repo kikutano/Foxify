@@ -132,3 +132,30 @@ endpoints:
 
   delay:
     path: /api/delay/${milliseconds}
+
+  # --- Forms and file uploads -----------------------------------------------
+
+  # An HTML form: tinyprobe encodes the values and sets the Content-Type.
+  submit_form:
+    method: POST
+    path: /api/form
+    params: { name:, password:, tags: }
+    form:
+      name: ${name}
+      password: ${password}
+      tags: ${tags}                  # a list sends the field once per value
+
+  # A file upload. File paths are relative to the workflow that runs.
+  upload:
+    method: POST
+    path: /api/files
+    params: { description:, avatar:, notes: }
+    multipart:
+      description: ${description}
+      avatar:
+        file: ${avatar}
+      notes:
+        file: ${notes}
+        filename: notes.md
+        content_type: text/markdown
+      tags: [profile, public]

@@ -1,0 +1,44 @@
+name: Forms and file uploads
+description: A form with values that need encoding, and a multipart upload of two files.
+
+import:
+  - ../api/testserver.yaml
+
+steps:
+  - name: Submit a form
+    call: submit_form
+    with:
+      name: Ada Lovelace
+      password: "a&b=c+d"
+      tags: [admin, owner]
+    expect:
+      status: 200
+      body:
+        $.content_type: application/x-www-form-urlencoded
+        $.raw: name=Ada+Lovelace&password=a%26b%3Dc%2Bd&tags=admin&tags=owner
+        $.fields[1].value: "a&b=c+d"
+        $.fields[3].name: tags
+
+  - name: Upload two files
+    call: upload
+    with:
+      description: Profile picture
+      avatar: ../fixtures/avatar.png       # relative to this workflow
+      notes: ../fixtures/notes.txt
+    expect:
+      status: 200
+      body:
+        $.content_type: { contains: multipart/form-data }
+        $.fields[0].name: description
+        $.fields[0].value: Profile picture
+        $.fields[0].content_type: null
+        $.fields[1].value: profile
+        $.fields[2].value: public
+        $.files[0].name: avatar
+        $.files[0].filename: avatar.png
+        $.files[0].content_type: image/png
+        $.files[0].size: 79
+        $.files[0].sha256: 0f6a1c6406a91833ca7d395f6f9e0b38733371b25a65377620962bb496441643
+        $.files[1].filename: notes.md
+        $.files[1].content_type: text/markdown
+        $.files[1].sha256: ef949e4eb10cc60fac52f7d9988bddee76217e2795ae260f1044ce2e4640ac4c
