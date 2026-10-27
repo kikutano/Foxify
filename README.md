@@ -319,7 +319,7 @@ GitHub Actions, with the action of this repository:
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: kikutano/tinyprobe@v0.15.0      # installs tinyprobe 0.15.0
+- uses: kikutano/tinyprobe@v0.16.0      # installs tinyprobe 0.16.0
   with:
     path: tinyprobe/workflows
     env-file: tinyprobe/env.ci.yaml
