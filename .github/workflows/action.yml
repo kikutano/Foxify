@@ -1,0 +1,33 @@
+name: GitHub Action
+
+# The action of this repository (action.yml) installs the released binary by itself, on every OS, after each
+# release; it runs example/ against JSONPlaceholder, so it needs no test server.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  action:
+    name: Action on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: tinyprobe
+        with:
+          version: ${{ github.event.release.tag_name }}
+          path: example/workflows
+          env-file: example/environment.yaml
+          junit: reports/example.xml
+
+      - name: The report is there
+        shell: bash
+        env:
+          REPORT: ${{ steps.tinyprobe.outputs.report }}
+        run: grep -q '<testsuites name="tinyprobe"' "$REPORT"

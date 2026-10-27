@@ -103,6 +103,40 @@ jobs:
           ./publish/tinyprobe init "$dir" --no-color | grep -q '= tinyprobe/env.local.yaml'
           test -d "$dir/tinyprobe/workflows" && grep -q 'tinyprobe guide' "$dir/AGENTS.md" && grep -qx '!tinyprobe/env.example.yaml' "$dir/.gitignore"
 
+      # The GitHub Action of this repository (action.yml), with the binary just built.
+      - name: GitHub Action
+        uses: ./
+        with:
+          tinyprobe-path: ./publish/tinyprobe
+          path: docs/example/workflows
+          env-file: docs/environment.yaml
+          junit: reports/action.xml
+
+      - name: A failing workflow for the GitHub Action
+        run: |
+          mkdir -p reports/failing
+          printf 'name: Failing on purpose\nimport: [../../docs/example/api/testserver.yaml]\nsteps:\n  - name: Public is 201\n    call: public\n    expect:\n      status: 201\n' > reports/failing/failing.yaml
+
+      - name: GitHub Action, failing workflow
+        id: failing
+        continue-on-error: true
+        uses: ./
+        with:
+          tinyprobe-path: ./publish/tinyprobe
+          path: reports/failing
+          env-file: docs/environment.yaml
+          junit: reports/failing.xml
+          annotations: 'false'
+          summary: 'false'
+
+      - name: The failing run failed the step, with exit code 1
+        env:
+          OUTCOME: ${{ steps.failing.outcome }}
+          EXIT_CODE: ${{ steps.failing.outputs.exit-code }}
+        run: |
+          test "$OUTCOME" = failure && test "$EXIT_CODE" = 1
+          grep -q 'failures="1"' reports/failing.xml
+
       - name: Test server log
         if: failure()
         run: cat server.log || true

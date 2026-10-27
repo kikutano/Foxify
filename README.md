@@ -307,20 +307,19 @@ A folder is read recursively, and only workflows run: API files and env files in
 
 Run the whole folder, and write a JUnit report that your CI server shows in its test tab: every step is a test, with its file and line, and a failed one shows the request line and every check with its actual value. The report has no headers and no bodies, since CI servers keep it and requests carry secrets.
 
-GitHub Actions:
+GitHub Actions, with the action of this repository:
 
 ```yaml
-- name: API tests
-  run: |
-    curl -fsSL https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.sh | TINYPROBE_VERSION=0.15.0 sh
-    ~/.local/bin/tinyprobe run tinyprobe/workflows -e tinyprobe/env.ci.yaml --junit reports/tinyprobe.xml
-
-- name: Test report
-  if: always()
-  uses: mikepenz/action-junit-report@v5
+- uses: actions/checkout@v4
+- uses: kikutano/tinyprobe@v0.15.0      # installs tinyprobe 0.15.0
   with:
-    report_paths: reports/tinyprobe.xml
+    path: tinyprobe/workflows
+    env-file: tinyprobe/env.ci.yaml
+    vars: |
+      token=${{ secrets.API_TOKEN }}
 ```
+
+It installs the binary of the same release (checksum verified), runs the folder, writes `tinyprobe-report.xml`, puts a summary on the job page, and marks each failing step as an error at its line in the workflow file, in the run and in pull requests. Inputs: `path` (files or folders), `env-file`, `vars` (one `name=value` per line; the log shows the names only), `version`, `junit`, `summary`, `annotations`, and `tinyprobe-path` to use a binary already on the runner. It runs on Linux, macOS and Windows runners. Upload the report with `actions/upload-artifact` to keep it.
 
 GitLab CI:
 
@@ -335,7 +334,7 @@ api-tests:
       junit: reports/tinyprobe.xml
 ```
 
-Pin the version, so a new release does not change your pipeline without you choosing it. Keep credentials in the CI's secrets and write `env.ci.yaml` from them, or pass them with `--var`.
+Pin the version (the action's tag, or `TINYPROBE_VERSION`), so a new release does not change your pipeline without you choosing it. Keep credentials in the CI's secrets and write `env.ci.yaml` from them, or pass them with `--var`.
 
 ### Explore an API
 

@@ -1,0 +1,107 @@
+name: tinyprobe
+description: Run tinyprobe API tests (YAML workflows) in GitHub Actions, with a JUnit report, a job summary and annotations at the failing steps.
+author: kikutano
+branding:
+  icon: check-circle
+  color: orange
+
+inputs:
+  path:
+    description: Workflow files or folders, separated by spaces or new lines. A folder is read recursively.
+    default: tinyprobe/workflows
+  env-file:
+    description: The environment file, like `-e`.
+    default: ''
+  vars:
+    description: Variables over the environment file, one `name=value` per line, like `--var`. Take credentials from the workflow's secrets; the log shows the names only.
+    default: ''
+  version:
+    description: The tinyprobe version to install. Default, the version of this action's tag (`kikutano/tinyprobe@v0.15.0` installs 0.15.0), or the latest release.
+    default: ''
+  junit:
+    description: Where to write the JUnit report.
+    default: tinyprobe-report.xml
+  summary:
+    description: Write a summary of the run on the job page.
+    default: 'true'
+  annotations:
+    description: Show failing steps as errors at their line in the workflow files, in the run and in pull requests.
+    default: 'true'
+  tinyprobe-path:
+    description: Use this tinyprobe binary instead of installing one, for example on a self-hosted runner.
+    default: ''
+
+outputs:
+  report:
+    description: The path of the JUnit report.
+    value: ${{ inputs.junit }}
+  exit-code:
+    description: The exit code of tinyprobe, 0 when every workflow passed.
+    value: ${{ steps.run.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    # Inputs reach the scripts as environment variables, never pasted into them.
+    - name: Install tinyprobe
+      id: install
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_TINYPROBE_PATH: ${{ inputs.tinyprobe-path }}
+        ACTION_REF: ${{ github.action_ref }}
+        RUNNER_OS_NAME: ${{ runner.os }}
+      run: |
+        if [ -n "$INPUT_TINYPROBE_PATH" ]; then
+          echo "bin=$INPUT_TINYPROBE_PATH" >> "$GITHUB_OUTPUT"
+          "$INPUT_TINYPROBE_PATH" --version
+          exit 0
+        fi
+
+        # kikutano/tinyprobe@v0.15.0 installs tinyprobe 0.15.0: the action and the binary are one release.
+        version="$INPUT_VERSION"
+        if [ -z "$version" ] && printf '%s' "$ACTION_REF" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+          version="${ACTION_REF#v}"
+        fi
+
+        dir="$RUNNER_TEMP/tinyprobe-bin"
+        if [ "$RUNNER_OS_NAME" = "Windows" ]; then
+          TINYPROBE_VERSION="$version" TINYPROBE_INSTALL_DIR="$dir" pwsh -NoProfile -File "$GITHUB_ACTION_PATH/install.ps1"
+          echo "bin=$dir/tinyprobe.exe" >> "$GITHUB_OUTPUT"
+        else
+          TINYPROBE_VERSION="$version" TINYPROBE_INSTALL_DIR="$dir" sh "$GITHUB_ACTION_PATH/install.sh"
+          echo "bin=$dir/tinyprobe" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Run tinyprobe
+      id: run
+      shell: bash
+      env:
+        TINYPROBE_BIN: ${{ steps.install.outputs.bin }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_ENV_FILE: ${{ inputs.env-file }}
+        INPUT_VARS: ${{ inputs.vars }}
+        INPUT_JUNIT: ${{ inputs.junit }}
+      run: bash "$GITHUB_ACTION_PATH/action/run.sh"
+
+    - name: Summary and annotations
+      if: always() && steps.run.outcome == 'success'
+      shell: bash
+      env:
+        INPUT_SUMMARY: ${{ inputs.summary }}
+        INPUT_ANNOTATIONS: ${{ inputs.annotations }}
+        INPUT_JUNIT: ${{ inputs.junit }}
+      run: |
+        python=$(command -v python3 || command -v python || true)
+        if [ -z "$python" ]; then
+          echo "::notice::Python is not installed: no job summary and no annotations. The JUnit report is in $INPUT_JUNIT."
+          exit 0
+        fi
+        "$python" -I "$GITHUB_ACTION_PATH/action/report.py" "$INPUT_JUNIT"
+
+    - name: Result
+      if: always() && steps.run.outcome == 'success'
+      shell: bash
+      env:
+        EXIT_CODE: ${{ steps.run.outputs.exit-code }}
+      run: exit "${EXIT_CODE:-2}"
