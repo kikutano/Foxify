@@ -140,3 +140,57 @@ jobs:
       - name: Test server log
         if: failure()
         run: cat server.log || true
+
+  # The Docker image (docker/Dockerfile) with an Alpine binary built from these sources, as the Release
+  # workflow builds it: the example workflows over the host network, a JUnit report written into the mounted
+  # folder by the caller's user, and an HTTPS request.
+  docker:
+    name: Docker image (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        include:
+          - { platform: linux/amd64, rid: linux-musl-x64,   os: ubuntu-latest }
+          - { platform: linux/arm64, rid: linux-musl-arm64, os: ubuntu-24.04-arm }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Start test server
+        run: |
+          dotnet build tests/Tinyprobe.RealServer.Tests -c Release
+          dotnet run --project tests/Tinyprobe.RealServer.Tests -c Release --no-build --urls http://localhost:5122 > server.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://localhost:5122/api/public && exit 0
+            sleep 1
+          done
+          echo "Test server did not start"; cat server.log; exit 1
+
+      - name: Publish Native AOT for Alpine
+        run: docker/publish-musl.sh ${{ matrix.rid }} docker/${{ matrix.platform }}
+
+      - name: Build the image
+        run: |
+          docker build -t tinyprobe:ci docker
+          docker image ls tinyprobe:ci
+
+      - name: End-to-end in the image
+        run: |
+          mkdir -p reports
+          docker run --rm --network host --user "$(id -u):$(id -g)" -v "$PWD:/work" tinyprobe:ci \
+            run docs/example/workflows -e docs/environment.yaml --junit reports/docker.xml
+          test "$(stat -c %u reports/docker.xml)" = "$(id -u)"
+          grep -q 'failures="0" errors="0"' reports/docker.xml
+          docker run --rm -v "$PWD:/work" tinyprobe:ci run docker/test/https.yaml
+
+      - name: Test server log
+        if: failure()
+        run: cat server.log || true

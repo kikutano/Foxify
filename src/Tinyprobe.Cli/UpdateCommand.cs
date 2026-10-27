@@ -16,7 +16,7 @@ internal static class UpdateCommand
     private const string Repository = "kikutano/tinyprobe";
 
     // Platforms with a prebuilt binary in every release (see .github/workflows/release.yml).
-    private static readonly string[] SupportedRids = ["win-x64", "linux-x64", "linux-arm64", "osx-arm64"];
+    private static readonly string[] SupportedRids = ["win-x64", "linux-x64", "linux-arm64", "linux-musl-x64", "linux-musl-arm64", "osx-arm64"];
 
     public static async Task<int> RunAsync(IAnsiConsole console, string currentVersion, bool checkOnly, bool force)
     {
@@ -129,8 +129,10 @@ internal static class UpdateCommand
             ?? throw new InvalidOperationException("The latest release has no tag.");
     }
 
+    // A Native AOT binary reports the RID it was built for: an Alpine build updates to the Alpine build.
     internal static string? CurrentOs() =>
         OperatingSystem.IsWindows() ? "win"
+        : OperatingSystem.IsLinux() && RuntimeInformation.RuntimeIdentifier.StartsWith("linux-musl", StringComparison.Ordinal) ? "linux-musl"
         : OperatingSystem.IsLinux() ? "linux"
         : OperatingSystem.IsMacOS() ? "osx"
         : null;

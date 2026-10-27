@@ -8,6 +8,8 @@ public class UpdateCommandTests
     [InlineData("win", Architecture.X64, "tinyprobe-win-x64.zip")]
     [InlineData("linux", Architecture.X64, "tinyprobe-linux-x64.tar.gz")]
     [InlineData("linux", Architecture.Arm64, "tinyprobe-linux-arm64.tar.gz")]
+    [InlineData("linux-musl", Architecture.X64, "tinyprobe-linux-musl-x64.tar.gz")]
+    [InlineData("linux-musl", Architecture.Arm64, "tinyprobe-linux-musl-arm64.tar.gz")]
     [InlineData("osx", Architecture.Arm64, "tinyprobe-osx-arm64.tar.gz")]
     public void GetAssetName_ReturnsTheReleaseArchive(string os, Architecture architecture, string expected)
     {

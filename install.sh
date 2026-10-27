@@ -25,9 +25,14 @@ case "$(uname -m)" in
   *) fail "unsupported architecture '$(uname -m)'." ;;
 esac
 
+# Alpine and other musl distributions cannot run the glibc binary.
+if [ "$os" = "linux" ] && ls /lib/ld-musl-*.so.1 >/dev/null 2>&1; then
+  os="linux-musl"
+fi
+
 rid="$os-$arch"
 case "$rid" in
-  linux-x64|linux-arm64|osx-arm64) ;;
+  linux-x64|linux-arm64|linux-musl-x64|linux-musl-arm64|osx-arm64) ;;
   *) fail "no prebuilt binary for $rid. Build from source: https://github.com/$REPO#build-from-source" ;;
 esac
 

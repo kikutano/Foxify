@@ -21,3 +21,6 @@ docs/dev_credentials.json
 ################################################################################
 .dev/
 publish/
+
+# Binaries copied into the Docker build context (docker/publish-musl.sh, Release workflow).
+docker/linux/

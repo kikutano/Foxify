@@ -76,9 +76,37 @@ jobs:
           name: tinyprobe-${{ matrix.rid }}
           path: dist/*
 
+  # Alpine (musl): for Alpine-based CI images, and the binaries of the Docker image.
+  build-musl:
+    name: Build (${{ matrix.rid }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { rid: linux-musl-x64,   os: ubuntu-latest }
+          - { rid: linux-musl-arm64, os: ubuntu-24.04-arm }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish Native AOT (smoke test included)
+        run: docker/publish-musl.sh ${{ matrix.rid }} publish "${GITHUB_REF_NAME#v}"
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          tar -czf dist/tinyprobe-${{ matrix.rid }}.tar.gz -C publish tinyprobe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tinyprobe-${{ matrix.rid }}
+          path: dist/*
+
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [build, build-musl]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,6 +139,66 @@ jobs:
           body_path: ${{ runner.temp }}/tag-notes.md
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # ghcr.io/kikutano/tinyprobe:X.Y.Z, X.Y and latest, from the musl binaries of this release.
+  docker:
+    name: Docker image
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tinyprobe-linux-musl-*
+          path: dist
+          merge-multiple: true
+
+      - name: Build context
+        run: |
+          mkdir -p docker/linux/amd64 docker/linux/arm64
+          tar -xzf dist/tinyprobe-linux-musl-x64.tar.gz -C docker/linux/amd64
+          tar -xzf dist/tinyprobe-linux-musl-arm64.tar.gz -C docker/linux/arm64
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A pre-release gets only its exact tag: latest and X.Y stay on the last stable release.
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=tinyprobe
+            org.opencontainers.image.description=API testing from the command line: endpoints and workflows in YAML.
+            org.opencontainers.image.licenses=MIT
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: docker
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # Pulled without credentials, as users do: this fails while the package is still private on GHCR.
+      - name: Smoke test (anonymous pull, HTTPS)
+        run: |
+          docker logout ghcr.io
+          image="ghcr.io/${{ github.repository }}:${GITHUB_REF_NAME#v}"
+          docker run --rm "$image" --version | grep -qx "${GITHUB_REF_NAME#v}"
+          docker run --rm -v "$PWD:/work" "$image" run docker/test/https.yaml
 
   # Users pin `kikutano/tinyprobe@vX.Y.Z`: the action of this release, with its binary, on every OS.
   action:

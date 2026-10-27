@@ -1,0 +1,11 @@
+# Run inside the Docker image by CI and by the Release workflow: an HTTPS request needs OpenSSL and the
+# CA certificates of the image, which the plain-HTTP example workflows never load.
+name: HTTPS from the image
+base_url: https://github.com
+endpoints:
+  home: { path: / }
+steps:
+  - name: GitHub over HTTPS
+    call: home
+    expect:
+      status: 200

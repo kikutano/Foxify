@@ -38,7 +38,15 @@ curl -fsSL https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.sh 
 irm https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.ps1 | iex
 ```
 
-Or download the archive for your platform from [Releases](https://github.com/kikutano/tinyprobe/releases) (`win-x64`, `linux-x64`, `linux-arm64`, `osx-arm64`) and put `tinyprobe` on your `PATH`.
+Or download the archive for your platform from [Releases](https://github.com/kikutano/tinyprobe/releases) (`win-x64`, `linux-x64`, `linux-arm64`, `linux-musl-x64` and `linux-musl-arm64` for Alpine, `osx-arm64`) and put `tinyprobe` on your `PATH`.
+
+**Docker**
+
+```bash
+docker run --rm -v "$PWD:/work" ghcr.io/kikutano/tinyprobe:0.16.0 run tinyprobe/workflows -e tinyprobe/env.local.yaml
+```
+
+The image is the release's Alpine binary on Microsoft's .NET `runtime-deps` Alpine base, for `linux/amd64` and `linux/arm64`; tags are the version (`0.16.0`), the minor (`0.16`) and `latest`. The current folder is mounted as `/work`. Inside the container `localhost` is the container itself: on Linux add `--network host` to test an API running on your machine, on macOS and Windows use `host.docker.internal` as the host. Add `--user "$(id -u):$(id -g)"` so that a report written with `--junit` belongs to you.
 
 Check that it works:
 
@@ -321,20 +329,24 @@ GitHub Actions, with the action of this repository:
 
 It installs the binary of the same release (checksum verified), runs the folder, writes `tinyprobe-report.xml`, puts a summary on the job page, and marks each failing step as an error at its line in the workflow file, in the run and in pull requests. Inputs: `path` (files or folders), `env-file`, `vars` (one `name=value` per line; the log shows the names only), `version`, `junit`, `summary`, `annotations`, and `tinyprobe-path` to use a binary already on the runner. It runs on Linux, macOS and Windows runners. Upload the report with `actions/upload-artifact` to keep it.
 
-GitLab CI:
+GitLab CI, with the Docker image:
 
 ```yaml
 api-tests:
+  image:
+    name: ghcr.io/kikutano/tinyprobe:0.16.0
+    entrypoint: [""]     # GitLab runs the script in a shell, not through tinyprobe
   script:
-    - curl -fsSL https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.sh | TINYPROBE_VERSION=0.15.0 sh
-    - ~/.local/bin/tinyprobe run tinyprobe/workflows -e tinyprobe/env.ci.yaml --junit reports/tinyprobe.xml
+    - tinyprobe run tinyprobe/workflows -e tinyprobe/env.ci.yaml --junit reports/tinyprobe.xml
   artifacts:
     when: always
     reports:
       junit: reports/tinyprobe.xml
 ```
 
-Pin the version (the action's tag, or `TINYPROBE_VERSION`), so a new release does not change your pipeline without you choosing it. Keep credentials in the CI's secrets and write `env.ci.yaml` from them, or pass them with `--var`.
+The same image works on any CI that runs jobs in a container (Bitbucket Pipelines, CircleCI, Woodpecker, Jenkins with Docker). In a job that needs its own image, install the binary instead: `curl -fsSL https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.sh | TINYPROBE_VERSION=0.16.0 sh`, then run `~/.local/bin/tinyprobe`. The script picks the Alpine build on Alpine.
+
+Pin the version (the action's tag, the image tag, or `TINYPROBE_VERSION`), so a new release does not change your pipeline without you choosing it. Keep credentials in the CI's secrets and write `env.ci.yaml` from them, or pass them with `--var`.
 
 ### Explore an API
 
@@ -453,7 +465,7 @@ dotnet publish src/Tinyprobe.Cli/Tinyprobe.Cli.csproj -c Release -r linux-x64 -o
 
 ## Releasing
 
-Push a SemVer tag. The [Release workflow](.github/workflows/release.yml) runs the tests, builds the native binaries for every platform and publishes a GitHub Release with checksums and generated notes.
+Push a SemVer tag. The [Release workflow](.github/workflows/release.yml) runs the tests, builds the native binaries for every platform, publishes a GitHub Release with checksums and generated notes, pushes the Docker image to `ghcr.io/kikutano/tinyprobe`, and runs the GitHub Action of the release on Linux, macOS and Windows.
 
 To put your own notes on top of the generated ones (a breaking change, highlights), write them in an annotated tag. The first line is the title; everything after it goes into the release notes:
 
