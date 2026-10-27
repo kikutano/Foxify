@@ -50,5 +50,8 @@ Claude Code, Sonnet. The runs of 2026-10-26 were made before the test server had
 | 0.11.0 | 21 | 0 | 10/10 | sent as a hand-built multipart string, reported as a failing workflow | reported, check kept | 0 | 0 | no |
 | 12.5, first draft | 15 | 1 | 10/10 | skipped, reported in the answer | reported, check kept | 0 | 0 | no |
 | 12.5 | 26 | 1 | 10/10 | skipped, reported in `MIGRATION.md` | reported in `MIGRATION.md`, check kept | 0 | 0 | `MIGRATION.md`, a row per operation |
+| 0.17.0 (`multipart`), 2026-10-27 | 18 | 0 | 11/11 | `multipart` endpoint, a fixture in `tinyprobe/fixtures/`, `204` and `404` steps passing | reported in `MIGRATION.md`, check kept | 0 | 0 | `MIGRATION.md`, 11 of 11 converted |
 
 The guide of 0.11.0 already converts the document well. Section 12.5 adds the rule for multipart bodies (skip and report instead of building the body by hand) and the coverage report. The exit `2` of both runs is a `tinyprobe call` of `login` without its required arguments. The number of rounds varies between runs of the same guide, so one run per guide is not enough to compare them.
+
+With `multipart` (0.17.0) the upload is converted, not skipped. The only failing invocation of that run (exit `1`) was a `tinyprobe call` of `upload_avatar` with `file=tinyprobe/fixtures/avatar.png`, a path from the current directory; the workflow then used `../fixtures/avatar.png` and passed. The guide now says that the same `../fixtures/…` path works for `call` and in workflows.

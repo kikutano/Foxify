@@ -106,7 +106,7 @@ endpoints:
 | `auth` | Name of an auth set of **the same file**, or a list of names. |
 | `body` | A YAML mapping or list: sent as JSON. A string (e.g. a `\|` block): sent as is, `text/plain` unless a `Content-Type` header says otherwise. A single placeholder (`body: ${payload}`): the whole body is an argument. |
 | `form` | A form body (`application/x-www-form-urlencoded`), instead of `body`: `field: value`, encoded by tinyprobe (`a&b` is sent as `a%26b`); a list sends the field once per value. tinyprobe sets the `Content-Type`: don't add the header. |
-| `multipart` | A `multipart/form-data` body (file uploads), instead of `body`: `field: value` for a text field, `field: { file: path }` for a file (`filename` and `content_type` are optional: by default the file's name and the type of its extension), a list for several values or files under one name. **The path is relative to the workflow that runs** (to the API file for `tinyprobe call`), like `import`: from `tinyprobe/workflows/`, a file in `tinyprobe/fixtures/` is `../fixtures/avatar.png`. Pass the path as an argument, as in `upload_invoice`. tinyprobe sets the `Content-Type` and its boundary: don't add the header. |
+| `multipart` | A `multipart/form-data` body (file uploads), instead of `body`: `field: value` for a text field, `field: { file: path }` for a file (`filename` and `content_type` are optional: by default the file's name and the type of its extension), a list for several values or files under one name. **The path is relative to the workflow that runs** (to the API file for `tinyprobe call`), like `import`, not to the current directory: a file in `tinyprobe/fixtures/` is `../fixtures/avatar.png` from `tinyprobe/workflows/` and from `tinyprobe/api/` alike, so `tinyprobe call … --with file=../fixtures/avatar.png` and the workflow use the same path. Pass the path as an argument, as in `upload_invoice`. tinyprobe sets the `Content-Type` and its boundary: don't add the header. |
 | `params` | Declared arguments: `name: default` or `name:` (required). **Declare every path placeholder and every required input as a required param**: a step that forgets it is then reported before running, instead of failing at run time. Placeholders of `auth` sets and `base_url` (such as `${token}`, `${baseUrl}`) are not params: do not declare them. |
 
 ## 4. Workflow file
@@ -342,7 +342,7 @@ Safety: run workflows only against a **local or test** environment, never agains
 | a Postman request or check skipped without a word | a line in `MIGRATION.md` that says what and why |
 | a multipart body built by hand in a string `body`, or `body: "a=${a}&b=${b}"` | `multipart:` or `form:`: tinyprobe encodes the values and writes the boundary |
 | a `Content-Type` header on an endpoint with `form` or `multipart` | no header: tinyprobe sets it, and reports the header as an error |
-| `file: tinyprobe/fixtures/a.png` in a workflow of `tinyprobe/workflows/` | `file: ../fixtures/a.png`: paths are relative to the workflow |
+| `file: tinyprobe/fixtures/a.png` in a workflow of `tinyprobe/workflows/`, or `--with file=tinyprobe/fixtures/a.png` in a `tinyprobe call` | `../fixtures/a.png`: paths are relative to the workflow, or to the API file for `call` |
 
 ## 11. Complete example
 

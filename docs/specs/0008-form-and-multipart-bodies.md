@@ -1,9 +1,9 @@
 # 0008 — Form and multipart bodies, file uploads
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M4-1
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#24](https://github.com/kikutano/tinyprobe/pull/24)
 
 ## Problem
 
@@ -160,12 +160,12 @@ Nothing required: completion and hover read the keys from `tinyprobe schema`, so
 
 ## Acceptance criteria
 
-- [ ] `form` and `multipart` as above, with every validation error at its location.
-- [ ] Unit tests: the loader (valid, and every error above), the request builder (encoding, field order, lists, file parts, default and explicit `filename` and `content_type`, the path relative to the workflow and to the API file for `call`, a missing file, the MCP working-directory rule), the recorded multipart text.
-- [ ] `docs/example/workflows/files.yaml` passes against the test server, in CI and in `scripts/dev.sh e2e`.
-- [ ] `inspect --json` has `form` and `multipart`; the schema has their keys, and its test passes.
-- [ ] The guide translates file uploads (Postman, OpenAPI, curl), and the OpenAPI bench converts `uploadAvatar`.
-- [ ] `scripts/dev.sh check` passes.
+- [x] `form` and `multipart` as above, with every validation error at its location.
+- [x] Unit tests: the loader (valid, and every error above), the request builder (encoding, field order, lists, file parts, default and explicit `filename` and `content_type`, the path relative to the workflow and to the API file for `call`, a missing file, the MCP working-directory rule), the recorded multipart text.
+- [x] `docs/example/workflows/files.yaml` passes against the test server, in CI and in `scripts/dev.sh e2e`.
+- [x] `inspect --json` has `form` and `multipart`; the schema has their keys, and its test passes.
+- [x] The guide translates file uploads (Postman, OpenAPI, curl), and the OpenAPI bench converts `uploadAvatar`.
+- [x] `scripts/dev.sh check` passes.
 
 ## Open questions
 
