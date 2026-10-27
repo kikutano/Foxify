@@ -1,11 +1,20 @@
 name: GitHub Action
 
 # The action of this repository (action.yml) installs the released binary by itself, on every OS, after each
-# release; it runs example/ against JSONPlaceholder, so it needs no test server.
+# release; it runs example/ against JSONPlaceholder, so it needs no test server. The Release workflow calls it:
+# a release published with GITHUB_TOKEN does not trigger other workflows.
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
   workflow_dispatch:
+    inputs:
+      version:
+        description: The tinyprobe version to install (empty for the latest release)
+        type: string
+        default: ''
 
 jobs:
   action:
@@ -21,7 +30,7 @@ jobs:
       - uses: ./
         id: tinyprobe
         with:
-          version: ${{ github.event.release.tag_name }}
+          version: ${{ inputs.version }}
           path: example/workflows
           env-file: example/environment.yaml
           junit: reports/example.xml

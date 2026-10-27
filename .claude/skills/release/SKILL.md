@@ -16,7 +16,7 @@ Pushing a tag publishes binaries to every user (`tinyprobe update`, install scri
    Set `version` in `agents/claude/.claude-plugin/plugin.json` to the new version and commit it before tagging: Claude Code updates the plugin when that version changes.
 5. Show the notes and the tag command to the user. After approval:
    `git tag -a vX.Y.Z --cleanup=whitespace -F notes.md && git push origin vX.Y.Z`
-   (`-beta.N` suffix → pre-release). The Release workflow builds win-x64, linux-x64, linux-arm64, osx-arm64 and publishes checksums. Then the "GitHub Action" workflow runs `action.yml` with the new release on Linux, macOS and Windows: check it passed, since users pin `kikutano/tinyprobe@vX.Y.Z`.
+   (`-beta.N` suffix → pre-release). The Release workflow builds win-x64, linux-x64, linux-arm64, osx-arm64, publishes checksums, then runs `action.yml` with the new release on Linux, macOS and Windows (job "GitHub Action"): check it passed, since users pin `kikutano/tinyprobe@vX.Y.Z`.
 
 ## Extension (`../tinyprobe-vscode`)
 

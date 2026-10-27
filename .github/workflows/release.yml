@@ -111,3 +111,11 @@ jobs:
           body_path: ${{ runner.temp }}/tag-notes.md
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # Users pin `kikutano/tinyprobe@vX.Y.Z`: the action of this release, with its binary, on every OS.
+  action:
+    name: GitHub Action
+    needs: release
+    uses: ./.github/workflows/action.yml
+    with:
+      version: ${{ github.ref_name }}
