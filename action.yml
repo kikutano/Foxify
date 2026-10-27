@@ -13,7 +13,7 @@ inputs:
     description: The environment file, like `-e`.
     default: ''
   vars:
-    description: Variables over the environment file, one `name=value` per line, like `--var`. Pass secrets as `token=${{ secrets.API_TOKEN }}`.
+    description: Variables over the environment file, one `name=value` per line, like `--var`. Take credentials from the workflow's secrets; the log shows the names only.
     default: ''
   version:
     description: The tinyprobe version to install. Default, the version of this action's tag (`kikutano/tinyprobe@v0.15.0` installs 0.15.0), or the latest release.
