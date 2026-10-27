@@ -66,7 +66,60 @@ endpoints:
 | `endpoints.<name>.headers` | Extra headers for this endpoint. |
 | `endpoints.<name>.auth` | One auth set or a list of them (`[bearer, apikey]`). |
 | `endpoints.<name>.body` | A YAML value, sent as JSON (`application/json`); a string, sent as is (`text/plain` unless a `Content-Type` header says otherwise); or a single `${…}` placeholder. |
+| `endpoints.<name>.form` | A form body (`application/x-www-form-urlencoded`), instead of `body`. See [Forms and file uploads](#forms-and-file-uploads). |
+| `endpoints.<name>.multipart` | A `multipart/form-data` body with text fields and files, instead of `body`. See [Forms and file uploads](#forms-and-file-uploads). |
 | `endpoints.<name>.params` | Optional declaration of the arguments: `name: default`, or `name:` for a required one. Declared params are checked before the request is sent. |
+
+### Forms and file uploads
+
+```yaml
+# file: api/forms.yaml
+base_url: ${baseUrl}
+endpoints:
+  token:
+    method: POST
+    path: /oauth/token
+    params: { client_id:, client_secret: }
+    form:                                  # application/x-www-form-urlencoded
+      grant_type: client_credentials
+      client_id: ${client_id}
+      client_secret: ${client_secret}
+      scope: [read, write]                 # a list: scope=read&scope=write
+
+  upload_avatar:
+    method: POST
+    path: /api/users/${id}/avatar
+    params: { id:, avatar: }
+    multipart:                             # multipart/form-data
+      description: Profile picture         # a text field
+      avatar:
+        file: ${avatar}                    # a file: its path
+        filename: me.png                   # optional, default: the file's name
+        content_type: image/png            # optional, default: from the extension
+      tags: [profile, public]              # a list: the field once per value
+```
+
+```yaml
+# file: workflows/avatar.yaml
+name: Avatar
+import: [../api/forms.yaml]
+steps:
+  - call: upload_avatar
+    with:
+      id: 1
+      avatar: ../fixtures/avatar.png       # relative to this workflow
+    expect:
+      status: 201
+```
+
+- An endpoint has at most one of `body`, `form` and `multipart`.
+- `form` encodes names and values, after resolving placeholders: a password `a&b` is sent as `a%26b`. Numbers and booleans are sent as text, `null` as an empty value.
+- In `multipart`, a field is a value (a text field), a mapping with `file` (a file), or a list of them (the field once per item). Fields are sent in the order written.
+- **File paths are relative to the file tinyprobe was given**: the workflow for `run` (each workflow of a folder on its own), the API file for `call`, like `import`. Absolute paths are used as they are. The file is read when the step runs, on every attempt; a missing file fails the step.
+- `content_type` defaults to the type of the extension (`png`, `jpg`, `jpeg`, `gif`, `webp`, `svg`, `pdf`, `json`, `txt`, `csv`, `xml`, `html`, `zip`), otherwise `application/octet-stream`. Text fields have no `Content-Type`.
+- tinyprobe sets the request's `Content-Type` (with the multipart boundary). A `Content-Type` from the file's `headers` or an auth set is not sent; one in the endpoint's own `headers` is an error.
+- With `-v` and in `--reporter ndjson`, a multipart body is shown with each file's content replaced by one line, `(file ../fixtures/avatar.png, 79 B)`.
+- Under `tinyprobe mcp`, files must be inside the server's working directory.
 
 ## Workflow file
 

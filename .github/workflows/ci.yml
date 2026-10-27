@@ -80,7 +80,7 @@ jobs:
           ./publish/tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --reporter ndjson > events.ndjson
           jq -e -s '.[0].event == "run_started" and .[-1].event == "run_finished" and .[-1].success' events.ndjson
           ./publish/tinyprobe run docs/example -e docs/environment.yaml --reporter ndjson > suite.ndjson
-          jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 4 and .[-1].event == "suite_finished" and .[-1].success' suite.ndjson
+          jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 5 and .[-1].event == "suite_finished" and .[-1].success' suite.ndjson
 
       - name: End-to-end (schema)
         run: ./publish/tinyprobe schema | jq -e '."$defs".step.properties.call and (.properties.steps.items."$ref" == "#/$defs/step")'
@@ -94,7 +94,7 @@ jobs:
             '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
             '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run","arguments":{"paths":["docs/example/workflows"],"env_file":"docs/environment.yaml"}}}' \
             | ./publish/tinyprobe mcp > mcp.ndjson
-          jq -e -s 'length == 3 and .[0].result.serverInfo.name == "tinyprobe" and (.[1].result.tools | length) == 4 and (.[2].result.isError | not) and (.[2].result.content[0].text | fromjson | .success and (.workflows | length) == 4)' mcp.ndjson
+          jq -e -s 'length == 3 and .[0].result.serverInfo.name == "tinyprobe" and (.[1].result.tools | length) == 4 and (.[2].result.isError | not) and (.[2].result.content[0].text | fromjson | .success and (.workflows | length) == 5)' mcp.ndjson
 
       - name: End-to-end (init)
         run: |

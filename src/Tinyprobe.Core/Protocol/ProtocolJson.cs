@@ -124,6 +124,8 @@ public static class ProtocolJson
             w.WriteNull("body");
         else
             WriteLiteral(w, "body", endpoint.Body);
+        WriteFields(w, "form", endpoint.Form);
+        WriteFields(w, "multipart", endpoint.Multipart);
 
         w.WriteStartArray("params");
         foreach (var (name, defaultValue) in endpoint.Params ?? new Dictionary<string, Template?>())
@@ -470,6 +472,35 @@ public static class ProtocolJson
     {
         w.WriteNumber("protocol", Version);
         w.WriteString("version", version);
+    }
+
+    /// <summary>The fields of a form or multipart body, in order, one entry per sent field; null when absent.</summary>
+    private static void WriteFields(Utf8JsonWriter w, string name, IReadOnlyList<BodyField>? fields)
+    {
+        if (fields is null)
+        {
+            w.WriteNull(name);
+            return;
+        }
+
+        w.WriteStartArray(name);
+        foreach (var field in fields)
+        {
+            w.WriteStartObject();
+            w.WriteString("name", field.Name);
+            if (field.File is null)
+            {
+                WriteLiteral(w, "value", field.Value!);
+            }
+            else
+            {
+                w.WriteString("file", field.File.ToString());
+                WriteNullableString(w, "filename", field.FileName?.ToString());
+                WriteNullableString(w, "content_type", field.ContentType?.ToString());
+            }
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
     }
 
     private static void WriteLiteral(Utf8JsonWriter w, string name, Template template)

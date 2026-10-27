@@ -236,7 +236,7 @@ only in tinyprobe/env.local.yaml and add it to .gitignore. Write tinyprobe/MIGRA
 converted, what you skipped and why, and tell me which failures look like backend bugs.
 ```
 
-Variants of the same request ("Login", "Login - wrong password") become one endpoint called with different arguments, and the values your scripts saved become `save`. What has no equivalent yet (scripts that compute a signature, `pm.sendRequest`, form-data uploads, cookies) is not guessed: the agent lists it in `MIGRATION.md`, so you know what the tests do not cover. The same prompt works for the exports of Insomnia, Bruno or another API tool: name the folder and the tool.
+Variants of the same request ("Login", "Login - wrong password") become one endpoint called with different arguments, and the values your scripts saved become `save`. What has no equivalent yet (scripts that compute a signature, `pm.sendRequest`, cookies) is not guessed: the agent lists it in `MIGRATION.md`, so you know what the tests do not cover. The same prompt works for the exports of Insomnia, Bruno or another API tool: name the folder and the tool.
 
 ### From an OpenAPI document
 
@@ -390,6 +390,15 @@ endpoints:
   get_user:
     path: /api/users/${id}
     auth: bearer
+  upload_avatar:
+    method: POST
+    path: /api/users/${id}/avatar
+    auth: bearer
+    params: { id:, avatar: }
+    multipart:               # a file upload; form: sends an urlencoded form
+      description: Profile picture
+      avatar:
+        file: ${avatar}
 ```
 
 ```yaml
@@ -432,7 +441,7 @@ steps:
 
 ## Test server example
 
-[docs/example/](docs/example/) tests the test server of this repository, and is what CI runs: one API file and four workflows covering authentication, CRUD, nested JSON, query strings, headers, status codes and slow responses. It needs the .NET SDK to start the server; for a first look, [example/](example/) needs nothing.
+[docs/example/](docs/example/) tests the test server of this repository, and is what CI runs: one API file and five workflows covering authentication, CRUD, nested JSON, query strings, headers, status codes, slow responses, forms and file uploads. It needs the .NET SDK to start the server; for a first look, [example/](example/) needs nothing.
 
 ```bash
 # terminal 1: start the test server on http://localhost:5122

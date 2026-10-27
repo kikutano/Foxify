@@ -8,8 +8,7 @@ This folder is **not** an example for users. It measures how well a coding agent
 
 | | Operations | What the agent should do |
 |---|---|---|
-| Translatable | 10 | An endpoint each, called by a passing workflow: `getPublic`, `login`, `checkBearer`, `checkApiKey`, `listUsers`, `createUser`, `getUser`, `replaceUser`, `updateUser`, `deleteUser`. |
-| Untranslatable | 1 | `uploadAvatar` (`multipart/form-data`): skip it and report why. |
+| Translatable | 11 | An endpoint each, called by a passing workflow: `getPublic`, `login`, `checkBearer`, `checkApiKey`, `listUsers`, `createUser`, `getUser`, `replaceUser`, `updateUser`, `deleteUser`, and `uploadAvatar` (`multipart/form-data`, since 0.17.0: a `multipart` endpoint and a small file in `tinyprobe/fixtures/`). |
 | Document and backend differ | 1 | `createUser` with an empty email answers `400`, the document says `422`: report the difference. |
 | Example values | — | The `User` example (id `42`, Jane Smith) is not in the seed data: checks must use real values, found with `tinyprobe call`. |
 
@@ -36,20 +35,23 @@ The password and the API key must not end up in a file that would be committed.
 |---|---|
 | Rounds | `tinyprobe inspect` / `run` / `call` invocations until the last run passes. |
 | Invalid files | Invocations that exited with `2`, and syntax that does not exist left in the final files. |
-| Operations covered | Of the 10 translatable operations, how many have a step in a workflow that passes. |
-| Untranslatable reported | Whether `uploadAvatar` is reported, in the answer or in a file. |
+| Operations covered | Of the translatable operations, how many have a step in a workflow that passes. |
+| `uploadAvatar` | Sent as `multipart` with a file, and passing (`204`). Before 0.17.0: reported as untranslatable. |
 | Difference reported | Whether the `400` / `422` difference of `createUser` is reported. |
 | Example values | Checks that expect a value of the document's examples. |
 | Secrets committed | Files outside `.gitignore` that contain the password or the API key. |
 
 ## Scores
 
-Claude Code, Sonnet, on 2026-10-26. The test server has no avatar route: a conversion that sends the upload anyway gets `404`.
+Claude Code, Sonnet. The runs of 2026-10-26 were made before the test server had an avatar route: a conversion that sent the upload anyway got `404`, and 10 operations were translatable.
 
 | Guide | Rounds | Exit `2` | Operations covered | `uploadAvatar` | `400` / `422` | Example values | Secrets committed | Coverage report |
 |---|---|---|---|---|---|---|---|---|
 | 0.11.0 | 21 | 0 | 10/10 | sent as a hand-built multipart string, reported as a failing workflow | reported, check kept | 0 | 0 | no |
 | 12.5, first draft | 15 | 1 | 10/10 | skipped, reported in the answer | reported, check kept | 0 | 0 | no |
 | 12.5 | 26 | 1 | 10/10 | skipped, reported in `MIGRATION.md` | reported in `MIGRATION.md`, check kept | 0 | 0 | `MIGRATION.md`, a row per operation |
+| 0.17.0 (`multipart`), 2026-10-27 | 18 | 0 | 11/11 | `multipart` endpoint, a fixture in `tinyprobe/fixtures/`, `204` and `404` steps passing | reported in `MIGRATION.md`, check kept | 0 | 0 | `MIGRATION.md`, 11 of 11 converted |
 
 The guide of 0.11.0 already converts the document well. Section 12.5 adds the rule for multipart bodies (skip and report instead of building the body by hand) and the coverage report. The exit `2` of both runs is a `tinyprobe call` of `login` without its required arguments. The number of rounds varies between runs of the same guide, so one run per guide is not enough to compare them.
+
+With `multipart` (0.17.0) the upload is converted, not skipped. The only failing invocation of that run (exit `1`) was a `tinyprobe call` of `upload_avatar` with `file=tinyprobe/fixtures/avatar.png`, a path from the current directory; the workflow then used `../fixtures/avatar.png` and passed. The guide now says that the same `../fixtures/…` path works for `call` and in workflows.

@@ -1,1 +1,4 @@
 *.sh text eol=lf
+
+# Uploaded by docs/example/workflows/files.yaml, which checks their size and SHA-256: never convert line endings.
+docs/example/fixtures/** -text

@@ -30,6 +30,7 @@ tinyprobe/
 │   ├── smoke.yaml            # one workflow per feature or resource
 │   ├── auth.yaml
 │   └── orders.yaml
+├── fixtures/                 # small files that workflows upload (multipart)
 ├── env.example.yaml          # committed: every variable, with placeholder values
 └── env.local.yaml            # NOT committed: real values for the local backend
 ```
@@ -74,6 +75,26 @@ endpoints:
     body:                         # a YAML value: sent as JSON
       productId: ${productId}
       quantity: ${quantity}
+
+  upload_invoice:
+    method: POST
+    path: /api/orders/${id}/invoice
+    auth: bearer
+    params:
+      id:
+      file:                       # the path of the file, passed by the step
+    multipart:                    # multipart/form-data: text fields and files
+      note: Uploaded by tinyprobe
+      invoice:
+        file: ${file}             # relative to the workflow that runs
+
+  login_form:
+    method: POST
+    path: /login
+    params: { username:, password: }
+    form:                         # application/x-www-form-urlencoded
+      username: ${username}
+      password: ${password}
 ```
 
 | Endpoint key | Meaning |
@@ -84,6 +105,8 @@ endpoints:
 | `headers` | Extra headers. Later headers override earlier ones: file `headers`, then `auth` sets, then endpoint `headers`. |
 | `auth` | Name of an auth set of **the same file**, or a list of names. |
 | `body` | A YAML mapping or list: sent as JSON. A string (e.g. a `\|` block): sent as is, `text/plain` unless a `Content-Type` header says otherwise. A single placeholder (`body: ${payload}`): the whole body is an argument. |
+| `form` | A form body (`application/x-www-form-urlencoded`), instead of `body`: `field: value`, encoded by tinyprobe (`a&b` is sent as `a%26b`); a list sends the field once per value. tinyprobe sets the `Content-Type`: don't add the header. |
+| `multipart` | A `multipart/form-data` body (file uploads), instead of `body`: `field: value` for a text field, `field: { file: path }` for a file (`filename` and `content_type` are optional: by default the file's name and the type of its extension), a list for several values or files under one name. **The path is relative to the workflow that runs** (to the API file for `tinyprobe call`), like `import`, not to the current directory: a file in `tinyprobe/fixtures/` is `../fixtures/avatar.png` from `tinyprobe/workflows/` and from `tinyprobe/api/` alike, so `tinyprobe call … --with file=../fixtures/avatar.png` and the workflow use the same path. Pass the path as an argument, as in `upload_invoice`. tinyprobe sets the `Content-Type` and its boundary: don't add the header. |
 | `params` | Declared arguments: `name: default` or `name:` (required). **Declare every path placeholder and every required input as a required param**: a step that forgets it is then reported before running, instead of failing at run time. Placeholders of `auth` sets and `base_url` (such as `${token}`, `${baseUrl}`) are not params: do not declare them. |
 
 ## 4. Workflow file
@@ -317,6 +340,9 @@ Safety: run workflows only against a **local or test** environment, never agains
 | the real values of a Postman environment in `env.example.yaml` | placeholders there; real values only in `env.local.yaml` |
 | a workflow that relies on a token saved by another workflow | each workflow logs in itself |
 | a Postman request or check skipped without a word | a line in `MIGRATION.md` that says what and why |
+| a multipart body built by hand in a string `body`, or `body: "a=${a}&b=${b}"` | `multipart:` or `form:`: tinyprobe encodes the values and writes the boundary |
+| a `Content-Type` header on an endpoint with `form` or `multipart` | no header: tinyprobe sets it, and reports the header as an error |
+| `file: tinyprobe/fixtures/a.png` in a workflow of `tinyprobe/workflows/`, or `--with file=tinyprobe/fixtures/a.png` in a `tinyprobe call` | `../fixtures/a.png`: paths are relative to the workflow, or to the API file for `call` |
 
 ## 11. Complete example
 
@@ -571,7 +597,8 @@ Follow this section when the user gives you exports of another API tool (a Postm
 | `url.query` | `query: [name, ...]`; the values go in the step's `with` |
 | `disabled: true` on a header, query parameter or form field | leave it out |
 | raw JSON body | a YAML mapping; `"qty": {{qty}}` without quotes becomes `qty: ${qty}`, which keeps the type |
-| `urlencoded` body | a string body `"a=${a}&b=${b}"` and the header `Content-Type: application/x-www-form-urlencoded` |
+| `urlencoded` body | `form:`, one field per enabled `urlencoded[]` entry (`key: value`); no `Content-Type` header |
+| `formdata` body | `multipart:`, one field per enabled `formdata[]` entry: `type: text` is `key: value`, `type: file` is `key: { file: "${key}" }` with the file in `tinyprobe/fixtures/` and its path in the step's `with` (see 12.3 when the file is not in the repository); no `Content-Type` header |
 | collection, folder or request `auth`: `bearer`, `apikey` | `auth` sets in the API file; a request with `inherit` (or no `auth`) uses its parent's set, `noauth` uses none |
 | `basic` auth | `Authorization: "Basic ${basicAuth}"`, with the base64 of `user:password` in `env.local.yaml` |
 | collection `variable`s | workflow `variables` for non-secret defaults, otherwise env files |
@@ -748,7 +775,7 @@ Either way, write a line in `MIGRATION.md`: the request, what was not translated
 | `pm.sendRequest` in a script | a plain request becomes a step before; otherwise report it |
 | `postman.setNextRequest` branching (not a retry loop) | translate the main path; report the branches |
 | data files, `pm.iterationData` | translate one iteration with the first row; report that `for_each` is not supported yet |
-| a `formdata` body, a file upload | skip the request; report it (multipart bodies are not supported yet) |
+| a `formdata` file whose `src` is not in the repository (a path on someone's machine) | ask the user for the file; otherwise create a small file in `tinyprobe/fixtures/` with the same extension (a few lines of text are enough for most servers) and say so in `MIGRATION.md` |
 | the OAuth 2.0 auth helper | client credentials: a token request as the first step, with `save`; other grant types: report them, and ask the user for a token in `env.local.yaml` |
 | cookies set by one response and sent by the next | report it (cookies are not supported yet) |
 | regex checks (`.to.match`), type checks (`.to.be.a("string")`), JSON schema (`jsonSchema`, `tv4`) | keep what has an equivalent (`{ exists: true }`, `contains` for a fixed part of the text); drop the rest and report it |
@@ -788,7 +815,8 @@ An OpenAPI document describes the endpoints but contains no tests. Use it as ste
 | `in: header` parameters | a header with a placeholder (`X-Tenant: ${tenant}`), and the param declared |
 | `in: cookie` parameters | report it (cookies are not supported yet) |
 | `requestBody` with `application/json` (3), the `in: body` parameter (2) | a YAML `body` with the schema's `required` properties, each from a param; optional properties only where a workflow needs them |
-| `application/x-www-form-urlencoded`, `multipart/form-data` | as `urlencoded` (12.2) and `formdata` (12.3) |
+| `requestBody` with `application/x-www-form-urlencoded` | `form`, as `urlencoded` in 12.2 |
+| `requestBody` with `multipart/form-data`, the `in: formData` parameters (2) | `multipart`, as `formdata` in 12.2: a property with `format: binary` (or `type: file` in 2) is a file field, `{ file: "${name}" }`, with a small file in `tinyprobe/fixtures/`; the others are text fields |
 | `securitySchemes` (3), `securityDefinitions` (2): `http` with `scheme: bearer`, `apiKey` with `in: header` | `auth` sets |
 | `apiKey` with `in: query` | a query parameter of each endpoint that needs it, passed as `api_key: ${apiKey}` in the steps' `with` |
 | `http` with `scheme: basic` (3), `type: basic` (2) | as `basic` auth in 12.2 |
@@ -884,7 +912,7 @@ An Insomnia export is JSON with `"__export_format": 4` and a flat `resources` li
 | `{{ _.baseUrl }}`, `{{ baseUrl }}` | `${baseUrl}` |
 | the base environment and its sub-environments | one env file per sub-environment, with the keys of the base environment merged in. A private sub-environment (`isPrivate: true`) and keys that look like credentials go only into `env.local.yaml` |
 | `authentication` of type `bearer`, `apikey`, `basic`, `oauth2` | as the Postman auth rows of 12.2 |
-| `body.mimeType`: `application/json`, `application/x-www-form-urlencoded`, `multipart/form-data` | as `raw` JSON and `urlencoded` (12.2), and `formdata` (12.3) |
+| `body.mimeType`: `application/json`, `application/x-www-form-urlencoded`, `multipart/form-data` | as `raw` JSON, `urlencoded` and `formdata` (12.2) |
 | `{% response 'body', 'req_…', 'b64::JC50b2tlbg==::46b', … %}` | a value taken from another request's response: that request becomes an earlier step, with `save`. After `b64::` is the path in base64: `JC50b2tlbg==` is `$.token` |
 | `{% uuid 'v4' %}`, `{% now 'iso-8601' %}`, `{% now 'unix' %}`, `{% faker … %}` | `${$uuid}`, `${$now}`, `${$timestamp}`, and as `$random…` in 12.2 |
 | other template tags (`{% now 'millis' %}`, `{% base64 … %}`, `{% hash … %}`, `{% prompt … %}`, `{% file … %}`) | report them (12.3) |
@@ -929,7 +957,7 @@ vars:post-response {
 | `params:query`, `headers` | `query`, `headers`. A line that starts with `~` is disabled: leave it out |
 | `auth: inherit` | the auth of `folder.bru`, else of `collection.bru` |
 | `auth:bearer`, `auth:apikey` (`placement: header`), `auth:basic` | as the Postman auth rows of 12.2 |
-| `body:json`, `body:form-urlencoded`, `body:multipart-form` | as `raw` JSON and `urlencoded` (12.2), and `formdata` (12.3) |
+| `body:json`, `body:form-urlencoded`, `body:multipart-form` | as `raw` JSON, `urlencoded` and `formdata` (12.2) |
 | `vars:pre-request` | workflow `variables`, or the step's `with` |
 | `vars:post-response { userEmail: res.body.email }`, `bru.setVar("userEmail", res.body.email)` | `save: { userEmail: $.email }` |
 | `assert` `res.status: eq 200` | `status: 200` |
@@ -965,6 +993,7 @@ A HAR file (`log.entries[]`) is a recording of the requests of one session, from
 - **It contains secrets.** Never copy the value of an `Authorization`, `Cookie` or `Set-Cookie` header, or of a credential field in a body, into a file. Tell the user not to commit the HAR.
 - **Keep only the API.** Drop requests to other hosts, `OPTIONS` preflights, and documents, scripts, styles, images and fonts (`response.content.mimeType`, `_resourceType`). Keep one of a series of identical polling requests.
 - **One endpoint per method and path pattern.** `/api/users/42` and `/api/users/7` are one endpoint, `path: /api/users/${id}`.
+- **Form and multipart bodies.** `postData.params` with `postData.mimeType` `application/x-www-form-urlencoded` is a `form`, with `multipart/form-data` a `multipart`. A HAR does not keep the content of uploaded files: create a small file of the same type in `tinyprobe/fixtures/` and say so in `MIGRATION.md`.
 - **Headers.** Keep `Content-Type`, `Accept` and the API's own headers. Drop the browser's (`User-Agent`, `Accept-Encoding`, `Origin`, `Referer`, `sec-*`, `Cookie`) and the HTTP/2 pseudo-headers (`:authority`, `:path`). `Authorization` becomes an `auth` set with a placeholder.
 - **The order is the flow.** Entries are in time order: a value that a response returned and a later request sent (an id in a URL, a token) becomes a `save`.
 - **Responses** (`response.content.text`, base64 when `encoding: base64`) show the shape for the checks. Don't copy volatile values (ids, dates) as expected values; check with `tinyprobe call`.
@@ -980,10 +1009,11 @@ From a README, a script, or "Copy as cURL" in a browser.
 | `-X POST`, `--request POST` | `method`; without `-X`, `GET`, or `POST` when there is `-d` |
 | `-H "Name: value"` | `headers`; `Authorization: Bearer …` → an `auth` set, and the token only in `env.local.yaml` |
 | `--json '{…}'`, or `-d` / `--data` / `--data-raw` with JSON and `Content-Type: application/json` | a YAML `body` |
-| `-d "a=1&b=2"` without a `Content-Type` | as `urlencoded` (12.2) |
+| `-d "a=1&b=2"` without a `Content-Type`, `--data-urlencode "a=x y"` | `form: { a: 1, b: 2 }` |
 | `-G` with `-d` | `query` |
 | `-u user:password` | as `basic` auth in 12.2 |
-| `-F` | report it (multipart bodies are not supported yet) |
+| `-F "name=value"` | `multipart: { name: value }` |
+| `-F "file=@path"` (`;type=…`, `;filename=…`) | `multipart: { file: { file: "${file}" } }` (`content_type`, `filename`), the file in `tinyprobe/fixtures/` and its path in the step's `with` |
 | `-b`, `--cookie`, `-c` | report it (cookies are not supported yet) |
 | `-k`, `--insecure` | report it: tinyprobe always checks certificates |
 | `-s`, `-v`, `-i`, `-L`, `--compressed` | leave them out |

@@ -62,9 +62,29 @@ public sealed class EndpointDefinition
     /// <summary>Headers in the order they apply: file headers, auth sets, endpoint headers. Later ones win.</summary>
     public IReadOnlyList<KeyValuePair<string, Template>> Headers { get; init; } = [];
     public Template? Body { get; init; }
+    /// <summary><c>form</c>: an <c>application/x-www-form-urlencoded</c> body, the fields in order. At most one of body, form, multipart.</summary>
+    public IReadOnlyList<BodyField>? Form { get; init; }
+    /// <summary><c>multipart</c>: a <c>multipart/form-data</c> body, the fields in order.</summary>
+    public IReadOnlyList<BodyField>? Multipart { get; init; }
     /// <summary>Declared params with their default (null = required), or null when the endpoint declares none.</summary>
     public IReadOnlyDictionary<string, Template?>? Params { get; init; }
     public required SourceLocation Location { get; init; }
+}
+
+/// <summary>
+/// One field of a <c>form</c> or <c>multipart</c> body: a text <see cref="Value"/>, or a <see cref="File"/> to send.
+/// A list in YAML is already one field per item, under the same name.
+/// </summary>
+public sealed class BodyField
+{
+    public required string Name { get; init; }
+    public Template? Value { get; init; }
+    /// <summary>The path of the file, relative to the file tinyprobe was given (the workflow, or the API file of a call).</summary>
+    public Template? File { get; init; }
+    public Template? FileName { get; init; }
+    public Template? ContentType { get; init; }
+
+    internal IEnumerable<Template> Templates => new[] { Value, File, FileName, ContentType }.OfType<Template>();
 }
 
 public abstract class StepDefinition
