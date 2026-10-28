@@ -128,6 +128,9 @@ internal sealed partial class Loader
     // The workflow being loaded: sequences add the endpoints of their imports to it, each API file once.
     private Dictionary<string, EndpointDefinition> _endpoints = new();
     private readonly HashSet<string> _imported = new(StringComparer.OrdinalIgnoreCase);
+    // Imports in load order, and the file each import name stands for.
+    private readonly List<KeyValuePair<string?, string>> _imports = new();
+    private readonly Dictionary<string, string> _importNames = new();
     private readonly List<string> _sequenceStack = new();
 
     public WorkflowDefinition LoadWorkflow(string text, string fullPath)
@@ -144,7 +147,7 @@ internal sealed partial class Loader
         var entries = Collect(file, root, "workflow", WorkflowKeys);
 
         var endpoints = _endpoints = new Dictionary<string, EndpointDefinition>();
-        _imported.Clear();
+        ResetImports();
         var problemsBeforeImports = _problems.Count;
         if (entries.TryGetValue("import", out var imports))
             Import(file, imports);
@@ -169,6 +172,7 @@ internal sealed partial class Loader
             Description = entries.TryGetValue("description", out var description) ? Scalar(file, description, "description") ?? "" : "",
             SourceFile = fullPath,
             Endpoints = endpoints,
+            Imports = _imports.ToList(),
             Steps = steps,
             Variables = entries.TryGetValue("variables", out var variables) ? ParseTemplates(file, variables, "variables") : new Dictionary<string, Template>(),
             Settings = entries.TryGetValue("settings", out var settings) ? ParseSettings(file, settings) : new WorkflowSettings()
@@ -293,32 +297,78 @@ internal sealed partial class Loader
         return root;
     }
 
-    /// <summary>The API files of <c>import</c>, relative to the file: their endpoints join the workflow's, each file once.</summary>
+    private void ResetImports()
+    {
+        _imported.Clear();
+        _imports.Clear();
+        _importNames.Clear();
+    }
+
+    /// <summary>
+    /// The API files of <c>import</c>, relative to the file: their endpoints join the workflow's, each file once per name.
+    /// An item is a path, or a <c>name: path</c> pair whose endpoints are called <c>name.endpoint</c>.
+    /// </summary>
     private void Import(FileContext file, YamlNode imports)
     {
         foreach (var item in Items(file, imports, "import"))
         {
-            if (Scalar(file, item, "an import") is not { } importPath)
+            string? importName = null;
+            YamlNode pathNode = item;
+            if (item is YamlMappingNode named)
+            {
+                if (named.Children.Count != 1 || named.Children.Keys.First() is not YamlScalarNode { Value: { } key })
+                {
+                    Error(file, item, "an import with a name is one `name: path` pair");
+                    continue;
+                }
+                if (!ImportName().IsMatch(key))
+                {
+                    Error(file, item, $"import name '{key}' must be lowercase letters, digits and _, starting with a letter (billing)");
+                    continue;
+                }
+                importName = key;
+                pathNode = named.Children.Values.First();
+            }
+
+            if (Scalar(file, pathNode, "an import") is not { } importPath)
                 continue;
 
             var importFullPath = Path.GetFullPath(Path.Combine(file.Directory, importPath));
             if (!File.Exists(importFullPath))
             {
-                Error(file, item, $"imported file not found: {importPath}");
+                Error(file, pathNode, $"imported file not found: {importPath}");
                 continue;
             }
 
-            if (_imported.Add(importFullPath))
-                AddEndpoints(_endpoints, LoadApiFile(importFullPath));
+            if (importName is not null)
+            {
+                if (_importNames.TryGetValue(importName, out var other) && !other.Equals(importFullPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    Error(file, item, $"import name '{importName}' is already used for {DisplayPath(other)}");
+                    continue;
+                }
+                _importNames[importName] = importFullPath;
+            }
+
+            if (!_imported.Add($"{importName}|{importFullPath}"))
+                continue;
+            _imports.Add(new(importName, importFullPath));
+            var endpoints = LoadApiFile(importFullPath);
+            AddEndpoints(_endpoints, importName is null
+                ? endpoints
+                : endpoints.Select(e => e with { Name = $"{importName}.{e.Name}", ImportName = importName }));
         }
     }
+
+    [GeneratedRegex("^[a-z][a-z0-9_]*$")]
+    private static partial Regex ImportName();
 
     /// <summary><c>inspect</c> of a sequence file: its params and steps, checked against its own imports.</summary>
     private WorkflowDefinition LoadSequence(FileContext file, YamlMappingNode root, string fullPath)
     {
         var entries = Collect(file, root, "a sequence", SequenceKeys);
         _endpoints = new Dictionary<string, EndpointDefinition>();
-        _imported.Clear();
+        ResetImports();
         if (entries.TryGetValue("import", out var imports))
             Import(file, imports);
 
@@ -340,6 +390,7 @@ internal sealed partial class Loader
             Description = entries.TryGetValue("description", out var description) ? Scalar(file, description, "description") ?? "" : "",
             SourceFile = fullPath,
             Endpoints = _endpoints,
+            Imports = _imports.ToList(),
             Steps = steps,
             IsSequence = true,
             Params = parameters
@@ -449,12 +500,26 @@ internal sealed partial class Loader
         return root is null ? [] : ParseApi(file, Collect(file, root, "an API file", ApiKeys));
     }
 
+    /// <summary>A valid import name from a file name: <c>billing-api.yaml</c> gives <c>billing_api</c>.</summary>
+    private static string SuggestedImportName(string file)
+    {
+        var name = new string(Path.GetFileNameWithoutExtension(file).ToLowerInvariant()
+            .Select(c => char.IsAsciiLetterOrDigit(c) ? c : '_').ToArray()).Trim('_');
+        return name.Length > 0 && char.IsAsciiLetter(name[0]) ? name : "api";
+    }
+
     private void AddEndpoints(Dictionary<string, EndpointDefinition> endpoints, IEnumerable<EndpointDefinition> added)
     {
         foreach (var endpoint in added)
         {
             if (endpoints.TryGetValue(endpoint.Name, out var existing))
-                Report(endpoint.Location, $"endpoint '{endpoint.Name}' is already defined at {existing.Location}");
+            {
+                // Two files of one workflow with the same names: usually two services, which a named import keeps apart.
+                var hint = existing.Location.File != endpoint.Location.File && endpoint.ImportName is null
+                    ? $" (give one import a name: `- {SuggestedImportName(endpoint.Location.File)}: <path>`, then `call: {SuggestedImportName(endpoint.Location.File)}.{endpoint.Name}`)"
+                    : "";
+                Report(endpoint.Location, $"endpoint '{endpoint.Name}' is already defined at {existing.Location}{hint}");
+            }
             else
                 endpoints[endpoint.Name] = endpoint;
         }

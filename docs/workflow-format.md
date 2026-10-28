@@ -208,11 +208,32 @@ steps:
 | Key | Description |
 |---|---|
 | `name`, `description` | Shown in the report. |
-| `import` | API files whose endpoints the steps can call. |
+| `import` | API files whose endpoints the steps can call: a path, or `name: path` to call them as `name.endpoint` (see [Named imports](#named-imports)). |
 | `endpoints`, `auth`, `base_url` | Same as in an API file: a workflow can define its own endpoints, handy for small single-file tests. |
 | `variables` | Default variables. Each is resolved once per run, the first time it is used, and may use the environment, other variables and generated values (see below). |
 | `settings` | `timeout` (seconds per request, default 30) and `max_retries` (retries on network errors and timeouts, default 0; HTTP error status codes are never retried). |
 | `steps` | Run in order; the workflow stops at the first failing step. |
+
+### Named imports
+
+A backend made of several services has an API file per service, and they often share endpoint names (`login`, `health`). Two endpoints with the same name are an error, so give the imports a name:
+
+```yaml
+name: Checkout
+import:
+  - ../api/testserver.yaml                 # endpoints by their names, as always
+  - other: ../api/forms.yaml               # endpoints called other.token, other.upload_avatar
+steps:
+  - call: login
+    with: { password: password }
+  - call: other.token
+    with: { client_id: tinyprobe, client_secret: s3cret }
+```
+
+- An item of `import` is a path, or one `name: path` pair. The name is lowercase letters, digits and `_`, and starts with a letter.
+- Every endpoint of a named import is called `name.endpoint`, in `call`, in the step's default name and in the reports. The file keeps its own `base_url`, `headers` and `auth` sets.
+- The same file under two names gives two sets of names; under one name, or twice without one, it is loaded once. A name used for two different files is an error.
+- Sequences name their imports the same way.
 
 ### Steps
 
@@ -582,4 +603,4 @@ The whole workflow, imports included, is checked before the first request. Every
 
 ## Not supported yet
 
-- Namespaced imports (`call: server.login`) — duplicate names are an error for now.
+Every feature planned for the format so far is in. See the [roadmap](../ROADMAP.md) for what comes next.
