@@ -79,7 +79,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [x] **M4-1** `cli` `multipart/form-data` bodies and file uploads, and `application/x-www-form-urlencoded` forms. Spec: [0008](docs/specs/0008-form-and-multipart-bodies.md). PR #24.
 - [x] **M4-2** `cli` Cookies: a cookie jar per run, `expect.cookies`, `save` from a cookie. Spec: [0009](docs/specs/0009-cookies.md). PR #25.
 - [x] **M4-3** `cli` Basic auth and OAuth2 client credentials: `basic` and `oauth2` in auth sets. Spec: [0010](docs/specs/0010-basic-and-oauth2.md). PR #26.
-- [ ] **M4-4** `cli` `for_each`: repeat a step over a list of arguments. *Spec needed.*
+- [~] **M4-4** `cli` `for_each`: repeat a step over a list of arguments. Spec: [0011](docs/specs/0011-for-each.md).
 - [ ] **M4-5** `cli` Reusable step sequences (a shared "log in"). *Spec needed.*
 - [ ] **M4-6** `cli` Namespaced imports (`call: server.login`). *Spec needed.*
 - [ ] **M4-7** `ext` Request history: the last calls with their responses, to send again.
