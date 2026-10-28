@@ -11,7 +11,7 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 
 ## Where we are
 
-Released: **tinyprobe 0.16.0** (with the Docker image `ghcr.io/kikutano/tinyprobe`) and the extension **0.5.0**. M1, M2 and M3 are done; next is M4.
+Released: **tinyprobe 0.17.0** (forms and file uploads; Docker image `ghcr.io/kikutano/tinyprobe`) and the extension **0.5.0**. M1, M2 and M3 are done; M4 is in progress.
 
 - Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
 - CLI: `run` (one workflow, or a folder as a suite, with a JUnit report), `call`, `inspect`, `init`, `mcp` (an MCP server for agents), `schema` (JSON Schema of the format), `update`, `guide`; console and ndjson reporters; a GitHub Action (`kikutano/tinyprobe@vX.Y.Z`); Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
@@ -77,7 +77,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 ## M4 — What Postman users miss
 
 - [x] **M4-1** `cli` `multipart/form-data` bodies and file uploads, and `application/x-www-form-urlencoded` forms. Spec: [0008](docs/specs/0008-form-and-multipart-bodies.md). PR #24.
-- [ ] **M4-2** `cli` Cookies: a cookie jar per run. *Spec needed.*
+- [x] **M4-2** `cli` Cookies: a cookie jar per run, `expect.cookies`, `save` from a cookie. Spec: [0009](docs/specs/0009-cookies.md). PR #25.
 - [ ] **M4-3** `cli` Basic auth and OAuth2 client credentials. *Spec needed.*
 - [ ] **M4-4** `cli` `for_each`: repeat a step over a list of arguments. *Spec needed.*
 - [ ] **M4-5** `cli` Reusable step sequences (a shared "log in"). *Spec needed.*

@@ -1,7 +1,8 @@
 using System.Diagnostics;
+using System.Net;
 using System.Reflection;
-using System.Text;
 using System.Text.Json;
+using System.Text;
 using Tinyprobe.Cli;
 using Tinyprobe.Cli.Mcp;
 using Tinyprobe.Core.Definitions;
@@ -119,7 +120,7 @@ if (args[0] == "mcp")
     var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
     using var input = new StreamReader(Console.OpenStandardInput(), encoding);
     using var output = new StreamWriter(Console.OpenStandardOutput(), encoding);
-    await new McpServer(GetVersion(), () => new HttpClientHandler()).RunAsync(input, output);
+    await new McpServer(GetVersion(), CreateHandler).RunAsync(input, output);
     return ExitSuccess;
 }
 
@@ -325,11 +326,12 @@ if (verbose)
 if (suite)
 {
     return await RunCommand.RunSuiteAsync(reporter, GetVersion(), filePath, suiteFiles, envFilePath, environment, log,
-        recordExchanges: reporterName == "ndjson", createHandler: () => new HttpClientHandler(), junitPath: junitPath);
+        recordExchanges: reporterName == "ndjson", createHandler: CreateHandler, junitPath: junitPath);
 }
 
-using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(workflow!.Settings.Timeout) };
-var engine = new WorkflowEngine(httpClient, log)
+var cookies = new CookieContainer();
+using var httpClient = new HttpClient(CreateHandler(cookies)) { Timeout = TimeSpan.FromSeconds(workflow!.Settings.Timeout) };
+var engine = new WorkflowEngine(httpClient, log, cookies)
 {
     RecordExchanges = reporterName == "ndjson" || command == "call"
 };
@@ -387,3 +389,6 @@ static string GetVersion()
     // Strip the "+<commit sha>" suffix the SDK appends to the informational version.
     return informational?.Split('+')[0] ?? "unknown";
 }
+
+// The handler keeps the cookies of one workflow run in the engine's jar, and sends them, redirects included.
+static HttpMessageHandler CreateHandler(CookieContainer cookies) => new HttpClientHandler { CookieContainer = cookies };

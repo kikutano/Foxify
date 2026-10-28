@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using Tinyprobe.Core.Definitions;
 using Tinyprobe.Core.Execution;
@@ -15,7 +16,7 @@ internal sealed class ToolArgumentException(string message) : Exception(message)
 /// The tools of <c>tinyprobe mcp</c>: guide, inspect, call and run. They use the same loader, engine and
 /// protocol JSON as the CLI, and keep nothing between calls (decision 0003).
 /// </summary>
-internal sealed class McpTools(string version, Func<HttpMessageHandler> createHandler)
+internal sealed class McpTools(string version, Func<CookieContainer, HttpMessageHandler> createHandler)
 {
     public static readonly string[] Names = ["guide", "inspect", "call", "run"];
 
@@ -122,9 +123,10 @@ internal sealed class McpTools(string version, Func<HttpMessageHandler> createHa
         WorkflowDefinition workflow, Dictionary<string, JsonElement> environment)
     {
         // A new client and handler for each workflow, as in a suite: nothing is shared, cookies included.
-        using var httpClient = new HttpClient(createHandler()) { Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout) };
+        var cookies = new CookieContainer();
+        using var httpClient = new HttpClient(createHandler(cookies)) { Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout) };
         // An agent connected only through MCP must not be able to upload any file the user can read.
-        var engine = new WorkflowEngine(httpClient, TextWriter.Null) { RecordExchanges = true, FileRoot = System.Environment.CurrentDirectory };
+        var engine = new WorkflowEngine(httpClient, TextWriter.Null, cookies) { RecordExchanges = true, FileRoot = System.Environment.CurrentDirectory };
         var stopwatch = Stopwatch.StartNew();
         var report = await engine.ExecuteAsync(workflow, environment);
         return (report, stopwatch.Elapsed);

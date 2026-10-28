@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using Tinyprobe.Core.Definitions;
 using Tinyprobe.Core.Execution;
@@ -11,11 +12,11 @@ namespace Tinyprobe.Cli;
 internal static class RunCommand
 {
     /// <param name="target">The first path of the command line, named by the <c>invalid</c> event.</param>
-    /// <param name="createHandler">A new HTTP handler for each workflow.</param>
+    /// <param name="createHandler">A new HTTP handler for each workflow, keeping its cookies in the jar it is given.</param>
     public static async Task<int> RunSuiteAsync(
         IRunReporter reporter, string version, string target, IReadOnlyList<string> files,
         string? envPath, IReadOnlyDictionary<string, JsonElement> environment,
-        TextWriter log, bool recordExchanges, Func<HttpMessageHandler> createHandler, string? junitPath = null)
+        TextWriter log, bool recordExchanges, Func<CookieContainer, HttpMessageHandler> createHandler, string? junitPath = null)
     {
         var (workflows, problems) = LoadSuite(files);
         if (problems.Count > 0)
@@ -35,8 +36,9 @@ internal static class RunCommand
         {
             // A new client and handler per workflow: each one starts from zero, cookies and connections
             // included (decision 0003), and gets its own timeout setting.
-            using var httpClient = new HttpClient(createHandler()) { Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout) };
-            var engine = new WorkflowEngine(httpClient, log) { RecordExchanges = recordExchanges };
+            var cookies = new CookieContainer();
+            using var httpClient = new HttpClient(createHandler(cookies)) { Timeout = TimeSpan.FromSeconds(workflow.Settings.Timeout) };
+            var engine = new WorkflowEngine(httpClient, log, cookies) { RecordExchanges = recordExchanges };
 
             reporter.WriteHeader(version, file, envPath, workflow, environment);
             var started = DateTime.UtcNow;

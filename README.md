@@ -236,7 +236,7 @@ only in tinyprobe/env.local.yaml and add it to .gitignore. Write tinyprobe/MIGRA
 converted, what you skipped and why, and tell me which failures look like backend bugs.
 ```
 
-Variants of the same request ("Login", "Login - wrong password") become one endpoint called with different arguments, and the values your scripts saved become `save`. What has no equivalent yet (scripts that compute a signature, `pm.sendRequest`, cookies) is not guessed: the agent lists it in `MIGRATION.md`, so you know what the tests do not cover. The same prompt works for the exports of Insomnia, Bruno or another API tool: name the folder and the tool.
+Variants of the same request ("Login", "Login - wrong password") become one endpoint called with different arguments, and the values your scripts saved become `save`. What has no equivalent yet (scripts that compute a signature, `pm.sendRequest`) is not guessed: the agent lists it in `MIGRATION.md`, so you know what the tests do not cover. The same prompt works for the exports of Insomnia, Bruno or another API tool: name the folder and the tool.
 
 ### From an OpenAPI document
 
@@ -432,8 +432,9 @@ steps:
 | `expect.status` | Expected status code, or a list (`[200, 204]`); without it any 2xx is accepted. |
 | `expect.body` | Checks by JSONPath: a plain value means equal; operators `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `exists`, `contains`. Combine them on one value, e.g. `{ gt: 0, lt: 10 }`: all must pass. For OR use `in: [a, b]` (one of these values) or `any: [ { lt: 0 }, { gt: 100 } ]` (one of these conditions). |
 | `expect.headers` | Checks on response headers. |
+| `expect.cookies` | Checks on cookies, e.g. `{ sid: { exists: true } }`. Each workflow keeps the cookies the server sets and sends them with the next requests. |
 | `expect.duration` | Response time, e.g. `{ lt: 500ms }`. |
-| `save` | Values from the response body for the next steps. |
+| `save` | Values from the response body for the next steps, or a cookie's value: `csrf: { cookie: XSRF-TOKEN }`. |
 | `until` | Polling: repeat the call until conditions pass, e.g. `until: { body: { $.status: Confirmed }, every: 1s, timeout: 30s }`. |
 | `sleep` | A pause, e.g. `sleep: 2s`. |
 
@@ -441,7 +442,7 @@ steps:
 
 ## Test server example
 
-[docs/example/](docs/example/) tests the test server of this repository, and is what CI runs: one API file and five workflows covering authentication, CRUD, nested JSON, query strings, headers, status codes, slow responses, forms and file uploads. It needs the .NET SDK to start the server; for a first look, [example/](example/) needs nothing.
+[docs/example/](docs/example/) tests the test server of this repository, and is what CI runs: one API file and six workflows covering authentication, CRUD, nested JSON, query strings, headers, status codes, slow responses, forms and file uploads, and a cookie session. It needs the .NET SDK to start the server; for a first look, [example/](example/) needs nothing.
 
 ```bash
 # terminal 1: start the test server on http://localhost:5122

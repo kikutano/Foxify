@@ -189,8 +189,8 @@ public static class ProtocolJson
         }
 
         w.WriteStartObject("save");
-        foreach (var (name, path) in call.Save)
-            w.WriteString(name, path);
+        foreach (var (name, source) in call.Save)
+            w.WriteString(name, source.ToString());
         w.WriteEndObject();
 
         WriteLocation(w, step.Location);
@@ -208,6 +208,8 @@ public static class ProtocolJson
         w.WriteStartArray("checks");
         foreach (var check in expectation.Headers)
             WriteConditions(w, $"header {check.Subject}", check.Conditions);
+        foreach (var check in expectation.Cookies)
+            WriteConditions(w, $"cookie {check.Subject}", check.Conditions);
         foreach (var check in expectation.Body)
             WriteConditions(w, check.Subject, check.Conditions);
         WriteConditions(w, "duration", expectation.Duration);

@@ -874,6 +874,103 @@ app.MapGet("/api/headers", (HttpResponse response) =>
 
 //
 // ============================================================================
+// COOKIE SESSION
+// ============================================================================
+//
+// A browser-style session: the login sets an HttpOnly "sid" cookie and an
+// "XSRF-TOKEN" cookie; writes must send the token back in X-XSRF-TOKEN.
+//
+
+const string SessionCookie = "sid";
+const string CsrfCookie = "XSRF-TOKEN";
+
+var sessions = new ConcurrentDictionary<string, CookieSession>();
+
+IResult StartSession(HttpResponse response, string username)
+{
+    var session = new CookieSession(username, Guid.NewGuid().ToString("N"));
+    var id = Guid.NewGuid().ToString("N");
+    sessions[id] = session;
+    response.Cookies.Append(SessionCookie, id, new CookieOptions { Path = "/api", HttpOnly = true, SameSite = SameSiteMode.Lax });
+    response.Cookies.Append(CsrfCookie, session.CsrfToken, new CookieOptions { Path = "/api", SameSite = SameSiteMode.Lax });
+    return Results.Ok(new { username });
+}
+
+CookieSession? CurrentSession(HttpRequest request) =>
+    request.Cookies.TryGetValue(SessionCookie, out var id) && id is not null && sessions.TryGetValue(id, out var session)
+        ? session
+        : null;
+
+IResult NotLoggedIn() =>
+    Results.Json(new { error = "not_logged_in", message = "Log in first: POST /api/session." }, statusCode: StatusCodes.Status401Unauthorized);
+
+// -----------------------------------------------------------------------------
+// POST /api/session
+// Logs in (admin / password) and sets the session cookies.
+// -----------------------------------------------------------------------------
+
+app.MapPost("/api/session", (LoginRequest request, HttpResponse response) =>
+    request.Username == "admin" && request.Password == "password"
+        ? StartSession(response, request.Username)
+        : Results.Json(new { error = "invalid_credentials" }, statusCode: StatusCodes.Status401Unauthorized));
+
+// -----------------------------------------------------------------------------
+// POST /api/session/form
+// An HTML-form login: sets the cookies and redirects (303) to /api/session/me.
+// -----------------------------------------------------------------------------
+
+app.MapPost("/api/session/form", async (HttpRequest request, HttpResponse response) =>
+{
+    var form = await request.ReadFormAsync();
+    if (form["username"] != "admin" || form["password"] != "password")
+        return Results.Json(new { error = "invalid_credentials" }, statusCode: StatusCodes.Status401Unauthorized);
+
+    StartSession(response, "admin");
+    response.Headers.Location = "/api/session/me";
+    return Results.StatusCode(StatusCodes.Status303SeeOther);
+});
+
+// -----------------------------------------------------------------------------
+// GET /api/session/me
+// The logged-in user; 401 without a valid session cookie.
+// -----------------------------------------------------------------------------
+
+app.MapGet("/api/session/me", (HttpRequest request) =>
+    CurrentSession(request) is { } session
+        ? Results.Ok(new { username = session.Username })
+        : NotLoggedIn());
+
+// -----------------------------------------------------------------------------
+// POST /api/session/notes
+// A write: needs the session cookie and X-XSRF-TOKEN equal to its CSRF token.
+// -----------------------------------------------------------------------------
+
+app.MapPost("/api/session/notes", (NoteRequest note, HttpRequest request) =>
+{
+    if (CurrentSession(request) is not { } session)
+        return NotLoggedIn();
+    if (request.Headers["X-XSRF-TOKEN"] != session.CsrfToken)
+        return Results.Json(new { error = "csrf", message = "X-XSRF-TOKEN must be the value of the XSRF-TOKEN cookie." }, statusCode: StatusCodes.Status403Forbidden);
+
+    return Results.Json(new { text = note.Text, author = session.Username }, statusCode: StatusCodes.Status201Created);
+});
+
+// -----------------------------------------------------------------------------
+// DELETE /api/session
+// Logs out: ends the session and removes both cookies.
+// -----------------------------------------------------------------------------
+
+app.MapDelete("/api/session", (HttpRequest request, HttpResponse response) =>
+{
+    if (request.Cookies.TryGetValue(SessionCookie, out var id) && id is not null)
+        sessions.TryRemove(id, out _);
+    response.Cookies.Delete(SessionCookie, new CookieOptions { Path = "/api" });
+    response.Cookies.Delete(CsrfCookie, new CookieOptions { Path = "/api" });
+    return Results.NoContent();
+});
+
+//
+// ============================================================================
 // RUN
 // ============================================================================
 
@@ -888,6 +985,10 @@ app.Run();
 record LoginRequest(
     string Username,
     string Password);
+
+record NoteRequest(string Text);
+
+record CookieSession(string Username, string CsrfToken);
 
 record CreateUserRequest(
     string FirstName,
