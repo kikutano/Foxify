@@ -27,4 +27,5 @@ Postman works like option 1: scripts write into the environment, so a request wo
 - Agents get one simple rule: API files describe, workflows run. There is no key that behaves differently in `call` and in `run`.
 - A token used often in single calls goes in `env.local.yaml` or in the extension's `tinyprobe.variables`, by hand. This is less convenient than Postman's scripts, and we accept it.
 - "Run to here" replays steps that create data. Workflows that clean up after themselves (guide, section 9) make this safe on a test environment.
+- **Credentials obtained by an auth set.** An `oauth2` auth set (client credentials, [spec 0010](../specs/0010-basic-and-oauth2.md)) sends a token request before the request it describes. This is part of sending that request, like the cookie jar: it is declared in the API file, takes no value from earlier steps, and the token lives for one run only (one workflow, or one `call`). Note added on 2026-10-28.
 - Proposals that add `save` or checks to API files, or a session shared between calls, are ruled out by this decision. We revisit it only if stepping through workflows proves not enough in practice.

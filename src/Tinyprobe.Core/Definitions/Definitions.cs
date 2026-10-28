@@ -66,6 +66,10 @@ public sealed class EndpointDefinition
     public IReadOnlyList<BodyField>? Form { get; init; }
     /// <summary><c>multipart</c>: a <c>multipart/form-data</c> body, the fields in order.</summary>
     public IReadOnlyList<BodyField>? Multipart { get; init; }
+    /// <summary>From an auth set with <c>basic</c>: the endpoint sends <c>Authorization: Basic …</c>.</summary>
+    public BasicAuth? BasicAuth { get; init; }
+    /// <summary>From an auth set with <c>oauth2</c>: the endpoint sends <c>Authorization: Bearer</c> with a token from the token URL.</summary>
+    public OAuth2ClientCredentials? OAuth2 { get; init; }
     /// <summary>Declared params with their default (null = required), or null when the endpoint declares none.</summary>
     public IReadOnlyDictionary<string, Template?>? Params { get; init; }
     public required SourceLocation Location { get; init; }
@@ -85,6 +89,40 @@ public sealed class BodyField
     public Template? ContentType { get; init; }
 
     internal IEnumerable<Template> Templates => new[] { Value, File, FileName, ContentType }.OfType<Template>();
+}
+
+/// <summary><c>basic</c> in an auth set: <c>Authorization: Basic</c> with the base64 of <c>username:password</c>.</summary>
+public sealed class BasicAuth
+{
+    public required Template Username { get; init; }
+    public required Template Password { get; init; }
+
+    internal IEnumerable<Template> Templates => [Username, Password];
+}
+
+/// <summary>How an OAuth2 client sends its id and secret to the token URL.</summary>
+public enum ClientAuthentication
+{
+    /// <summary>An <c>Authorization: Basic</c> header (RFC 6749 section 2.3.1).</summary>
+    Basic,
+    /// <summary><c>client_id</c> and <c>client_secret</c> fields of the form body.</summary>
+    Form
+}
+
+/// <summary><c>oauth2</c> in an auth set: a token from the client credentials grant, reused for the run until it expires.</summary>
+public sealed class OAuth2ClientCredentials
+{
+    public required Template TokenUrl { get; init; }
+    public required Template ClientId { get; init; }
+    public required Template ClientSecret { get; init; }
+    /// <summary>A value, or a list joined with spaces.</summary>
+    public Template? Scope { get; init; }
+    public ClientAuthentication ClientAuth { get; init; } = ClientAuthentication.Basic;
+    /// <summary>Other fields of the token request, such as <c>audience</c>.</summary>
+    public IReadOnlyList<KeyValuePair<string, Template>> Form { get; init; } = [];
+
+    internal IEnumerable<Template> Templates =>
+        new[] { TokenUrl, ClientId, ClientSecret, Scope }.OfType<Template>().Concat(Form.Select(f => f.Value));
 }
 
 public abstract class StepDefinition

@@ -1,6 +1,6 @@
 # 0010 — Basic auth and OAuth2 client credentials
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M4-3
 - **Repositories:** tinyprobe
 - **PRs:** —
@@ -192,3 +192,12 @@ Nothing required. Completion and hover read `basic`, `oauth2` and their keys fro
 2. **The syntax.** The proposal puts `basic` and `oauth2` as keys of an auth set, next to its headers: one place for auth, and a set can still add headers (`X-Tenant`). `basic` and `oauth2` are not real header names, so nothing that works today changes. The alternative is a separate section (`auth_schemes:`), with a second name to learn. *Recommendation: keys of an auth set.*
 3. **The default `client_auth`.** `basic` follows RFC 6749 and Postman's default. `form` is what some tutorials show, and most servers accept both. *Recommendation: `basic`.*
 4. **Token lifetime.** The proposal reuses the token for the whole run until `expires_in`. The alternative is a token for every request: simpler, but slower, and some servers rate-limit token requests. *Recommendation: reuse until `expires_in`.*
+
+## Decisions
+
+Approved on 2026-10-28 with the recommendations:
+
+1. `oauth2` goes in auth sets, and decision 0003 gets a note: an auth set may obtain its credential, which lives for one run.
+2. `basic` and `oauth2` are keys of an auth set, next to its headers.
+3. `client_auth` defaults to `basic`.
+4. A token is reused for the run until `expires_in`, minus 30 seconds.

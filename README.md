@@ -377,6 +377,11 @@ base_url: ${baseUrl}
 auth:
   bearer:
     Authorization: "Bearer ${token}"
+  service:                   # or basic: { username, password }
+    oauth2:                  # OAuth2 client credentials: the token is fetched and reused for you
+      token_url: ${baseUrl}oauth/token
+      client_id: ${clientId}
+      client_secret: ${clientSecret}
 endpoints:
   login:
     method: POST

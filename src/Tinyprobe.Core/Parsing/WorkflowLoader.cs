@@ -91,6 +91,10 @@ internal sealed partial class Loader
     internal static readonly string[] ExpectKeys = ["status", "headers", "cookies", "body", "duration"];
     internal static readonly string[] UntilKeys = ["status", "headers", "cookies", "body", "every", "timeout"];
     internal static readonly string[] SaveKeys = ["cookie"];
+    internal static readonly string[] BasicKeys = ["username", "password"];
+    internal static readonly string[] OAuth2Keys = ["token_url", "client_id", "client_secret", "scope", "client_auth", "form"];
+    /// <summary>Keys of an auth set that are a scheme, not a header.</summary>
+    internal static readonly string[] AuthSchemeKeys = ["basic", "oauth2"];
     internal static readonly string[] SettingsKeys = ["timeout", "max_retries"];
 
     internal static readonly Dictionary<string, Operator> Operators = new()
@@ -315,11 +319,11 @@ internal sealed partial class Loader
             : null;
         var fileHeaders = entries.TryGetValue("headers", out var headersNode) ? ParseHeaders(file, headersNode, "headers") : [];
 
-        var authSets = new Dictionary<string, List<KeyValuePair<string, Template>>>();
+        var authSets = new Dictionary<string, AuthSet>();
         if (entries.TryGetValue("auth", out var authNode))
         {
             foreach (var (name, _, value) in Entries(file, authNode, "auth"))
-                authSets[name] = ParseHeaders(file, value, $"auth '{name}'");
+                authSets[name] = ParseAuthSet(file, name, value);
         }
 
         var endpoints = new List<EndpointDefinition>();
@@ -337,7 +341,7 @@ internal sealed partial class Loader
 
     private EndpointDefinition? ParseEndpoint(
         FileContext file, string name, YamlNode keyNode, YamlNode node, Template? baseUrl,
-        List<KeyValuePair<string, Template>> fileHeaders, Dictionary<string, List<KeyValuePair<string, Template>>> authSets)
+        List<KeyValuePair<string, Template>> fileHeaders, Dictionary<string, AuthSet> authSets)
     {
         var what = $"endpoint '{name}'";
         var entries = Collect(file, node, what, EndpointKeys);
@@ -368,7 +372,7 @@ internal sealed partial class Loader
             }
         }
 
-        var headers = new List<KeyValuePair<string, Template>>(fileHeaders);
+        var used = new List<AuthSet>();
         if (entries.TryGetValue("auth", out var authNode))
         {
             var names = authNode is YamlSequenceNode ? Items(file, authNode, "auth") : [authNode];
@@ -376,14 +380,29 @@ internal sealed partial class Loader
             {
                 if (Scalar(file, item, "auth") is not { } authName)
                     continue;
-                if (authSets.TryGetValue(authName, out var authHeaders))
-                    headers.AddRange(authHeaders);
+                if (authSets.TryGetValue(authName, out var set))
+                    used.Add(set);
                 else
                     Error(file, item, $"unknown auth '{authName}'{Suggest(authName, authSets.Keys)}");
             }
         }
 
         var ownHeaders = entries.TryGetValue("headers", out var headersNode) ? ParseHeaders(file, headersNode, $"headers of {what}") : [];
+
+        // basic and oauth2 write the Authorization header: another one would be replaced, or would replace it.
+        var schemeSet = used.FirstOrDefault(set => set.HasScheme);
+        var headers = new List<KeyValuePair<string, Template>>(fileHeaders);
+        if (schemeSet is not null)
+        {
+            headers.RemoveAll(h => IsAuthorization(h.Key));
+            var setting = used.Where(set => set.HasScheme || set.Headers.Any(h => IsAuthorization(h.Key))).Select(set => set.Name).ToList();
+            if (setting.Count > 1)
+                Error(file, authNode!, $"{what} uses auth '{setting[0]}' and '{setting[1]}', which both set Authorization: use one of them");
+            foreach (var (headerName, value) in ownHeaders.Where(h => IsAuthorization(h.Key)))
+                Report(value.Location, $"{what} sets {headerName}, but its auth '{schemeSet.Name}' sets its own: remove the header");
+        }
+        foreach (var set in used)
+            headers.AddRange(set.Headers);
         headers.AddRange(ownHeaders);
 
         var bodyKeys = new[] { "body", "form", "multipart" }.Where(entries.ContainsKey).ToList();
@@ -416,6 +435,8 @@ internal sealed partial class Loader
             Path = Template(file, pathNode),
             Query = query,
             Headers = headers,
+            BasicAuth = schemeSet?.Basic,
+            OAuth2 = schemeSet?.OAuth2,
             Body = entries.TryGetValue("body", out var bodyNode) ? Template(file, bodyNode) : null,
             Form = form,
             Multipart = multipart,
@@ -486,12 +507,109 @@ internal sealed partial class Loader
     private Template? ScalarTemplate(FileContext file, Dictionary<string, YamlNode> entries, string key) =>
         entries.TryGetValue(key, out var node) && Scalar(file, node, key) is not null ? Template(file, node) : null;
 
-    private List<KeyValuePair<string, Template>> ParseHeaders(FileContext file, YamlNode node, string what)
+    private static bool IsAuthorization(string header) => header.Equals("Authorization", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A named auth set: headers, and at most one scheme (<c>basic</c> or <c>oauth2</c>).</summary>
+    internal sealed record AuthSet(string Name, List<KeyValuePair<string, Template>> Headers, BasicAuth? Basic, OAuth2ClientCredentials? OAuth2)
+    {
+        public bool HasScheme => Basic is not null || OAuth2 is not null;
+    }
+
+    private AuthSet ParseAuthSet(FileContext file, string name, YamlNode node)
+    {
+        var headers = new List<KeyValuePair<string, Template>>();
+        BasicAuth? basic = null;
+        OAuth2ClientCredentials? oauth2 = null;
+        var schemes = new List<string>();
+        foreach (var (key, keyNode, value) in Entries(file, node, $"auth '{name}'"))
+        {
+            switch (key)
+            {
+                case "basic":
+                    schemes.Add(key);
+                    basic = ParseBasic(file, name, keyNode, value);
+                    break;
+                case "oauth2":
+                    schemes.Add(key);
+                    oauth2 = ParseOAuth2(file, name, keyNode, value);
+                    break;
+                default:
+                    if (Scalar(file, value, $"header '{key}'") is not null)
+                        headers.Add(new(key, Template(file, value)));
+                    break;
+            }
+        }
+
+        if (schemes.Count > 1)
+            Error(file, node, $"auth '{name}' has basic and oauth2: use one of them");
+        else if (schemes.Count == 1)
+        {
+            foreach (var (_, value) in headers.Where(h => IsAuthorization(h.Key)))
+                Report(value.Location, $"auth '{name}' has {schemes[0]} and an Authorization header: use one of them");
+        }
+        return new AuthSet(name, headers, basic, oauth2);
+    }
+
+    private BasicAuth? ParseBasic(FileContext file, string set, YamlNode keyNode, YamlNode node)
+    {
+        var entries = Collect(file, node, "basic", BasicKeys);
+        var username = ScalarTemplate(file, entries, "username");
+        var password = ScalarTemplate(file, entries, "password");
+        if (username is null || password is null)
+        {
+            if (!entries.ContainsKey("username") || !entries.ContainsKey("password"))
+                Error(file, keyNode, $"auth '{set}': basic needs username and password");
+            return null;
+        }
+        return new BasicAuth { Username = username, Password = password };
+    }
+
+    private OAuth2ClientCredentials? ParseOAuth2(FileContext file, string set, YamlNode keyNode, YamlNode node)
+    {
+        var entries = Collect(file, node, "oauth2", OAuth2Keys);
+        var tokenUrl = ScalarTemplate(file, entries, "token_url");
+        var clientId = ScalarTemplate(file, entries, "client_id");
+        var clientSecret = ScalarTemplate(file, entries, "client_secret");
+
+        Template? scope = null;
+        if (entries.TryGetValue("scope", out var scopeNode))
+        {
+            var items = scopeNode is YamlSequenceNode sequence ? sequence.Children : [scopeNode];
+            if (items.All(item => item is YamlScalarNode))
+                scope = Template(file, scopeNode);
+            else
+                Error(file, scopeNode, "scope must be a value or a list of values");
+        }
+
+        var clientAuth = ClientAuthentication.Basic;
+        if (entries.TryGetValue("client_auth", out var clientAuthNode) && Scalar(file, clientAuthNode, "client_auth") is { } clientAuthText)
+        {
+            if (clientAuthText == "form")
+                clientAuth = ClientAuthentication.Form;
+            else if (clientAuthText != "basic")
+                Error(file, clientAuthNode, $"client_auth must be basic or form, not '{clientAuthText}'");
+        }
+
+        var form = entries.TryGetValue("form", out var formNode) ? ParseHeaders(file, formNode, "form of oauth2", "form field") : [];
+
+        if (tokenUrl is null || clientId is null || clientSecret is null)
+        {
+            if (new[] { "token_url", "client_id", "client_secret" }.Any(k => !entries.ContainsKey(k)))
+                Error(file, keyNode, $"auth '{set}': oauth2 needs token_url, client_id and client_secret");
+            return null;
+        }
+        return new OAuth2ClientCredentials
+        {
+            TokenUrl = tokenUrl, ClientId = clientId, ClientSecret = clientSecret, Scope = scope, ClientAuth = clientAuth, Form = form
+        };
+    }
+
+    private List<KeyValuePair<string, Template>> ParseHeaders(FileContext file, YamlNode node, string what, string item = "header")
     {
         var headers = new List<KeyValuePair<string, Template>>();
         foreach (var (name, _, value) in Entries(file, node, what))
         {
-            if (Scalar(file, value, $"header '{name}'") is not null)
+            if (Scalar(file, value, $"{item} '{name}'") is not null)
                 headers.Add(new(name, Template(file, value)));
         }
         return headers;
@@ -840,15 +958,17 @@ internal sealed partial class Loader
         new[] { endpoint.BaseUrl, endpoint.Path, endpoint.Body }
             .Concat(endpoint.Headers.Select(h => h.Value))
             .Concat((endpoint.Form ?? []).Concat(endpoint.Multipart ?? []).SelectMany(f => f.Templates))
+            .Concat(endpoint.BasicAuth?.Templates ?? [])
+            .Concat(endpoint.OAuth2?.Templates ?? [])
             .Concat(endpoint.Params?.Values ?? [])
             .OfType<Template>();
 
     /// <summary>Expected values of the step's <c>expect</c> and <c>until</c> checks.</summary>
     private static IEnumerable<Template> CheckTemplates(CallStep step)
     {
-        var checks = step.Expect.Headers.Concat(step.Expect.Body);
+        var checks = step.Expect.Headers.Concat(step.Expect.Cookies).Concat(step.Expect.Body);
         if (step.Until is { } until)
-            checks = checks.Concat(until.Checks.Headers).Concat(until.Checks.Body);
+            checks = checks.Concat(until.Checks.Headers).Concat(until.Checks.Cookies).Concat(until.Checks.Body);
         return checks.SelectMany(c => Values(c.Conditions)).OfType<Template>();
 
         static IEnumerable<Template?> Values(IEnumerable<Condition> conditions) =>

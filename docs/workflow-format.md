@@ -58,7 +58,7 @@ endpoints:
 |---|---|
 | `base_url` | Prepended to every `path` of the file. Optional if paths are absolute URLs. |
 | `headers` | Headers sent by every endpoint of the file. |
-| `auth.<name>` | A named set of headers. |
+| `auth.<name>` | A named auth set: headers, plus at most one of `basic` and `oauth2`. See [Auth sets](#auth-sets). |
 | `endpoints.<name>` | An endpoint, called by its name. |
 | `endpoints.<name>.method` | HTTP verb, default `GET`. |
 | `endpoints.<name>.path` | Path, may contain `${…}` placeholders. |
@@ -69,6 +69,59 @@ endpoints:
 | `endpoints.<name>.form` | A form body (`application/x-www-form-urlencoded`), instead of `body`. See [Forms and file uploads](#forms-and-file-uploads). |
 | `endpoints.<name>.multipart` | A `multipart/form-data` body with text fields and files, instead of `body`. See [Forms and file uploads](#forms-and-file-uploads). |
 | `endpoints.<name>.params` | Optional declaration of the arguments: `name: default`, or `name:` for a required one. Declared params are checked before the request is sent. |
+
+### Auth sets
+
+An auth set is a named set of headers that endpoints pick with `auth:`. Two keys of a set are not headers: `basic` and `oauth2`, which write the `Authorization` header for you.
+
+```yaml
+# file: api/secure.yaml
+base_url: ${baseUrl}
+
+auth:
+  apikey:
+    X-API-Key: ${apiKey}                   # headers, as many as needed
+  admin:
+    basic:                                 # Authorization: Basic base64(username:password)
+      username: ${username}
+      password: ${password}
+  service:
+    oauth2:                                # client credentials
+      token_url: ${authUrl}/oauth/token
+      client_id: ${clientId}
+      client_secret: ${clientSecret}
+      scope: [orders:read, orders:write]   # optional; a list is sent joined with spaces
+      client_auth: basic                   # optional: basic (default) or form
+      form: { audience: "https://api.example.com" }   # optional: other fields of the token request
+    X-Tenant: ${tenant}                    # a set with a scheme can still add headers
+
+endpoints:
+  admin_stats:
+    path: /admin/stats
+    auth: admin
+    params: { username: admin, password: }
+
+  list_orders:
+    path: /orders
+    auth: [service, apikey]
+```
+
+**`basic`** sends `Authorization: Basic` with the base64 of `username:password`, encoded as UTF-8. Both keys are required and may be placeholders, so a step can try a wrong password with `with: { password: wrong }`. A username with `:` fails the step.
+
+**`oauth2`** uses the client credentials grant:
+
+- Before the first request that uses the set, tinyprobe sends a `POST` to `token_url` with `grant_type=client_credentials` (and `scope`, and the `form` fields). Then it sends the request with `Authorization: Bearer <access_token>`.
+- The client id and secret go in an `Authorization: Basic` header of the token request (`client_auth: basic`, the default) or in its form body (`client_auth: form`).
+- **The token is reused for the rest of the run**, by every endpoint whose set has the same token URL, client and scope, until its `expires_in` minus 30 seconds. Each workflow of a suite gets its own token. `tinyprobe call` gets one on every call, so a protected endpoint can be called with only the environment file.
+- If the token request fails, the step fails before calling the API, with the token server's answer: `Cannot get an OAuth2 token from https://auth.example.com/oauth/token: status 401, {"error":"invalid_client"}`. A network error of the token request is retried like the API request (`max_retries`).
+- To test the authorization server's own errors (a wrong secret), call the token URL as a normal `form` endpoint.
+
+Rules for both:
+
+- An endpoint can use at most one set with `basic` or `oauth2`, plus header sets.
+- An `Authorization` header in the same set, in another set of the endpoint, or in the endpoint's own `headers` is an error. One in the file's `headers` is not sent to that endpoint.
+- Their placeholders are endpoint arguments, like the ones in headers.
+- With `-v`, the log shows when a token is requested or reused. The recorded request shows the `Authorization` header as it was sent.
 
 ### Forms and file uploads
 

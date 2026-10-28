@@ -24,7 +24,17 @@ public static class FormatSchema
         ["file.steps"] = "The steps, run in order. A step `call`s an endpoint or `sleep`s; the workflow stops at the first failing step.",
         ["file.base_url"] = "Prepended to every `path` of this file, usually `${baseUrl}` from the environment file.",
         ["file.headers"] = "Headers sent by every endpoint of this file, `Name: value`.",
-        ["file.auth"] = "Named sets of headers, such as `bearer: { Authorization: \"Bearer ${token}\" }`. An endpoint picks them with `auth:`.",
+        ["file.auth"] = "Named auth sets: headers, such as `bearer: { Authorization: \"Bearer ${token}\" }`, and at most one of `basic` and `oauth2`. An endpoint picks them with `auth:`.",
+        ["auth_set.basic"] = "Basic auth: `username` and `password`; tinyprobe sends `Authorization: Basic` with their base64.",
+        ["auth_set.oauth2"] = "OAuth2 client credentials: tinyprobe gets a token from `token_url` on first use, reuses it for the run until it expires, and sends `Authorization: Bearer <token>`.",
+        ["basic.username"] = "The user name. May be a placeholder. Cannot contain `:`.",
+        ["basic.password"] = "The password. May be a placeholder, e.g. `${password}` from the env file.",
+        ["oauth2.token_url"] = "The token endpoint, a full URL such as `${authUrl}/oauth/token`.",
+        ["oauth2.client_id"] = "The client id.",
+        ["oauth2.client_secret"] = "The client secret: a placeholder, with the value in `env.local.yaml`.",
+        ["oauth2.scope"] = "Optional: a scope, or a list of scopes, sent joined with spaces.",
+        ["oauth2.client_auth"] = "How the client id and secret are sent: `basic` (an `Authorization: Basic` header, the default) or `form` (fields of the body).",
+        ["oauth2.form"] = "Other fields of the token request, such as `audience` (Auth0) or `resource` (Azure AD).",
         ["file.endpoints"] = "The endpoints, by name. Steps call them like functions: `call: <name>`, with arguments in `with`.",
 
         // endpoint
@@ -106,6 +116,9 @@ public static class FormatSchema
             w.WriteStartObject("$defs");
             Definition(w, "endpoint", "An endpoint: what to send.", Loader.EndpointKeys);
             Definition(w, "multipart_file", "A file of a multipart body.", Loader.MultipartFileKeys, anyOfRequired: ["file"]);
+            AuthSet(w);
+            Definition(w, "basic", "Basic auth credentials.", Loader.BasicKeys, required: Loader.BasicKeys);
+            Definition(w, "oauth2", "OAuth2 client credentials.", Loader.OAuth2Keys, required: ["token_url", "client_id", "client_secret"]);
             Definition(w, "save_cookie", "A value saved from a cookie.", Loader.SaveKeys, anyOfRequired: ["cookie"]);
             Definition(w, "step", "A step: `call` an endpoint, or `sleep`.", Loader.StepKeys, anyOfRequired: ["call", "sleep"]);
             Definition(w, "expect", "What the response must be.", Loader.ExpectKeys);
@@ -193,13 +206,20 @@ public static class FormatSchema
     }
 
     private static void Definition(Utf8JsonWriter w, string name, string description, string[] keys,
-        string[]? anyOfRequired = null, string? section = null)
+        string[]? anyOfRequired = null, string? section = null, string[]? required = null)
     {
         w.WriteStartObject(name);
         w.WriteString("description", description);
         w.WriteString("type", "object");
         Properties(w, section ?? name, keys);
         w.WriteBoolean("additionalProperties", false);
+        if (required is not null)
+        {
+            w.WriteStartArray("required");
+            foreach (var key in required)
+                w.WriteStringValue(key);
+            w.WriteEndArray();
+        }
         if (anyOfRequired is not null)
         {
             w.WriteStartArray("anyOf");
@@ -213,6 +233,22 @@ public static class FormatSchema
             }
             w.WriteEndArray();
         }
+        w.WriteEndObject();
+    }
+
+    /// <summary>An auth set: the scheme keys, and any other key is a header.</summary>
+    private static void AuthSet(Utf8JsonWriter w)
+    {
+        w.WriteStartObject("auth_set");
+        w.WriteString("description", "An auth set: headers (`Name: value`), and at most one of `basic` and `oauth2`.");
+        w.WriteString("type", "object");
+        Properties(w, "auth_set", Loader.AuthSchemeKeys);
+        w.WriteStartObject("additionalProperties");
+        w.WriteStartArray("type");
+        foreach (var type in new[] { "string", "number", "boolean" })
+            w.WriteStringValue(type);
+        w.WriteEndArray();
+        w.WriteEndObject();
         w.WriteEndObject();
     }
 
@@ -240,7 +276,8 @@ public static class FormatSchema
         {
             case "file.name" or "file.description" or "file.base_url" or "endpoint.path"
                 or "multipart_file.file" or "multipart_file.filename" or "multipart_file.content_type"
-                or "save_cookie.cookie" or "step.name" or "step.call" or "step.sleep" or "until.every" or "until.timeout":
+                or "save_cookie.cookie" or "basic.username" or "basic.password"
+                or "oauth2.token_url" or "oauth2.client_id" or "oauth2.client_secret" or "step.name" or "step.call" or "step.sleep" or "until.every" or "until.timeout":
                 w.WriteString("type", "string");
                 break;
             case "endpoint.method":
@@ -270,7 +307,26 @@ public static class FormatSchema
                 MapOf(w, () => Ref(w, "multipart_value", inline: true));
                 break;
             case "file.auth":
-                MapOf(w, () => Ref(w, "headers", inline: true));
+                MapOf(w, () => Ref(w, "auth_set", inline: true));
+                break;
+            case "auth_set.basic":
+                Ref(w, "basic", inline: true);
+                break;
+            case "auth_set.oauth2":
+                Ref(w, "oauth2", inline: true);
+                break;
+            case "oauth2.scope":
+                StringOrList(w);
+                break;
+            case "oauth2.client_auth":
+                w.WriteString("type", "string");
+                w.WriteStartArray("enum");
+                w.WriteStringValue("basic");
+                w.WriteStringValue("form");
+                w.WriteEndArray();
+                break;
+            case "oauth2.form":
+                Ref(w, "headers", inline: true);
                 break;
             case "file.endpoints":
                 MapOf(w, () => Ref(w, "endpoint", inline: true));
