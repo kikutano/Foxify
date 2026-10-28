@@ -1,9 +1,9 @@
 # 0010 — Basic auth and OAuth2 client credentials
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M4-3
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#26](https://github.com/kikutano/tinyprobe/pull/26)
 
 ## Problem
 
@@ -173,18 +173,18 @@ Nothing required. Completion and hover read `basic`, `oauth2` and their keys fro
 
 ## Acceptance criteria
 
-- [ ] `basic` and `oauth2` in auth sets as above, with every validation error at its location.
-- [ ] Unit tests with `FakeServer`:
+- [x] `basic` and `oauth2` in auth sets as above, with every validation error at its location.
+- [x] Unit tests with `FakeServer`:
   - Basic: the header, UTF-8, a username with `:`;
   - OAuth2: both `client_auth`, `scope` as a value and a list, extra `form` fields;
   - the token reused within a run and requested again after `expires_in`;
   - each run gets its own token;
   - token errors (status, no `access_token`, network error with retries);
   - placeholders from `with`, and the recorded `Authorization` header.
-- [ ] `inspect --json` has `basic_auth`, `oauth2` and their arguments. The schema test passes.
-- [ ] `docs/example/workflows/auth.yaml` covers Basic and OAuth2 against the test server, in CI and in `scripts/dev.sh e2e`.
-- [ ] `tinyprobe call` of an endpoint with `oauth2` works with only the env file.
-- [ ] `scripts/dev.sh check` passes.
+- [x] `inspect --json` has `basic_auth`, `oauth2` and their arguments. The schema test passes.
+- [x] `docs/example/workflows/auth.yaml` covers Basic and OAuth2 against the test server, in CI and in `scripts/dev.sh e2e`.
+- [x] `tinyprobe call` of an endpoint with `oauth2` works with only the env file.
+- [x] `scripts/dev.sh check` passes.
 
 ## Open questions
 
