@@ -1,0 +1,22 @@
+# A sequence: steps that several workflows run with `use:`. The workflows
+# that need a token start with it, instead of a copy of the login step.
+name: Log in
+description: Logs in and saves the bearer token as ${token}.
+
+import:
+  - ../api/testserver.yaml
+
+params:
+  username: admin           # default, can be overridden with `with:`
+  password:                 # no default: every use must pass it
+
+sequence:
+  - name: Admin logs in
+    call: login
+    with:
+      username: ${username}
+      password: ${password}
+    expect:
+      status: 200
+    save:
+      token: $.access_token   # visible to the steps after the `use`

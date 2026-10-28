@@ -26,6 +26,8 @@ Create the files in a `tinyprobe/` folder at the root of the user's repository, 
 tinyprobe/
 ├── api/
 │   └── backend.yaml          # all endpoints of the backend (split by area if it is large)
+├── sequences/
+│   └── log-in.yaml           # steps shared by several workflows (a login), run with `use:`
 ├── workflows/
 │   ├── smoke.yaml            # one workflow per feature or resource
 │   ├── auth.yaml
@@ -162,7 +164,8 @@ A workflow may also contain `base_url`, `headers`, `auth` and `endpoints` itself
 
 | Step key | Meaning |
 |---|---|
-| `call` | Endpoint name. Required, unless the step is a `sleep`. |
+| `call` | Endpoint name. Required, unless the step is a `use` or a `sleep`. |
+| `use` | A step of its own: `use: ../sequences/log-in.yaml` with `with` for its params. The steps of the sequence run here: see section 6e. |
 | `with` | Arguments: values for the endpoint's placeholders. May use variables: `id: ${orderId}`. An argument the endpoint does not use (not a param, query name or placeholder of its path, headers, auth sets, base URL or body) is an error, so typos such as `pagesize` are caught. Query values are URL-encoded; `true`, `42` are sent as written. |
 | `expect.status` | A code (`201`) or a list (`[200, 204]`). **Without it, any 2xx is accepted and anything else fails the step.** |
 | `expect.headers` | Checks on response headers, keyed by header name (case-insensitive). Every operator works (`exists`, `in`, `any`, `ne`, `contains`, numeric ones). Header values are text and are compared as text, so quoting the expected value makes no difference: `X-Count: 3` and `X-Count: "3"` are the same check. |
@@ -344,6 +347,48 @@ variables:
 - Data files go in `tinyprobe/data/`. CSV values are text; JSON keeps types.
 - Use `for_each` only when the steps differ by values. Different endpoints, different checks or a `save` mean different steps.
 
+## 6e. Shared steps: sequences and `use`
+
+**Write the login once.** When two workflows or more need the same steps (a login, a shared setup), put them in a sequence file in `tinyprobe/sequences/` and start each workflow with `use`. Every workflow still logs in itself: through the sequence.
+
+```yaml
+# file: tinyprobe/sequences/log-in.yaml
+name: Log in
+import:
+  - ../api/backend.yaml           # the endpoints it calls: a sequence imports them itself
+params:
+  email: ${adminEmail}            # a default may use the env file
+  password:                       # required: every use passes it
+sequence:                         # not `steps:`
+  - name: Log in
+    call: login
+    with: { email: "${email}", password: "${password}" }
+    expect:
+      status: 200
+    save:
+      token: $.accessToken        # visible to the workflow's next steps
+```
+
+```yaml
+# file: tinyprobe/workflows/sequences-demo.yaml
+name: Notes with the shared login
+import:
+  - ../api/backend.yaml
+steps:
+  - use: ../sequences/log-in.yaml
+    with:
+      password: ${adminPassword}
+  - name: Notes of the user
+    call: list_notes
+    expect:
+      status: 200
+```
+
+- A param is a variable inside the sequence only. Its `save` values are visible after the `use`.
+- Check a sequence with `tinyprobe inspect tinyprobe/sequences/log-in.yaml`. `tinyprobe run` does not run it on its own; `tinyprobe run tinyprobe/workflows` skips sequence files anyway.
+- Write a sequence only for steps used by two workflows or more. A step used once stays in its workflow.
+- The auth workflow that tests the login itself (wrong password, missing token) calls `login` directly: those steps are the test, not a setup.
+
 ## 7. Environment file
 
 ```yaml
@@ -388,7 +433,7 @@ Safety: run workflows only against a **local or test** environment, never agains
 
 ## 9. Writing good workflows
 
-- **Independent workflows.** Each workflow logs in itself and creates the data it needs. Never rely on another workflow having run first.
+- **Independent workflows.** Each workflow logs in itself and creates the data it needs, with a `use` of a shared sequence when several workflows log in the same way. Never rely on another workflow having run first.
 - **Leave the data as you found it.** Create a resource, `save` its id, work on it, delete it. Do not modify or delete seed data that other tests may read.
 - **Tolerate leftovers.** A failing step stops the workflow, so the delete steps after it do not run and a failed run can leave its data behind (there is no teardown step). Identify your data by the id you saved, not by counts: check `$.total: { gte: 1 }` rather than `$.total: 1` after creating something, and never assert the exact size of a list your workflow adds to.
 - **Stable checks.** For values that change on every run (timestamps, generated ids, tokens) check `{ exists: true }`, a type-like condition (`{ gt: 0 }`) or a format (`{ contains: "@" }`), not an exact value.
@@ -426,7 +471,10 @@ Safety: run workflows only against a **local or test** environment, never agains
 | one endpoint per Postman request (`login_ok`, `login_wrong_password`) | one endpoint; each variant is a step with its own `with` (section 12) |
 | `{{token}}` left in a converted file | `${token}` |
 | the real values of a Postman environment in `env.example.yaml` | placeholders there; real values only in `env.local.yaml` |
-| a workflow that relies on a token saved by another workflow | each workflow logs in itself |
+| a workflow that relies on a token saved by another workflow | each workflow logs in itself: `use: ../sequences/log-in.yaml` as its first step |
+| the same login steps copied in every workflow | one sequence in `tinyprobe/sequences/`, and `use` in each workflow |
+| `steps:` in a sequence file | `sequence:`: with `steps:` it is a workflow, and `run` runs it alone |
+| a sequence that calls endpoints without `import` | `import` the API file in the sequence too, so it can be checked on its own |
 | a Postman request or check skipped without a word | a line in `MIGRATION.md` that says what and why |
 | a multipart body built by hand in a string `body`, or `body: "a=${a}&b=${b}"` | `multipart:` or `form:`: tinyprobe encodes the values and writes the boundary |
 | a `Content-Type` header on an endpoint with `form` or `multipart` | no header: tinyprobe sets it, and reports the header as an error |
@@ -677,7 +725,7 @@ Follow this section when the user gives you exports of another API tool (a Postm
    Write this list to `tinyprobe/MIGRATION.md`, one row per request (section 12.4). It becomes the coverage report.
 2. **Environments.** Each environment export (`values[]`) becomes `tinyprobe/env.<name>.yaml`, a flat map of its enabled keys. Values of type `secret`, and keys that look like credentials (`password`, `token`, `apiKey`, `secret`, `clientSecret`), go only into `env.local.yaml`, which is in `.gitignore`; `env.example.yaml` gets every key with a placeholder value. Keys that scripts fill at run time (a token, a created id) don't belong in env files: they become `save`.
 3. **API file.** Group endpoints by resource, not by folder. Requests that differ only in their values (a wrong password, a missing field, another token) are **one endpoint**: declare its inputs as `params`, and each Postman request becomes a step with its own `with`.
-4. **Workflows.** One workflow per folder that tests a flow, with the steps in the folder's order. Each workflow logs in itself (section 9), even when Postman relied on an earlier folder to set the token.
+4. **Workflows.** One workflow per folder that tests a flow, with the steps in the folder's order. Each workflow logs in itself (section 9), even when Postman relied on an earlier folder to set the token: the login request becomes a sequence in `tinyprobe/sequences/` (section 6e), and each workflow starts with its `use`.
 5. **One folder at a time.** For each folder: write its endpoints and its workflow, `tinyprobe inspect` them, `tinyprobe run` the workflow until it passes, and update `MIGRATION.md`. Then move to the next folder. Never convert everything first and validate at the end.
 6. **Coverage report.** Run the whole folder once more (`tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml`), finish `MIGRATION.md` (section 12.4) and tell the user the totals: requests converted, requests skipped, checks dropped, failures that look like backend bugs.
 

@@ -21,12 +21,15 @@ public static class ProtocolJson
 
     // --- inspect ---------------------------------------------------------------
 
-    /// <summary>A valid workflow or API file: its endpoints, and for a workflow its variables, settings and steps.</summary>
+    /// <summary>
+    /// A valid workflow, API file or sequence: its endpoints, and for a workflow its variables, settings and steps
+    /// (with the steps of its sequences in place of their <c>use</c>); for a sequence its params and steps.
+    /// </summary>
     public static string Inspection(string version, WorkflowDefinition workflow, bool indented = true) => Write(indented, w =>
     {
         WriteHeader(w, version);
         w.WriteBoolean("valid", true);
-        w.WriteString("kind", workflow.Steps.Count > 0 ? "workflow" : "api");
+        w.WriteString("kind", workflow.IsSequence ? "sequence" : workflow.Steps.Count > 0 ? "workflow" : "api");
         w.WriteString("file", workflow.SourceFile);
         w.WriteString("name", workflow.Name);
         w.WriteString("description", workflow.Description);
@@ -56,6 +59,9 @@ public static class ProtocolJson
         for (int index = 0; index < workflow.Steps.Count; index++)
             WriteStep(w, index, workflow.Steps[index]);
         w.WriteEndArray();
+
+        if (workflow.Params is { } parameters)
+            WriteParams(w, parameters);
     });
 
     /// <summary>The problems of an invalid file; as a run event, <paramref name="eventName"/> is <c>invalid</c>.</summary>
@@ -130,8 +136,21 @@ public static class ProtocolJson
         WriteBasicAuth(w, endpoint.BasicAuth);
         WriteOAuth2(w, endpoint.OAuth2);
 
+        WriteParams(w, endpoint.Params ?? new Dictionary<string, Template?>());
+
+        w.WriteStartArray("arguments");
+        foreach (var name in Loader.EndpointArguments(endpoint))
+            w.WriteStringValue(name);
+        w.WriteEndArray();
+
+        WriteLocation(w, endpoint.Location);
+        w.WriteEndObject();
+    }
+
+    private static void WriteParams(Utf8JsonWriter w, IReadOnlyDictionary<string, Template?> parameters)
+    {
         w.WriteStartArray("params");
-        foreach (var (name, defaultValue) in endpoint.Params ?? new Dictionary<string, Template?>())
+        foreach (var (name, defaultValue) in parameters)
         {
             w.WriteStartObject();
             w.WriteString("name", name);
@@ -143,14 +162,31 @@ public static class ProtocolJson
             w.WriteEndObject();
         }
         w.WriteEndArray();
+    }
 
-        w.WriteStartArray("arguments");
-        foreach (var name in Loader.EndpointArguments(endpoint))
-            w.WriteStringValue(name);
-        w.WriteEndArray();
+    /// <summary>
+    /// A step of a sequence is located at its workflow's <c>use</c> step (where tools show its result);
+    /// <c>source_location</c> is its line in the sequence file, and <c>sequence</c> the use it comes from.
+    /// </summary>
+    private static void WriteOrigin(Utf8JsonWriter w, StepDefinition step)
+    {
+        WriteLocation(w, step.Location);
+        if (step.SourceLocation is { } source)
+            WriteLocation(w, source, "source_location");
+        else
+            w.WriteNull("source_location");
 
-        WriteLocation(w, endpoint.Location);
-        w.WriteEndObject();
+        if (step.Sequence is { } use)
+        {
+            w.WriteStartObject("sequence");
+            w.WriteString("name", use.Name);
+            w.WriteString("file", use.File);
+            w.WriteEndObject();
+        }
+        else
+        {
+            w.WriteNull("sequence");
+        }
     }
 
     private static void WriteStep(Utf8JsonWriter w, int index, StepDefinition step)
@@ -163,7 +199,7 @@ public static class ProtocolJson
             w.WriteString("type", "sleep");
             w.WriteString("name", sleep.Name);
             w.WriteNumber("duration_ms", sleep.Duration.TotalMilliseconds);
-            WriteLocation(w, step.Location);
+            WriteOrigin(w, step);
             w.WriteEndObject();
             return;
         }
@@ -198,7 +234,7 @@ public static class ProtocolJson
             w.WriteString(name, source.ToString());
         w.WriteEndObject();
 
-        WriteLocation(w, step.Location);
+        WriteOrigin(w, step);
         w.WriteEndObject();
     }
 
@@ -622,9 +658,9 @@ public static class ProtocolJson
         TemplateRenderer.ToLiteral(template.Node).WriteTo(w);
     }
 
-    private static void WriteLocation(Utf8JsonWriter w, SourceLocation location)
+    private static void WriteLocation(Utf8JsonWriter w, SourceLocation location, string name = "location")
     {
-        w.WriteStartObject("location");
+        w.WriteStartObject(name);
         w.WriteString("file", location.File);
         w.WriteNumber("line", location.Line);
         w.WriteNumber("column", location.Column);

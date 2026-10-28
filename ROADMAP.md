@@ -80,7 +80,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [x] **M4-2** `cli` Cookies: a cookie jar per run, `expect.cookies`, `save` from a cookie. Spec: [0009](docs/specs/0009-cookies.md). PR #25.
 - [x] **M4-3** `cli` Basic auth and OAuth2 client credentials: `basic` and `oauth2` in auth sets. Spec: [0010](docs/specs/0010-basic-and-oauth2.md). PR #26.
 - [x] **M4-4** `cli` `for_each`: repeat a step over a list of items (written, a variable, or a CSV or JSON file). Spec: [0011](docs/specs/0011-for-each.md). PR #27.
-- [ ] **M4-5** `cli` Reusable step sequences (a shared "log in"). *Spec needed.*
+- [x] **M4-5** `cli` Reusable step sequences (a shared "log in"): sequence files run with `use`. Spec: [0012](docs/specs/0012-reusable-sequences.md). PR #28.
 - [ ] **M4-6** `cli` Namespaced imports (`call: server.login`). *Spec needed.*
 - [ ] **M4-7** `ext` Request history: the last calls with their responses, to send again.
 - [ ] **M4-8** `ext` Environment editor: see and edit the variables of the selected environment.
@@ -116,6 +116,8 @@ Not planned now. We reconsider them after M4.
 New ideas, not planned yet.
 
 - `cli` Faster loading of large workflows: loading and validating cost about 0.2 ms per step (450 ms for 2000 steps, the same in 0.17.0), likely the arguments of every step being recomputed from the endpoint's templates. Profile before changing it.
+- `cli` `for_each` over a sequence (`use` with `for_each`): the steps of the sequence once per item, for a create/read/delete per item. Builds on spec 0012.
+- `ext` Sequence files: no ▶ Run workflow or Test Explorer entry for them, completion of a `use` step's `with` from the sequence's `params`, and "go to definition" on a `use` path.
 - `ext` Show the items of a `for_each` step in the run view (the `iterations` of `step_completed`), each with its request and response, and in the Test Explorer.
 
 - `ext` Publish to the VS Code Marketplace from the release workflow, without a token: Trusted Publishing when Microsoft ships it, or Microsoft Entra ID with a GitHub federated credential. Until then each `.vsix` is uploaded by hand.

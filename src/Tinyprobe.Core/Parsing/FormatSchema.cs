@@ -21,6 +21,8 @@ public static class FormatSchema
         ["file.import"] = "API files whose endpoints the steps can call, relative to this file: one path or a list.",
         ["file.variables"] = "Default variables of the workflow, `name: value`. Each is resolved once per run and may use the environment, other variables and generated values (`${$uuid}`). The environment file overrides them.",
         ["file.settings"] = "`timeout` (seconds per request) and `max_retries` (retries on network errors and timeouts).",
+        ["file.sequence"] = "A sequence file: the steps that a workflow runs with `use:` (a login, a shared setup), written as in `steps`.",
+        ["file.params"] = "A sequence's params, passed by `use` with `with`: `name: default`, or `name:` for a required one. Inside the sequence each one is a variable.",
         ["file.steps"] = "The steps, run in order. A step `call`s an endpoint or `sleep`s; the workflow stops at the first failing step.",
         ["file.base_url"] = "Prepended to every `path` of this file, usually `${baseUrl}` from the environment file.",
         ["file.headers"] = "Headers sent by every endpoint of this file, `Name: value`.",
@@ -56,6 +58,7 @@ public static class FormatSchema
         // step
         ["step.name"] = "Shown in the report. Default: the call and its path and query arguments.",
         ["step.call"] = "The endpoint to call, by name.",
+        ["step.use"] = "Run the steps of a sequence file here, relative to this file (`../sequences/log-in.yaml`). `with` passes its params; its saved values are visible to the next steps.",
         ["step.with"] = "Arguments of the endpoint, `name: value`. Values may use variables, such as `id: ${userId}`.",
         ["step.for_each"] = "Repeat the call once per item: a list of mappings whose keys are arguments (like `with`) and variables of the step, a variable holding such a list (`${users}`), or a data file (`{ file: ../data/cases.csv }`, CSV or JSON). Every item runs; the step passes when all passed.",
         ["for_each_file.file"] = "A JSON list of objects, or a CSV file whose first line names the columns, relative to the workflow.",
@@ -112,7 +115,7 @@ public static class FormatSchema
             w.WriteString("description",
                 "A tinyprobe API file (endpoints) or workflow (steps). Validate with `tinyprobe inspect`; the format is in `tinyprobe guide`.");
             w.WriteString("type", "object");
-            Properties(w, "file", Loader.WorkflowKeys);
+            Properties(w, "file", Loader.FileKeys);
             w.WriteBoolean("additionalProperties", false);
 
             w.WriteStartObject("$defs");
@@ -123,7 +126,7 @@ public static class FormatSchema
             Definition(w, "oauth2", "OAuth2 client credentials.", Loader.OAuth2Keys, required: ["token_url", "client_id", "client_secret"]);
             Definition(w, "for_each_file", "A data file of items.", Loader.ForEachFileKeys, required: Loader.ForEachFileKeys);
             Definition(w, "save_cookie", "A value saved from a cookie.", Loader.SaveKeys, anyOfRequired: ["cookie"]);
-            Definition(w, "step", "A step: `call` an endpoint, or `sleep`.", Loader.StepKeys, anyOfRequired: ["call", "sleep"]);
+            Definition(w, "step", "A step: `call` an endpoint, `use` a sequence, or `sleep`.", Loader.StepKeys, anyOfRequired: ["call", "use", "sleep"]);
             Definition(w, "expect", "What the response must be.", Loader.ExpectKeys);
             Definition(w, "until", "Polling conditions.", Loader.UntilKeys);
             Definition(w, "settings", "Settings of the workflow.", Loader.SettingsKeys);
@@ -280,7 +283,7 @@ public static class FormatSchema
             case "file.name" or "file.description" or "file.base_url" or "endpoint.path"
                 or "multipart_file.file" or "multipart_file.filename" or "multipart_file.content_type"
                 or "save_cookie.cookie" or "for_each_file.file" or "basic.username" or "basic.password"
-                or "oauth2.token_url" or "oauth2.client_id" or "oauth2.client_secret" or "step.name" or "step.call" or "step.sleep" or "until.every" or "until.timeout":
+                or "oauth2.token_url" or "oauth2.client_id" or "oauth2.client_secret" or "step.name" or "step.call" or "step.use" or "step.sleep" or "until.every" or "until.timeout":
                 w.WriteString("type", "string");
                 break;
             case "endpoint.method":
@@ -334,7 +337,7 @@ public static class FormatSchema
             case "file.endpoints":
                 MapOf(w, () => Ref(w, "endpoint", inline: true));
                 break;
-            case "file.steps":
+            case "file.steps" or "file.sequence":
                 w.WriteString("type", "array");
                 w.WriteStartObject("items");
                 Ref(w, "step", inline: true);
@@ -343,7 +346,7 @@ public static class FormatSchema
             case "file.settings":
                 Ref(w, "settings", inline: true);
                 break;
-            case "file.variables" or "step.with" or "endpoint.params":
+            case "file.variables" or "step.with" or "endpoint.params" or "file.params":
                 w.WriteString("type", "object");
                 break;
             case "step.save":

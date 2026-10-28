@@ -189,7 +189,7 @@ Let a coding agent (Claude Code, Cursor, Copilot, Codex, ...) write the tinyprob
 
 `tinyprobe guide` prints the same guide from the installed binary, so it always matches your version, also offline. If the agent cannot open links, paste the file into the chat.
 
-Start with `tinyprobe init` at the root of your repository. It creates the `tinyprobe/` folder of the guide (`api/`, `workflows/`, the env files), adds the env files with credentials to `.gitignore`, and adds a section to `AGENTS.md` that tells every coding agent to run `tinyprobe guide` before touching the tests. It never overwrites a file.
+Start with `tinyprobe init` at the root of your repository. It creates the `tinyprobe/` folder of the guide (`api/`, `workflows/`, `sequences/`, the env files), adds the env files with credentials to `.gitignore`, and adds a section to `AGENTS.md` that tells every coding agent to run `tinyprobe guide` before touching the tests. It never overwrites a file.
 
 The agent can check its own work: an invalid file is reported with `file:line:column` and a suggestion before any request is sent, and a failing check shows the actual value.
 
@@ -434,6 +434,7 @@ steps:
 | In a step | Description |
 |---|---|
 | `call` / `with` | The endpoint to call and its arguments. |
+| `use` | Run a shared sequence of steps here (a login), e.g. `use: ../sequences/log-in.yaml` with `with` for its params. |
 | `expect.status` | Expected status code, or a list (`[200, 204]`); without it any 2xx is accepted. |
 | `expect.body` | Checks by JSONPath: a plain value means equal; operators `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `exists`, `contains`. Combine them on one value, e.g. `{ gt: 0, lt: 10 }`: all must pass. For OR use `in: [a, b]` (one of these values) or `any: [ { lt: 0 }, { gt: 100 } ]` (one of these conditions). |
 | `expect.headers` | Checks on response headers. |
@@ -448,7 +449,7 @@ steps:
 
 ## Test server example
 
-[docs/example/](docs/example/) tests the test server of this repository, and is what CI runs: one API file and seven workflows covering authentication (bearer, API key, Basic, OAuth2), CRUD, nested JSON, query strings, headers, status codes, slow responses, forms and file uploads, a cookie session, and tables of cases with `for_each`. It needs the .NET SDK to start the server; for a first look, [example/](example/) needs nothing.
+[docs/example/](docs/example/) tests the test server of this repository, and is what CI runs: one API file and seven workflows covering authentication (bearer, API key, Basic, OAuth2), CRUD, nested JSON, query strings, headers, status codes, slow responses, forms and file uploads, a cookie session, tables of cases with `for_each`, and a login shared through a sequence (`docs/example/sequences/`). It needs the .NET SDK to start the server; for a first look, [example/](example/) needs nothing.
 
 ```bash
 # terminal 1: start the test server on http://localhost:5122

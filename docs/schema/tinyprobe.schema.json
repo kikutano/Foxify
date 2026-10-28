@@ -63,6 +63,17 @@
       "additionalProperties": {
         "$ref": "#/$defs/endpoint"
       }
+    },
+    "params": {
+      "description": "A sequence's params, passed by `use` with `with`: `name: default`, or `name:` for a required one. Inside the sequence each one is a variable.",
+      "type": "object"
+    },
+    "sequence": {
+      "description": "A sequence file: the steps that a workflow runs with `use:` (a login, a shared setup), written as in `steps`.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/step"
+      }
     }
   },
   "additionalProperties": false,
@@ -287,7 +298,7 @@
       ]
     },
     "step": {
-      "description": "A step: `call` an endpoint, or `sleep`.",
+      "description": "A step: `call` an endpoint, `use` a sequence, or `sleep`.",
       "type": "object",
       "properties": {
         "name": {
@@ -296,6 +307,10 @@
         },
         "call": {
           "description": "The endpoint to call, by name.",
+          "type": "string"
+        },
+        "use": {
+          "description": "Run the steps of a sequence file here, relative to this file (`../sequences/log-in.yaml`). `with` passes its params; its saved values are visible to the next steps.",
           "type": "string"
         },
         "with": {
@@ -352,6 +367,11 @@
         {
           "required": [
             "call"
+          ]
+        },
+        {
+          "required": [
+            "use"
           ]
         },
         {

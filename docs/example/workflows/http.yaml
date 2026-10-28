@@ -9,12 +9,9 @@ settings:
   max_retries: 0
 
 steps:
-  - name: Log in
-    call: login
+  - use: ../sequences/log-in.yaml   # the shared login: saves ${token}
     with:
       password: password
-    save:
-      token: $.access_token
 
   - name: Echo returns what was sent
     call: echo

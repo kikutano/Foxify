@@ -5,12 +5,9 @@ import:
   - ../api/testserver.yaml
 
 steps:
-  - name: Log in
-    call: login
+  - use: ../sequences/log-in.yaml   # the shared login: saves ${token}
     with:
       password: password
-    save:
-      token: $.access_token
 
   - name: Catalog structure
     call: catalog

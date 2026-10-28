@@ -74,14 +74,21 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
       "for_each": null,
       "until": null,
       "save": { "token": "$.token" },
-      "location": { "file": "tinyprobe/workflows/users.yaml", "line": 9, "column": 5 }
+      "location": { "file": "tinyprobe/workflows/users.yaml", "line": 9, "column": 5 },
+      "source_location": null,
+      "sequence": null
     },
     { "index": 1, "type": "sleep", "name": "sleep 1s", "duration_ms": 1000, "location": { "file": "tinyprobe/workflows/users.yaml", "line": 17, "column": 5 } }
   ]
 }
 ```
 
-- `kind` is `workflow` or `api`. An API file has an empty `steps` and `variables`.
+- `kind` is `workflow`, `api` or `sequence`. An API file has an empty `steps` and `variables`. A sequence file (`inspect` of a file with `sequence:`) also has `params`, as an endpoint's, and its `steps`.
+- In a workflow, the steps of a sequence are listed where their `use` is, with consecutive indexes, as they run. Every step has:
+  - `source_location`: where a sequence's step is written, in the sequence file, or `null`;
+  - `sequence`: `{ "name", "file" }` of the `use` it comes from, or `null`.
+
+  For those steps `location` is the `use` step's, the line a tool shows the result on.
 - `headers` are the effective headers of the endpoint: file headers, then `auth` sets, then the endpoint's own, where a later one with the same name replaces an earlier one.
 - `body`, `form` and `multipart`: at most one is not `null`. `form` and `multipart` are the fields in order, one entry per field sent (a YAML list gives one entry per item): `{ "name", "value" }` for a text field, `{ "name", "file", "filename", "content_type" }` for a file, with `filename` and `content_type` `null` when they are not written. Values are the literal YAML, placeholders included, as in `body`:
   ```json

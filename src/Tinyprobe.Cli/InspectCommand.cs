@@ -35,8 +35,15 @@ internal static class InspectCommand
     private static void Write(IAnsiConsole console, string path, WorkflowDefinition workflow)
     {
         var isWorkflow = workflow.Steps.Count > 0;
+        var kind = workflow.IsSequence ? "sequence" : isWorkflow ? "workflow" : "api";
         console.WriteLine();
-        console.MarkupLine($"  [bold]{(isWorkflow ? "workflow" : "api")}[/] {Escape(workflow.Name)} [grey]{Escape(path)}[/]");
+        console.MarkupLine($"  [bold]{kind}[/] {Escape(workflow.Name)} [grey]{Escape(path)}[/]");
+
+        if (workflow.Params is { Count: > 0 } sequenceParams)
+        {
+            Section(console, "params", sequenceParams.Count);
+            console.MarkupLine($"  {Escape(string.Join(", ", sequenceParams.Select(p => p.Value is null ? p.Key : $"{p.Key}?")))}");
+        }
 
         Section(console, "endpoints", workflow.Endpoints.Count);
         int nameWidth = workflow.Endpoints.Keys.Select(k => k.Length).DefaultIfEmpty(0).Max();
@@ -66,7 +73,7 @@ internal static class InspectCommand
             {
                 var text = workflow.Steps[index] switch
                 {
-                    CallStep call => $"{Escape(call.Name.PadRight(stepWidth))}  [grey]call {Escape(call.Call)}{(call.Until is null ? "" : ", until")}[/]",
+                    CallStep call => $"{Escape(call.Name.PadRight(stepWidth))}  [grey]call {Escape(call.Call)}{(call.Until is null ? "" : ", until")}{(call.ForEach is null ? "" : ", for_each")}[/]",
                     SleepStep sleep => $"[grey]{sleep.Name}[/]",
                     _ => ""
                 };

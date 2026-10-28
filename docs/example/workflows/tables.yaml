@@ -22,12 +22,9 @@ steps:
     expect:
       status: ${status}
 
-  - name: Admin logs in
-    call: login
+  - use: ../sequences/log-in.yaml   # the shared login: saves ${token}
     with:
       password: password
-    save:
-      token: $.access_token
 
   - name: An email is required
     call: create_user
