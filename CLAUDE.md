@@ -13,7 +13,8 @@ scripts/dev.sh e2e       # docs/example workflows + protocol checks against the 
 scripts/dev.sh server    # test server on http://localhost:5122, foreground
 scripts/dev.sh install   # dev binary (0.0.0-dev) linked as ~/.local/bin/tinyprobe-dev, for the extension
 scripts/dev.sh example   # example/ against JSONPlaceholder (internet)
-scripts/dev.sh aot       # real Native AOT publish (needs clang + zlib1g-dev, not installed on this machine)
+scripts/dev.sh aot       # real Native AOT publish to publish/ (clang, or gcc as on this machine; zlib1g-dev)
+scripts/dev.sh perf      # aot + the CI performance guard (scripts/perf.sh): size and speed budgets
 dotnet test Tinyprobe.slnx --filter "FullyQualifiedName~WorkflowLoaderTests"   # one test class
 ```
 
@@ -36,6 +37,7 @@ YAML ──► Parsing/WorkflowLoader ──► Definitions (immutable model) �
 
 ## Rules that are easy to break
 
+- **Light and fast.** `scripts/perf.sh` fails CI when the AOT binary goes over its size or time budgets. Raise a budget only on purpose, in the PR that needs it, and say why.
 - **Native AOT.** No reflection, no `System.Text.Json` reflection serialization, YamlDotNet only through the representation model (`YamlNode`). `IsAotCompatible` warns at build time; the real gate is `scripts/dev.sh aot` / CI.
 - **Docs are tested.** `DocumentationTests` loads every ```yaml block of the docs; blocks starting with `# file: path` are written to disk so imports resolve. A doc example with invalid syntax fails the tests.
 - **`docs/llm-guide.md` is embedded in the binary** (`tinyprobe guide`) and is what coding agents read: update it with every format change.

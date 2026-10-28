@@ -21,7 +21,7 @@ scripts/dev.sh server    # the test server on http://localhost:5122
 scripts/dev.sh install   # a development binary, linked as ~/.local/bin/tinyprobe-dev
 ```
 
-`scripts/dev.sh e2e` starts the test server itself when it is not running. The Native AOT binary (`scripts/dev.sh aot`) also needs `clang` and `zlib1g-dev` on Linux, or the C++ workload on Windows. CI builds it on every push, so you don't need it locally. On Windows, run the script from Git Bash or WSL.
+`scripts/dev.sh e2e` starts the test server itself when it is not running. The Native AOT binary (`scripts/dev.sh aot`) also needs `clang` (or `gcc`) and `zlib1g-dev` on Linux, or the C++ workload on Windows. CI builds it on every push, so you don't need it locally. CI also runs the performance guard, `scripts/perf.sh`: the binary must stay under its size budget, and start-up, loading and a run of 500 requests under their time budgets. `scripts/dev.sh perf` runs it on your machine. On Windows, run the script from Git Bash or WSL.
 
 [CLAUDE.md](CLAUDE.md) maps the code: where the format is parsed, where steps run, how results become JSON. It is written for coding agents but is just as useful to people.
 
