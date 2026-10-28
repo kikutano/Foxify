@@ -1,9 +1,9 @@
 # 0011 — `for_each`: repeat a step over a list
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M4-4
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#27](https://github.com/kikutano/tinyprobe/pull/27)
 
 ## Problem
 
@@ -146,8 +146,8 @@ Nothing required: the run view and the Test Explorer read the step's own fields,
 
 ## Acceptance criteria
 
-- [ ] `for_each` with a literal list, a variable and a JSON or CSV file, as above, with every load and run error.
-- [ ] Unit tests with `FakeServer`:
+- [x] `for_each` with a literal list, a variable and a JSON or CSV file, as above, with every load and run error.
+- [x] Unit tests with `FakeServer`:
   - arguments from items and `with`;
   - item values in checks, and `status: ${status}`;
   - all iterations run after a failure, then the workflow stops;
@@ -155,10 +155,10 @@ Nothing required: the run view and the Test Explorer read the step's own fields,
   - the variable form, with extra keys ignored, and a wrong type;
   - CSV and JSON files, an empty list;
   - names and the summary counts.
-- [ ] ndjson: `iteration` and `iterations` in `step_started`; one `step_completed` with `iterations`, whose own fields are the first failing iteration's. JUnit has one test case per iteration.
-- [ ] `inspect --json` and the schema have `for_each`.
-- [ ] The `docs/example` steps pass against the test server, in CI and in `scripts/dev.sh e2e`.
-- [ ] `scripts/dev.sh check` passes.
+- [x] ndjson: `iteration` and `iterations` in `step_started`; one `step_completed` with `iterations`, whose own fields are the first failing iteration's. JUnit has one test case per iteration.
+- [x] `inspect --json` and the schema have `for_each`.
+- [x] The `docs/example` steps pass against the test server, in CI and in `scripts/dev.sh e2e`.
+- [x] `scripts/dev.sh check` passes.
 
 ## Open questions
 
