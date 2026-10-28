@@ -116,6 +116,11 @@ e2e() {
     > "$DEV_DIR/suite.ndjson"
   jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 7
     and .[-1].event == "suite_finished" and .[-1].success' "$DEV_DIR/suite.ndjson" > /dev/null
+  # Run to here: the steps up to the third, and a success although the workflow has more.
+  "$DEV_BIN" run docs/example/workflows/users.yaml -e docs/environment.yaml --var "baseUrl=$BASE_URL/" --to 3 \
+    --reporter ndjson > "$DEV_DIR/to.ndjson"
+  jq -e -s '.[0].to == 2 and (.[0].steps | length) == 3 and .[-1].success and .[-1].summary.stopped_after == 2' \
+    "$DEV_DIR/to.ndjson" > /dev/null
   echo "Protocol checks passed."
 
   step "End-to-end (schema)"

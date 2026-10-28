@@ -228,6 +228,39 @@ public sealed class McpServerTests : IDisposable
     }
 
     [Fact]
+    public async Task Run_WithTo_StopsAfterThatStep_ByNumberOrName()
+    {
+        Write("api.yaml", Api);
+        var workflow = Workflow("a.yaml", "  - call: ok\n  - name: Second\n    call: ok\n  - call: broken\n");
+
+        var (byNumber, numberError) = ToolResult(await CallTool("run", new { paths = workflow, to = 2 }));
+        var (byName, nameError) = ToolResult(await CallTool("run", new { paths = workflow, to = "Second" }));
+
+        Assert.False(numberError);
+        Assert.False(nameError);
+        foreach (var text in new[] { byNumber, byName })
+        {
+            var run = Json(text).GetProperty("workflows")[0];
+            Assert.True(run.GetProperty("success").GetBoolean());
+            Assert.Equal(1, run.GetProperty("summary").GetProperty("stopped_after").GetInt32());
+            Assert.Equal(2, run.GetProperty("summary").GetProperty("total_steps").GetInt32());
+        }
+        Assert.Equal(4, _server.Requests.Count); // the broken step never ran
+    }
+
+    [Fact]
+    public async Task Run_WithTo_NeedsOneWorkflowFile_AndAStepOfIt()
+    {
+        Write("flows/api.yaml", Api);
+        var workflow = Workflow("flows/a.yaml", "  - call: ok\n");
+
+        Assert.Equal(("'to' runs one workflow file: give one path, a workflow file.", true),
+            ToolResult(await CallTool("run", new { paths = Path.Combine(_directory, "flows"), to = 1 })));
+        Assert.Equal(("--to 5: the workflow has 1 step", true), ToolResult(await CallTool("run", new { paths = workflow, to = 5 })));
+        Assert.Empty(_server.Requests);
+    }
+
+    [Fact]
     public async Task Run_AcceptsOnePathAsAString()
     {
         Write("api.yaml", Api);

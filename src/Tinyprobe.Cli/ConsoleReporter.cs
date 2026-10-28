@@ -124,7 +124,8 @@ internal sealed class ConsoleReporter : IRunReporter
 
         WriteMetric("steps", $"{summary.PassedSteps}/{summary.TotalSteps} passed"
             + (summary.FailedSteps > 0 ? $"  [red]{summary.FailedSteps} failed[/]" : "")
-            + (summary.NotRunSteps > 0 ? $"  [yellow]{summary.NotRunSteps} not run[/]" : ""));
+            + (summary.NotRunSteps > 0 ? $"  [yellow]{summary.NotRunSteps} not run[/]" : "")
+            + (summary.StoppedAfter is { } last ? $"  [grey](stopped after step {last + 1} of {summary.StepsInFile}: --to)[/]" : ""));
 
         var rate = elapsed.TotalSeconds > 0 ? summary.HttpRequests / elapsed.TotalSeconds : 0;
         WriteMetric("http_reqs", $"{summary.HttpRequests}  [grey]{rate:0.##}/s[/]");

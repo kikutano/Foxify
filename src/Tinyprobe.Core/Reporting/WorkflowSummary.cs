@@ -24,6 +24,11 @@ public sealed class WorkflowSummary
     public long BytesSent { get; init; }
     public long BytesReceived { get; init; }
 
+    /// <summary><c>run --to</c>: the index of the last step run; the steps after it are not counted. Null for a whole run.</summary>
+    public int? StoppedAfter { get; init; }
+    /// <summary>The steps of the workflow file, those after <see cref="StoppedAfter"/> included (sleeps too).</summary>
+    public int StepsInFile { get; init; }
+
     public bool IsSuccess => FailedSteps == 0 && NotRunSteps == 0;
 
     public static WorkflowSummary Create(WorkflowDefinition workflow, WorkflowReport report)
@@ -49,6 +54,8 @@ public sealed class WorkflowSummary
             TotalSteps = workflow.Steps.OfType<CallStep>().Count() + report.StepReports.Count(s => s.Iteration > 1),
             PassedSteps = report.StepReports.Count(s => s.IsSuccess),
             FailedSteps = report.StepReports.Count(s => !s.IsSuccess),
+            StoppedAfter = workflow.StoppedAfter,
+            StepsInFile = workflow.StoppedAfter is null ? workflow.Steps.Count : workflow.StepsInFile,
             ChecksPassed = checksPassed,
             ChecksFailed = checksFailed,
             HttpRequests = responses.Count,
