@@ -1,9 +1,9 @@
 # 0013 — Namespaced imports
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M4-6
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#30](https://github.com/kikutano/tinyprobe/pull/30)
 
 ## Problem
 
@@ -112,9 +112,9 @@ No new `MINIMUM_VERSION`.
 
 ## Acceptance criteria
 
-- [ ] Named imports as above in workflows and sequences, with every error at its location.
-- [ ] Plain imports behave exactly as before; the existing workflows and tests pass unchanged.
-- [ ] Unit tests:
+- [x] Named imports as above in workflows and sequences, with every error at its location.
+- [x] Plain imports behave exactly as before; the existing workflows and tests pass unchanged.
+- [x] Unit tests:
   - prefixed names, and the default step names;
   - the same file under two names, and twice under one;
   - a name used for two files, and an invalid name;
@@ -122,8 +122,8 @@ No new `MINIMUM_VERSION`.
   - each file keeps its own `base_url` and `auth`;
   - a sequence's named imports;
   - `inspect --json` with `import_name` and `imports`.
-- [ ] A `docs/example` workflow calls a named import against the test server.
-- [ ] `scripts/dev.sh check` passes, and the performance guard.
+- [x] A `docs/example` workflow calls a named import against the test server.
+- [x] `scripts/dev.sh check` passes, and the performance guard.
 
 ## Open questions
 

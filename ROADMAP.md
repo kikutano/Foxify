@@ -81,7 +81,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [x] **M4-3** `cli` Basic auth and OAuth2 client credentials: `basic` and `oauth2` in auth sets. Spec: [0010](docs/specs/0010-basic-and-oauth2.md). PR #26.
 - [x] **M4-4** `cli` `for_each`: repeat a step over a list of items (written, a variable, or a CSV or JSON file). Spec: [0011](docs/specs/0011-for-each.md). PR #27.
 - [x] **M4-5** `cli` Reusable step sequences (a shared "log in"): sequence files run with `use`. Spec: [0012](docs/specs/0012-reusable-sequences.md). PR #28.
-- [~] **M4-6** `cli` Namespaced imports (`call: server.login`). Spec: [0013](docs/specs/0013-namespaced-imports.md).
+- [x] **M4-6** `cli` Namespaced imports (`call: server.login`): `- billing: ../api/billing.yaml` in `import`. Spec: [0013](docs/specs/0013-namespaced-imports.md). PR #30.
 - [ ] **M4-7** `ext` Request history: the last calls with their responses, to send again.
 - [ ] **M4-8** `ext` Environment editor: see and edit the variables of the selected environment.
 - [ ] **M4-9** `ext` Visual request editor for people who prefer forms to YAML; it writes the YAML.
