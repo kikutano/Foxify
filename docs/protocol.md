@@ -49,6 +49,8 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
       "body": { "email": "${email}", "password": "${password}" },
       "form": null,
       "multipart": null,
+      "basic_auth": null,
+      "oauth2": null,
       "params": [
         { "name": "email", "required": true, "default": null },
         { "name": "password", "required": false, "default": "secret" }
@@ -86,7 +88,12 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
     { "name": "avatar", "file": "${avatar}", "filename": null, "content_type": null }
   ]
   ```
-- `arguments` are the names a call of the endpoint can pass with `--with` (or a step's `with`): its params, its query names and every placeholder of its base URL, path, headers, body, form and multipart fields. Generated values (`${$uuid}`) are not listed. A UI can build the form of an endpoint from `params` (required ones first) and `arguments`.
+- `basic_auth` and `oauth2`: the `basic` or `oauth2` key of the endpoint's auth set, `null` when it has none. Values are the literal YAML, placeholders included; `scope` is `null` when not written, and a list of scopes is shown joined with spaces. `headers` does not list the `Authorization` header they write.
+  ```json
+  "basic_auth": { "username": "${username}", "password": "${password}" },
+  "oauth2": { "token_url": "${authUrl}/oauth/token", "client_id": "${clientId}", "client_secret": "${clientSecret}", "scope": "orders:read orders:write", "client_auth": "basic", "form": {} }
+  ```
+- `arguments` are the names a call of the endpoint can pass with `--with` (or a step's `with`): its params, its query names and every placeholder of its base URL, path, headers, body, form and multipart fields, `basic_auth` and `oauth2`. Generated values (`${$uuid}`) are not listed. A UI can build the form of an endpoint from `params` (required ones first) and `arguments`.
 - `until`, when present, has the same `status` and `checks` as `expect`, plus `every_ms` and `timeout_ms`.
 - `checks[].subject` is a JSONPath, `duration`, `header <name>` or `cookie <name>`.
 - `checks[].condition` is the text the report shows, such as `>= 3`, `in ["a","b"]`, `< 0 or > 100`.

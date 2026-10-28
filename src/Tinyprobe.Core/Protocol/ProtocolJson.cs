@@ -5,6 +5,7 @@ using Tinyprobe.Core.Execution;
 using Tinyprobe.Core.Models;
 using Tinyprobe.Core.Parsing;
 using Tinyprobe.Core.Reporting;
+using YamlDotNet.RepresentationModel;
 
 namespace Tinyprobe.Core.Protocol;
 
@@ -126,6 +127,8 @@ public static class ProtocolJson
             WriteLiteral(w, "body", endpoint.Body);
         WriteFields(w, "form", endpoint.Form);
         WriteFields(w, "multipart", endpoint.Multipart);
+        WriteBasicAuth(w, endpoint.BasicAuth);
+        WriteOAuth2(w, endpoint.OAuth2);
 
         w.WriteStartArray("params");
         foreach (var (name, defaultValue) in endpoint.Params ?? new Dictionary<string, Template?>())
@@ -503,6 +506,45 @@ public static class ProtocolJson
             w.WriteEndObject();
         }
         w.WriteEndArray();
+    }
+
+    private static void WriteBasicAuth(Utf8JsonWriter w, BasicAuth? basic)
+    {
+        if (basic is null)
+        {
+            w.WriteNull("basic_auth");
+            return;
+        }
+        w.WriteStartObject("basic_auth");
+        w.WriteString("username", basic.Username.ToString());
+        w.WriteString("password", basic.Password.ToString());
+        w.WriteEndObject();
+    }
+
+    private static void WriteOAuth2(Utf8JsonWriter w, OAuth2ClientCredentials? oauth2)
+    {
+        if (oauth2 is null)
+        {
+            w.WriteNull("oauth2");
+            return;
+        }
+        w.WriteStartObject("oauth2");
+        w.WriteString("token_url", oauth2.TokenUrl.ToString());
+        w.WriteString("client_id", oauth2.ClientId.ToString());
+        w.WriteString("client_secret", oauth2.ClientSecret.ToString());
+        // A list of scopes is shown as it is sent: joined with spaces.
+        if (oauth2.Scope is null)
+            w.WriteNull("scope");
+        else if (oauth2.Scope.Node is YamlSequenceNode scopes)
+            w.WriteString("scope", string.Join(' ', scopes.Children.Select(item => ((YamlScalarNode)item).Value)));
+        else
+            w.WriteString("scope", oauth2.Scope.ToString());
+        w.WriteString("client_auth", oauth2.ClientAuth == ClientAuthentication.Form ? "form" : "basic");
+        w.WriteStartObject("form");
+        foreach (var (name, value) in oauth2.Form)
+            w.WriteString(name, value.ToString());
+        w.WriteEndObject();
+        w.WriteEndObject();
     }
 
     private static void WriteLiteral(Utf8JsonWriter w, string name, Template template)

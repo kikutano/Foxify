@@ -51,10 +51,10 @@
       "$ref": "#/$defs/headers"
     },
     "auth": {
-      "description": "Named sets of headers, such as `bearer: { Authorization: \"Bearer ${token}\" }`. An endpoint picks them with `auth:`.",
+      "description": "Named auth sets: headers, such as `bearer: { Authorization: \"Bearer ${token}\" }`, and at most one of `basic` and `oauth2`. An endpoint picks them with `auth:`.",
       "type": "object",
       "additionalProperties": {
-        "$ref": "#/$defs/headers"
+        "$ref": "#/$defs/auth_set"
       }
     },
     "endpoints": {
@@ -162,6 +162,96 @@
             "file"
           ]
         }
+      ]
+    },
+    "auth_set": {
+      "description": "An auth set: headers (`Name: value`), and at most one of `basic` and `oauth2`.",
+      "type": "object",
+      "properties": {
+        "basic": {
+          "description": "Basic auth: `username` and `password`; tinyprobe sends `Authorization: Basic` with their base64.",
+          "$ref": "#/$defs/basic"
+        },
+        "oauth2": {
+          "description": "OAuth2 client credentials: tinyprobe gets a token from `token_url` on first use, reuses it for the run until it expires, and sends `Authorization: Bearer <token>`.",
+          "$ref": "#/$defs/oauth2"
+        }
+      },
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
+    },
+    "basic": {
+      "description": "Basic auth credentials.",
+      "type": "object",
+      "properties": {
+        "username": {
+          "description": "The user name. May be a placeholder. Cannot contain `:`.",
+          "type": "string"
+        },
+        "password": {
+          "description": "The password. May be a placeholder, e.g. `${password}` from the env file.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "username",
+        "password"
+      ]
+    },
+    "oauth2": {
+      "description": "OAuth2 client credentials.",
+      "type": "object",
+      "properties": {
+        "token_url": {
+          "description": "The token endpoint, a full URL such as `${authUrl}/oauth/token`.",
+          "type": "string"
+        },
+        "client_id": {
+          "description": "The client id.",
+          "type": "string"
+        },
+        "client_secret": {
+          "description": "The client secret: a placeholder, with the value in `env.local.yaml`.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "Optional: a scope, or a list of scopes, sent joined with spaces.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "client_auth": {
+          "description": "How the client id and secret are sent: `basic` (an `Authorization: Basic` header, the default) or `form` (fields of the body).",
+          "type": "string",
+          "enum": [
+            "basic",
+            "form"
+          ]
+        },
+        "form": {
+          "description": "Other fields of the token request, such as `audience` (Auth0) or `resource` (Azure AD).",
+          "$ref": "#/$defs/headers"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "token_url",
+        "client_id",
+        "client_secret"
       ]
     },
     "save_cookie": {

@@ -1,2 +1,4 @@
 baseUrl: "http://localhost:5122/"
 apiKey: "tinyprobe-test-api-key"
+clientId: "tinyprobe-client"
+clientSecret: "tinyprobe-secret"

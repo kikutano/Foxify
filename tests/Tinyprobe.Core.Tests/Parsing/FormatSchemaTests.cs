@@ -36,10 +36,13 @@ public sealed class FormatSchemaTests : IDisposable
         Assert.Equal(Loader.UntilKeys, Keys(Definition("until")));
         Assert.Equal(Loader.SettingsKeys, Keys(Definition("settings")));
         Assert.Equal(Loader.SaveKeys, Keys(Definition("save_cookie")));
+        Assert.Equal(Loader.AuthSchemeKeys, Keys(Definition("auth_set")));
+        Assert.Equal(Loader.BasicKeys, Keys(Definition("basic")));
+        Assert.Equal(Loader.OAuth2Keys, Keys(Definition("oauth2")));
         Assert.Equal(Loader.Operators.Keys, Keys(Definition("condition")));
         Assert.Equal(Loader.DurationOperators, Keys(Definition("duration_condition")));
 
-        foreach (var section in new[] { Schema, Definition("endpoint"), Definition("step"), Definition("condition") })
+        foreach (var section in new[] { Schema, Definition("endpoint"), Definition("step"), Definition("condition"), Definition("auth_set"), Definition("oauth2") })
         {
             Assert.All(section.GetProperty("properties").EnumerateObject(),
                 p => Assert.False(string.IsNullOrWhiteSpace(p.Value.GetProperty("description").GetString()), p.Name));

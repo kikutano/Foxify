@@ -22,7 +22,8 @@ internal static class RequestBuilder
     /// </summary>
     public static readonly HttpRequestOptionsKey<string> RecordedBody = new("tinyprobe.recorded_body");
 
-    public static HttpRequestMessage Build(EndpointDefinition endpoint, CallScope scope, FileAccess files)
+    /// <param name="authorization">The <c>Authorization</c> header of a <c>basic</c> or <c>oauth2</c> auth set, if any.</param>
+    public static HttpRequestMessage Build(EndpointDefinition endpoint, CallScope scope, FileAccess files, string? authorization = null)
     {
         var request = new HttpRequestMessage(new HttpMethod(endpoint.Method), BuildUri(endpoint, scope));
 
@@ -67,8 +68,25 @@ internal static class RequestBuilder
             }
         }
 
+        // The loader removed every other Authorization header of the endpoint.
+        if (authorization is not null)
+            request.Headers.TryAddWithoutValidation("Authorization", authorization);
+
         return request;
     }
+
+    /// <summary>The <c>Authorization</c> header of a <c>basic</c> auth set.</summary>
+    public static string BasicAuthorization(BasicAuth basic, CallScope scope)
+    {
+        var username = TemplateRenderer.RenderText(basic.Username, scope);
+        if (username.Contains(':'))
+            throw new InvalidOperationException("Basic auth: the username cannot contain ':'");
+        return $"Basic {Base64Credentials(username, TemplateRenderer.RenderText(basic.Password, scope))}";
+    }
+
+    /// <summary><c>user:password</c> in base64, encoded as UTF-8 (RFC 7617).</summary>
+    public static string Base64Credentials(string user, string password) =>
+        Convert.ToBase64String(Encoding.UTF8.GetBytes($"{user}:{password}"));
 
     /// <summary>The text values of a field: a list (written, or the value of a placeholder) sends the field once per item.</summary>
     private static IEnumerable<string> Texts(BodyField field, CallScope scope)

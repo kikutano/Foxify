@@ -32,6 +32,7 @@ public sealed class WorkflowEngine
     private readonly HttpClient _httpClient;
     private readonly TextWriter _log;
     private readonly CookieContainer _cookies;
+    private OAuth2Tokens? _tokens;
 
     /// <summary>Raised before each step runs, and again before each new attempt of an <c>until</c> step.</summary>
     public event Action<StepProgress>? StepStarted;
@@ -55,6 +56,9 @@ public sealed class WorkflowEngine
 
     /// <summary>When set, multipart bodies may send only files inside this directory: set by the MCP server, for its workspace.</summary>
     public string? FileRoot { get; set; }
+
+    /// <summary>The clock of OAuth2 token expiry; tests replace it.</summary>
+    internal TimeProvider Time { get; init; } = TimeProvider.System;
 
     public async Task<WorkflowReport> ExecuteAsync(
         WorkflowDefinition workflow, IReadOnlyDictionary<string, JsonElement>? environment = null)
@@ -159,7 +163,8 @@ public sealed class WorkflowEngine
         for (int attempt = 0; ; attempt++)
         {
             // A request message can be sent only once, so it is rebuilt on every attempt.
-            using var request = RequestBuilder.Build(endpoint, scope, files);
+            var authorization = await AuthorizationAsync(endpoint, scope, maxRetries);
+            using var request = RequestBuilder.Build(endpoint, scope, files, authorization);
             report.Method = request.Method.Method;
             report.Url = request.RequestUri;
             report.BytesSent = request.Content?.Headers.ContentLength ?? 0;
@@ -183,6 +188,18 @@ public sealed class WorkflowEngine
                 await Task.Delay(delay);
             }
         }
+    }
+
+    /// <summary>The <c>Authorization</c> header of the endpoint's <c>basic</c> or <c>oauth2</c> auth set; null without one.</summary>
+    private async Task<string?> AuthorizationAsync(EndpointDefinition endpoint, CallScope scope, int maxRetries)
+    {
+        if (endpoint.BasicAuth is { } basic)
+            return RequestBuilder.BasicAuthorization(basic, scope);
+        if (endpoint.OAuth2 is not { } oauth2)
+            return null;
+
+        _tokens ??= new OAuth2Tokens(_httpClient, _log, Time);
+        return $"Bearer {await _tokens.GetAsync(oauth2, scope, maxRetries)}";
     }
 
     private async Task<HttpResponseMessage> SendTimedAsync(HttpRequestMessage request, StepReport report)

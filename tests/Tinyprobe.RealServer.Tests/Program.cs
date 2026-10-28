@@ -261,6 +261,79 @@ app.MapGet("/api/auth/both", (HttpRequest request) =>
     });
 });
 
+// -----------------------------------------------------------------------------
+// GET /api/auth/basic
+// Tests Basic authentication (admin / password)
+// -----------------------------------------------------------------------------
+
+app.MapGet("/api/auth/basic", (HttpRequest request, HttpResponse response) =>
+{
+    var expected = "Basic " + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("admin:password"));
+    if (request.Headers.Authorization.ToString() != expected)
+    {
+        response.Headers.WWWAuthenticate = "Basic realm=\"tinyprobe\"";
+        return Results.Json(new { error = "unauthorized" }, statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    return Results.Ok(new { authenticated = true, authentication = "basic", username = "admin" });
+});
+
+//
+// ============================================================================
+// OAUTH2 CLIENT CREDENTIALS
+// ============================================================================
+//
+// POST /oauth/token issues tokens to one client, which may authenticate with an
+// Authorization: Basic header or with client_id and client_secret in the form.
+//
+
+const string OAuthClientId = "tinyprobe-client";
+const string OAuthClientSecret = "tinyprobe-secret";
+
+var oauthTokens = new ConcurrentDictionary<string, string>();
+
+// -----------------------------------------------------------------------------
+// POST /oauth/token
+// -----------------------------------------------------------------------------
+
+app.MapPost("/oauth/token", async (HttpRequest request) =>
+{
+    var form = await request.ReadFormAsync();
+    string? clientId = form["client_id"];
+    string? clientSecret = form["client_secret"];
+    var authorization = request.Headers.Authorization.ToString();
+    if (authorization.StartsWith("Basic ", StringComparison.Ordinal))
+    {
+        var credentials = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(authorization["Basic ".Length..])).Split(':', 2);
+        (clientId, clientSecret) = (credentials[0], credentials.ElementAtOrDefault(1));
+    }
+
+    if (form["grant_type"] != "client_credentials")
+        return Results.Json(new { error = "unsupported_grant_type" }, statusCode: StatusCodes.Status400BadRequest);
+    if (clientId != OAuthClientId || clientSecret != OAuthClientSecret)
+        return Results.Json(new { error = "invalid_client" }, statusCode: StatusCodes.Status401Unauthorized);
+
+    var scope = form["scope"].ToString();
+    var token = $"tinyprobe-oauth-{Guid.NewGuid():N}";
+    oauthTokens[token] = scope;
+    return Results.Ok(new { access_token = token, token_type = "bearer", expires_in = 3600, scope });
+});
+
+// -----------------------------------------------------------------------------
+// GET /api/auth/oauth
+// Needs a token from POST /oauth/token; returns its scope.
+// -----------------------------------------------------------------------------
+
+app.MapGet("/api/auth/oauth", (HttpRequest request) =>
+{
+    var authorization = request.Headers.Authorization.ToString();
+    if (!authorization.StartsWith("Bearer ", StringComparison.Ordinal)
+        || !oauthTokens.TryGetValue(authorization["Bearer ".Length..], out var scope))
+        return Results.Json(new { error = "invalid_token" }, statusCode: StatusCodes.Status401Unauthorized);
+
+    return Results.Ok(new { authenticated = true, authentication = "oauth2", client_id = OAuthClientId, scope });
+});
+
 //
 // ============================================================================
 // USERS - CRUD

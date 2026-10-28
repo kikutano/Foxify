@@ -47,11 +47,21 @@ base_url: ${baseUrl}              # prepended to every path of this file
 headers:                          # optional: sent by every endpoint of this file
   Accept: application/json
 
-auth:                             # optional: named header sets, picked per endpoint
+auth:                             # optional: named auth sets, picked per endpoint
   bearer:
     Authorization: "Bearer ${token}"
   apikey:
     X-API-Key: ${apiKey}
+  admin:
+    basic:                        # Basic auth: tinyprobe computes the base64
+      username: ${adminUser}
+      password: ${adminPassword}
+  service:
+    oauth2:                       # OAuth2 client credentials: tinyprobe gets and reuses the token
+      token_url: ${authUrl}/oauth/token
+      client_id: ${clientId}
+      client_secret: ${clientSecret}
+      scope: [orders:read]        # optional
 
 endpoints:
   get_order:                      # the name a step calls: snake_case, unique
@@ -108,6 +118,13 @@ endpoints:
 | `form` | A form body (`application/x-www-form-urlencoded`), instead of `body`: `field: value`, encoded by tinyprobe (`a&b` is sent as `a%26b`); a list sends the field once per value. tinyprobe sets the `Content-Type`: don't add the header. |
 | `multipart` | A `multipart/form-data` body (file uploads), instead of `body`: `field: value` for a text field, `field: { file: path }` for a file (`filename` and `content_type` are optional: by default the file's name and the type of its extension), a list for several values or files under one name. **The path is relative to the workflow that runs** (to the API file for `tinyprobe call`), like `import`, not to the current directory: a file in `tinyprobe/fixtures/` is `../fixtures/avatar.png` from `tinyprobe/workflows/` and from `tinyprobe/api/` alike, so `tinyprobe call … --with file=../fixtures/avatar.png` and the workflow use the same path. Pass the path as an argument, as in `upload_invoice`. tinyprobe sets the `Content-Type` and its boundary: don't add the header. |
 | `params` | Declared arguments: `name: default` or `name:` (required). **Declare every path placeholder and every required input as a required param**: a step that forgets it is then reported before running, instead of failing at run time. Placeholders of `auth` sets and `base_url` (such as `${token}`, `${baseUrl}`) are not params: do not declare them. |
+
+**Auth sets.** A set is headers (`Authorization: "Bearer ${token}"`, `X-API-Key: ${apiKey}`), plus at most one of two keys that are not headers:
+
+- `basic: { username, password }`: tinyprobe sends `Authorization: Basic` with the base64. Never compute base64 yourself, and never put it in an env file.
+- `oauth2: { token_url, client_id, client_secret, scope, client_auth, form }`, the client credentials grant: tinyprobe requests a token from `token_url` before the first request that needs it, reuses it for the run until it expires, and sends `Authorization: Bearer <token>`. `client_auth` is `basic` (the default: the client in an `Authorization: Basic` header of the token request) or `form` (the client in the form body). `form` adds fields to the token request (`audience`, `resource`). `tinyprobe call` of such an endpoint works with only the env file: no token step, no `--with token=`.
+- Next to `basic` or `oauth2`, no `Authorization` header: not in the set, not in another set of the endpoint, not in the endpoint's `headers` (it is an error).
+- Secrets (`password`, `client_secret`) are placeholders, with the values only in `env.local.yaml`.
 
 ## 4. Workflow file
 
@@ -316,7 +333,7 @@ Follow these steps in order. If the user gives you a Postman collection or the e
    - Rails: `config/routes.rb`; Laravel: `routes/api.php`; Go: `http.HandleFunc`, `r.GET`
 
    For each endpoint note: method, path and path parameters, query parameters, request body fields and validation rules, whether it needs authentication, status codes and response body shape.
-2. **Understand authentication**: how a client obtains a token (login endpoint, the field that contains it), which header carries it, API keys. Model each mechanism as an `auth` set.
+2. **Understand authentication**: how a client obtains a token (login endpoint, the field that contains it), which header carries it, API keys, Basic auth, OAuth2 client credentials (a token URL with a client id and secret). Model each mechanism as an `auth` set: a header, `basic` or `oauth2`.
 3. **Find real test data**: seed data, fixtures, migrations, test users, `.env.example`, `docker-compose.yml` (base URL and port). Use values that exist in the backend; never invent ids, emails or expected values. If credentials or the base URL cannot be found, ask the user.
 4. **Write the API file** with every endpoint you found. Check it with `tinyprobe inspect tinyprobe/api/<name>.yaml` (exit `0` means valid), then try the main endpoints with `tinyprobe call`, for example `tinyprobe call tinyprobe/api/backend.yaml get_note --with id=1 -e tinyprobe/env.local.yaml`: the checks you write next should match the responses you saw, not the ones you expect. An endpoint that needs a token gets it with `--with token=...` or `--var token=...`, from a `call` of the login endpoint.
 5. **Write the workflows**, one per feature or resource:
@@ -363,6 +380,9 @@ Safety: run workflows only against a **local or test** environment, never agains
 | `duration: 500` or `{ lt: 500 }` | `duration: { lt: 500ms }` |
 | an endpoint per variant (`login_ok`, `login_wrong`) | one `login` endpoint, different `with` |
 | a token in the API file | `Authorization: "Bearer ${token}"` and `save: { token: ... }` |
+| `Authorization: "Basic ${basicAuth}"` with the base64 in an env file | `basic: { username: ${user}, password: ${password} }` in the auth set |
+| a token step against `/oauth/token` at the start of every workflow, for client credentials | an `oauth2` auth set; keep a `form` endpoint for the token URL only to test its errors |
+| an `Authorization` header next to `basic` or `oauth2` | remove it: the scheme writes the header |
 | `auth: bearer` where `bearer` is defined in another file | define the auth set in the same API file as the endpoint |
 | `path: /api/notes/${id}` without `params` | `params: { id: }`: a forgotten `with.id` is then caught before running |
 | `$.total: 1` after creating an item | `$.total: { gte: 1 }`: a previous failed run may have left data |
@@ -635,7 +655,8 @@ Follow this section when the user gives you exports of another API tool (a Postm
 | `urlencoded` body | `form:`, one field per enabled `urlencoded[]` entry (`key: value`); no `Content-Type` header |
 | `formdata` body | `multipart:`, one field per enabled `formdata[]` entry: `type: text` is `key: value`, `type: file` is `key: { file: "${key}" }` with the file in `tinyprobe/fixtures/` and its path in the step's `with` (see 12.3 when the file is not in the repository); no `Content-Type` header |
 | collection, folder or request `auth`: `bearer`, `apikey` | `auth` sets in the API file; a request with `inherit` (or no `auth`) uses its parent's set, `noauth` uses none |
-| `basic` auth | `Authorization: "Basic ${basicAuth}"`, with the base64 of `user:password` in `env.local.yaml` |
+| `basic` auth (`auth.basic[]`: `username`, `password`) | an auth set `basic: { username: ${username}, password: ${password} }`, with the values in the env files (the password only in `env.local.yaml`) |
+| `oauth2` auth with `grant_type` `client_credentials` (`auth.oauth2[]`: `accessTokenUrl`, `clientId`, `clientSecret`, `scope`, `client_authentication`) | an auth set `oauth2: { token_url, client_id, client_secret, scope }`; `client_authentication: header` is `client_auth: basic` (the default), `body` is `client_auth: form`; the secret only in `env.local.yaml`. Drop `tokenName`, `addTokenTo: header` and the other UI settings |
 | collection `variable`s | workflow `variables` for non-secret defaults, otherwise env files |
 | `pm.environment.set("t", pm.response.json().token)` (also `collectionVariables`, `globals`, `pm.variables`) | `save: { t: $.token }` |
 | `pm.response.to.have.status(201)`, `pm.response.code === 201` | `expect.status: 201` |
@@ -816,7 +837,7 @@ Either way, write a line in `MIGRATION.md`: the request, what was not translated
 | `postman.setNextRequest` branching (not a retry loop) | translate the main path; report the branches |
 | data files, `pm.iterationData` | translate one iteration with the first row; report that `for_each` is not supported yet |
 | a `formdata` file whose `src` is not in the repository (a path on someone's machine) | ask the user for the file; otherwise create a small file in `tinyprobe/fixtures/` with the same extension (a few lines of text are enough for most servers) and say so in `MIGRATION.md` |
-| the OAuth 2.0 auth helper | client credentials: a token request as the first step, with `save`; other grant types: report them, and ask the user for a token in `env.local.yaml` |
+| the OAuth 2.0 auth helper with another grant type (`authorization_code`, `password`, `implicit`, PKCE) | report it, and ask the user for a token in `env.local.yaml`, used by a bearer set (client credentials are translated: 12.2) |
 | regex checks (`.to.match`), type checks (`.to.be.a("string")`), JSON schema (`jsonSchema`, `tv4`) | keep what has an equivalent (`{ exists: true }`, `contains` for a fixed part of the text); drop the rest and report it |
 | a loop over a response array (`json.forEach`) | check the first items by index; report that the others are not checked |
 | XML or HTML responses | check `status` and headers only; report the body checks |
@@ -859,7 +880,7 @@ An OpenAPI document describes the endpoints but contains no tests. Use it as ste
 | `securitySchemes` (3), `securityDefinitions` (2): `http` with `scheme: bearer`, `apiKey` with `in: header` | `auth` sets |
 | `apiKey` with `in: query` | a query parameter of each endpoint that needs it, passed as `api_key: ${apiKey}` in the steps' `with` |
 | `http` with `scheme: basic` (3), `type: basic` (2) | as `basic` auth in 12.2 |
-| `oauth2` with `clientCredentials` (3) or `flow: application` (2) | a token request as the first step, with `save` |
+| `oauth2` with `clientCredentials` (3) or `flow: application` (2) | an `oauth2` auth set: `tokenUrl` is `token_url`, the scopes the operations need are `scope`; `client_id` and `client_secret` are placeholders |
 | other `oauth2` flows, `openIdConnect` | ask the user for a token in `env.local.yaml` |
 | `security` at the top level, or on an operation; `security: []` | the endpoint's `auth`; no `auth` for `[]` |
 | the documented success response (`200`, `201`, `204`) | `expect.status` of the main step |
@@ -950,7 +971,8 @@ An Insomnia export is JSON with `"__export_format": 4` and a flat `resources` li
 | `_type: request`: `method`, `url`, `headers`, `parameters`, `body` | an endpoint, as a Postman request |
 | `{{ _.baseUrl }}`, `{{ baseUrl }}` | `${baseUrl}` |
 | the base environment and its sub-environments | one env file per sub-environment, with the keys of the base environment merged in. A private sub-environment (`isPrivate: true`) and keys that look like credentials go only into `env.local.yaml` |
-| `authentication` of type `bearer`, `apikey`, `basic`, `oauth2` | as the Postman auth rows of 12.2 |
+| `authentication` of type `bearer`, `apikey`, `basic` | as the Postman auth rows of 12.2 |
+| `authentication` of type `oauth2` with `grantType: client_credentials`: `accessTokenUrl`, `clientId`, `clientSecret`, `scope`, `audience`, `credentialsInBody` | an `oauth2` auth set; `credentialsInBody: true` is `client_auth: form`; `audience` goes in `form` |
 | `body.mimeType`: `application/json`, `application/x-www-form-urlencoded`, `multipart/form-data` | as `raw` JSON, `urlencoded` and `formdata` (12.2) |
 | `{% response 'body', 'req_…', 'b64::JC50b2tlbg==::46b', … %}` | a value taken from another request's response: that request becomes an earlier step, with `save`. After `b64::` is the path in base64: `JC50b2tlbg==` is `$.token` |
 | `{% uuid 'v4' %}`, `{% now 'iso-8601' %}`, `{% now 'unix' %}`, `{% faker … %}` | `${$uuid}`, `${$now}`, `${$timestamp}`, and as `$random…` in 12.2 |
@@ -996,6 +1018,7 @@ vars:post-response {
 | `params:query`, `headers` | `query`, `headers`. A line that starts with `~` is disabled: leave it out |
 | `auth: inherit` | the auth of `folder.bru`, else of `collection.bru` |
 | `auth:bearer`, `auth:apikey` (`placement: header`), `auth:basic` | as the Postman auth rows of 12.2 |
+| `auth:oauth2` with `grant_type: client_credentials`: `access_token_url`, `client_id`, `client_secret`, `scope` | an `oauth2` auth set |
 | `body:json`, `body:form-urlencoded`, `body:multipart-form` | as `raw` JSON, `urlencoded` and `formdata` (12.2) |
 | `vars:pre-request` | workflow `variables`, or the step's `with` |
 | `vars:post-response { userEmail: res.body.email }`, `bru.setVar("userEmail", res.body.email)` | `save: { userEmail: $.email }` |
@@ -1050,7 +1073,7 @@ From a README, a script, or "Copy as cURL" in a browser.
 | `--json '{…}'`, or `-d` / `--data` / `--data-raw` with JSON and `Content-Type: application/json` | a YAML `body` |
 | `-d "a=1&b=2"` without a `Content-Type`, `--data-urlencode "a=x y"` | `form: { a: 1, b: 2 }` |
 | `-G` with `-d` | `query` |
-| `-u user:password` | as `basic` auth in 12.2 |
+| `-u user:password` | an auth set `basic: { username: ${username}, password: ${password} }` |
 | `-F "name=value"` | `multipart: { name: value }` |
 | `-F "file=@path"` (`;type=…`, `;filename=…`) | `multipart: { file: { file: "${file}" } }` (`content_type`, `filename`), the file in `tinyprobe/fixtures/` and its path in the step's `with` |
 | `-c file`, `-b file` (a cookie jar between commands) | nothing: the login command becomes a step, and each workflow keeps its cookies |

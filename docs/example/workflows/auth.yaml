@@ -67,3 +67,48 @@ steps:
       status: 200
       body:
         $.authenticated: true
+
+  - name: Basic auth is accepted
+    call: basic_check
+    with:
+      password: password
+    expect:
+      status: 200
+      body:
+        $.authentication: basic
+        $.username: admin
+
+  - name: Basic auth with a wrong password is rejected
+    call: basic_check
+    with:
+      password: wrong-password
+    expect:
+      status: 401
+      headers:
+        WWW-Authenticate: { contains: Basic }
+
+  - name: OAuth2 client credentials, client in a Basic header
+    call: oauth_check                 # tinyprobe gets the token from /oauth/token first
+    expect:
+      status: 200
+      body:
+        $.authentication: oauth2
+        $.scope: users:read users:write
+
+  - name: OAuth2 client credentials, client in the form
+    call: oauth_form_check
+    expect:
+      status: 200
+      body:
+        $.client_id: tinyprobe-client
+        $.scope: ""
+
+  - name: The token endpoint rejects a wrong secret
+    call: oauth_token
+    with:
+      client_id: ${clientId}
+      client_secret: wrong-secret
+    expect:
+      status: 401
+      body:
+        $.error: invalid_client
