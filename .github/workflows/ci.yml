@@ -56,6 +56,11 @@ jobs:
       - name: End-to-end (docs/example/workflows)
         run: ./publish/tinyprobe run docs/example/workflows -e docs/environment.yaml --junit reports/tinyprobe.xml
 
+      # The release binary's size and speed against budgets: a heavier or slower tinyprobe is a choice made
+      # in a PR, never an accident. The numbers go to the job summary.
+      - name: Performance guard
+        run: scripts/perf.sh ./publish/tinyprobe http://localhost:5122
+
       # The JUnit report (docs/specs/0007-junit-report.md), read the way users' CI reads it.
       - name: Upload the JUnit report
         if: always()

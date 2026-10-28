@@ -13,7 +13,8 @@
 #   check     build + test + e2e: run it before opening a pull request.
 #   install   Publish a development binary to .dev/tinyprobe and link it as tinyprobe-dev
 #             in $HOME/.local/bin. The VS Code extension can use it with tinyprobe.path.
-#   aot       Publish the Native AOT binary to publish/, like a release (needs clang, zlib).
+#   aot       Publish the Native AOT binary to publish/, like a release (needs clang or gcc, and zlib).
+#   perf      aot, then the performance guard of CI (scripts/perf.sh) against the test server.
 #
 # Environment variables:
 #   TINYPROBE_PORT   port of the test server (default: 5122)
@@ -160,10 +161,23 @@ install_dev() {
 }
 
 aot() {
-  command -v clang > /dev/null || fail "Native AOT needs clang and zlib (Debian/Ubuntu: sudo apt-get install clang zlib1g-dev)."
+  # Releases link with clang; gcc gives a binary of the same size (measured: 16 bytes apart), enough for local checks.
+  linker=""
+  if ! command -v clang > /dev/null; then
+    command -v gcc > /dev/null || fail "Native AOT needs clang (or gcc) and zlib (Debian/Ubuntu: sudo apt-get install clang zlib1g-dev)."
+    linker="-p:CppCompilerAndLinker=gcc"
+  fi
   step "Native AOT ($(rid))"
-  dotnet publish "$ROOT/src/Tinyprobe.Cli/Tinyprobe.Cli.csproj" -c Release -r "$(rid)" -o "$ROOT/publish" -nologo
+  # shellcheck disable=SC2086 # $linker is empty or one option
+  dotnet publish "$ROOT/src/Tinyprobe.Cli/Tinyprobe.Cli.csproj" -c Release -r "$(rid)" -o "$ROOT/publish" -nologo $linker
   ls -lh "$ROOT/publish/tinyprobe"
+}
+
+perf() {
+  aot
+  start_server
+  step "Performance guard"
+  "$ROOT/scripts/perf.sh" "$ROOT/publish/tinyprobe" "$BASE_URL"
 }
 
 case "${1:-}" in
@@ -175,6 +189,7 @@ case "${1:-}" in
   check) build && unit_tests && e2e && step "All checks passed" ;;
   install) install_dev ;;
   aot) aot ;;
+  perf) perf ;;
   ""|-h|--help|help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) fail "unknown command '$1'. See scripts/dev.sh --help." ;;
 esac
