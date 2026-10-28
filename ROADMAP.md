@@ -11,7 +11,7 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 
 ## Where we are
 
-Released: **tinyprobe 0.17.0** (forms and file uploads; Docker image `ghcr.io/kikutano/tinyprobe`) and the extension **0.5.0**. M1, M2 and M3 are done; M4 is in progress.
+Released: **tinyprobe 0.18.0** (cookies, Basic and OAuth2, `for_each`, sequences, named imports, `run --to`) and the extension **0.6.0** (Run to here). M1, M2 and M3 are done; M4 is in progress (the extension tasks M4-7, M4-8 and M4-9 remain).
 
 - Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
 - CLI: `run` (one workflow, or a folder as a suite, with a JUnit report), `call`, `inspect`, `init`, `mcp` (an MCP server for agents), `schema` (JSON Schema of the format), `update`, `guide`; console and ndjson reporters; a GitHub Action (`kikutano/tinyprobe@vX.Y.Z`); Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
