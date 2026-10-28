@@ -80,7 +80,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [x] **M4-2** `cli` Cookies: a cookie jar per run, `expect.cookies`, `save` from a cookie. Spec: [0009](docs/specs/0009-cookies.md). PR #25.
 - [x] **M4-3** `cli` Basic auth and OAuth2 client credentials: `basic` and `oauth2` in auth sets. Spec: [0010](docs/specs/0010-basic-and-oauth2.md). PR #26.
 - [x] **M4-4** `cli` `for_each`: repeat a step over a list of items (written, a variable, or a CSV or JSON file). Spec: [0011](docs/specs/0011-for-each.md). PR #27.
-- [ ] **M4-5** `cli` Reusable step sequences (a shared "log in"). *Spec needed.*
+- [~] **M4-5** `cli` Reusable step sequences (a shared "log in"). Spec: [0012](docs/specs/0012-reusable-sequences.md).
 - [ ] **M4-6** `cli` Namespaced imports (`call: server.login`). *Spec needed.*
 - [ ] **M4-7** `ext` Request history: the last calls with their responses, to send again.
 - [ ] **M4-8** `ext` Environment editor: see and edit the variables of the selected environment.
