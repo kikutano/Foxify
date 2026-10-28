@@ -1,9 +1,9 @@
 # 0012 — Reusable step sequences (`use`)
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M4-5
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#28](https://github.com/kikutano/tinyprobe/pull/28)
 
 ## Problem
 
@@ -148,8 +148,8 @@ Later, in the extension (Inbox): ▶ Run workflow and CodeLens are not shown in 
 
 ## Acceptance criteria
 
-- [ ] Sequence files and `use` as above, with every load error at its location (inside the sequence file for its own errors).
-- [ ] Unit tests:
+- [x] Sequence files and `use` as above, with every load error at its location (inside the sequence file for its own errors).
+- [x] Unit tests:
   - params with defaults, required and unknown;
   - params local to the sequence, and saves visible after it;
   - a nested sequence, and a cycle;
@@ -158,9 +158,9 @@ Later, in the extension (Inbox): ▶ Run workflow and CodeLens are not shown in 
   - names with the prefix;
   - `location` and `source_location` in `inspect`, events and JUnit;
   - `run` of a folder skips sequence files, and `run` of a sequence fails with exit `2`.
-- [ ] `docs/example` workflows log in through `docs/example/sequences/log-in.yaml`, in CI and in `scripts/dev.sh e2e`.
-- [ ] `inspect --json` and the schema have the new keys. The extension's checks pass with the new binary.
-- [ ] `scripts/dev.sh check` passes.
+- [x] `docs/example` workflows log in through `docs/example/sequences/log-in.yaml`, in CI and in `scripts/dev.sh e2e`.
+- [x] `inspect --json` and the schema have the new keys. The extension's checks pass with the new binary.
+- [x] `scripts/dev.sh check` passes.
 
 ## Open questions
 
