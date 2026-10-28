@@ -93,6 +93,11 @@ A Postman-like app for people who don't work in VS Code, as light as the binary:
 
 - [ ] **M5-1** `client` A standalone client in plain JavaScript on Node, with **no dependencies**: `node` serves a small local web UI and opens it in the browser. It lists the API files and workflows of a folder, calls an endpoint from a form (params, query, body), runs workflows with live results, and picks the environment. Like the extension, it has no engine of its own: it runs the `tinyprobe` binary and reads its [JSON protocol](docs/protocol.md), and it reuses the run view of the extension (`media/run-view.js`, which already renders ndjson events in any browser). *Spec needed:* where it lives (a third repository or a folder), how it is installed (`npx`, a single file), and what it shows first.
 - [ ] **M5-2** `client` Request history and an environment editor in the client, shared with the extension tasks M4-7 and M4-8 where the code can be the same.
+- [ ] **M5-3** `client` A self-explanatory picture of the flows being run: the steps of a workflow as a diagram (what each step calls, the values it saves and the steps that use them, `until` loops, `for_each` iterations), lit up live as the run goes. Someone who opens a workflow for the first time understands it at a glance. To explore in the spec of M5-1, when the client is designed.
+
+## M6 — Tell the world
+
+- [ ] **M6-1** `repo` Rewrite `README.md` around the killer features, after M4 and M5: the migration done by the user's own AI and made reliable by the guide, the validation and the `inspect` / `call` / `run` loop (with the bench numbers); tests without hidden state (API files declare, workflows run); CI first (one binary, Docker image, GitHub Action, JUnit); one engine for the CLI, the extension, MCP and the client; no account and no cloud. Lead with what makes tinyprobe different, then install and quick start; move the reference material to `docs/`.
 
 ## Parked
 
