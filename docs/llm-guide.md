@@ -160,6 +160,16 @@ steps:
 
 A workflow may also contain `base_url`, `headers`, `auth` and `endpoints` itself, for small single-file tests.
 
+**Several services.** When the backend is made of several services (microservices, a gateway, a third-party API), write one API file per service, each with its own `base_url` (`${usersUrl}`, `${billingUrl}`). If two files have endpoints with the same name, import them with a name and call `name.endpoint`:
+
+```yaml
+import:
+  - ../api/shop.yaml                # create_order, list_products...
+  - billing: ../api/billing.yaml    # billing.login, billing.create_invoice...
+```
+
+Never rename endpoints (`billing_login`) to avoid a clash: the API file should read like the service it describes.
+
 ### Steps
 
 | Step key | Meaning |
@@ -467,6 +477,7 @@ Safety: run workflows only against a **local or test** environment, never agains
 | `path: /api/notes/${id}` without `params` | `params: { id: }`: a forgotten `with.id` is then caught before running |
 | `$.total: 1` after creating an item | `$.total: { gte: 1 }`: a previous failed run may have left data |
 | body checks on a `204` or an empty `401` | only `status`: there is no JSON body to check |
+| endpoints renamed (`users_login`, `billing_login`) because two services both have `login` | keep the names; import the files with a name: `- billing: ../api/billing.yaml`, then `call: billing.login` |
 | `import: [api/backend.yaml]` from `tinyprobe/workflows/` | `import: [../api/backend.yaml]`: paths are relative to the workflow |
 | one endpoint per Postman request (`login_ok`, `login_wrong_password`) | one endpoint; each variant is a step with its own `with` (section 12) |
 | `{{token}}` left in a converted file | `${token}` |
@@ -724,7 +735,7 @@ Follow this section when the user gives you exports of another API tool (a Postm
 
    Write this list to `tinyprobe/MIGRATION.md`, one row per request (section 12.4). It becomes the coverage report.
 2. **Environments.** Each environment export (`values[]`) becomes `tinyprobe/env.<name>.yaml`, a flat map of its enabled keys. Values of type `secret`, and keys that look like credentials (`password`, `token`, `apiKey`, `secret`, `clientSecret`), go only into `env.local.yaml`, which is in `.gitignore`; `env.example.yaml` gets every key with a placeholder value. Keys that scripts fill at run time (a token, a created id) don't belong in env files: they become `save`.
-3. **API file.** Group endpoints by resource, not by folder. Requests that differ only in their values (a wrong password, a missing field, another token) are **one endpoint**: declare its inputs as `params`, and each Postman request becomes a step with its own `with`.
+3. **API file.** Group endpoints by resource, not by folder. Several collections (one per service) become several API files; when their names clash, import them with a name (section 4). Requests that differ only in their values (a wrong password, a missing field, another token) are **one endpoint**: declare its inputs as `params`, and each Postman request becomes a step with its own `with`.
 4. **Workflows.** One workflow per folder that tests a flow, with the steps in the folder's order. Each workflow logs in itself (section 9), even when Postman relied on an earlier folder to set the token: the login request becomes a sequence in `tinyprobe/sequences/` (section 6e), and each workflow starts with its `use`.
 5. **One folder at a time.** For each folder: write its endpoints and its workflow, `tinyprobe inspect` them, `tinyprobe run` the workflow until it passes, and update `MIGRATION.md`. Then move to the next folder. Never convert everything first and validate at the end.
 6. **Coverage report.** Run the whole folder once more (`tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml`), finish `MIGRATION.md` (section 12.4) and tell the user the totals: requests converted, requests skipped, checks dropped, failures that look like backend bugs.

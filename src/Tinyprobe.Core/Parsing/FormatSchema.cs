@@ -18,7 +18,7 @@ public static class FormatSchema
         // API file and workflow
         ["file.name"] = "Name of the workflow, shown in the report. Default: the file name.",
         ["file.description"] = "What the workflow tests, shown in the report.",
-        ["file.import"] = "API files whose endpoints the steps can call, relative to this file: one path or a list.",
+        ["file.import"] = "API files whose endpoints the steps can call, relative to this file: one path or a list. An item `billing: ../api/billing.yaml` names the import: its endpoints are called `billing.login`.",
         ["file.variables"] = "Default variables of the workflow, `name: value`. Each is resolved once per run and may use the environment, other variables and generated values (`${$uuid}`). The environment file overrides them.",
         ["file.settings"] = "`timeout` (seconds per request) and `max_retries` (retries on network errors and timeouts).",
         ["file.sequence"] = "A sequence file: the steps that a workflow runs with `use:` (a login, a shared setup), written as in `steps`.",
@@ -294,7 +294,10 @@ public static class FormatSchema
                     w.WriteStringValue(method);
                 w.WriteEndArray();
                 break;
-            case "file.import" or "endpoint.auth":
+            case "file.import":
+                ImportList(w);
+                break;
+            case "endpoint.auth":
                 StringOrList(w);
                 break;
             case "endpoint.query":
@@ -437,6 +440,37 @@ public static class FormatSchema
         w.WriteStartArray("type");
         foreach (var type in new[] { "string", "number", "boolean", "null" })
             w.WriteStringValue(type);
+        w.WriteEndArray();
+    }
+
+    /// <summary><c>import</c>: a path, or a list of paths and <c>name: path</c> pairs.</summary>
+    private static void ImportList(Utf8JsonWriter w)
+    {
+        w.WriteStartArray("anyOf");
+        w.WriteStartObject();
+        w.WriteString("type", "string");
+        w.WriteEndObject();
+        w.WriteStartObject();
+        w.WriteString("type", "array");
+        w.WriteStartObject("items");
+        w.WriteStartArray("anyOf");
+        w.WriteStartObject();
+        w.WriteString("type", "string");
+        w.WriteEndObject();
+        w.WriteStartObject();
+        w.WriteString("type", "object");
+        w.WriteNumber("minProperties", 1);
+        w.WriteNumber("maxProperties", 1);
+        w.WriteStartObject("propertyNames");
+        w.WriteString("pattern", "^[a-z][a-z0-9_]*$");
+        w.WriteEndObject();
+        w.WriteStartObject("additionalProperties");
+        w.WriteString("type", "string");
+        w.WriteEndObject();
+        w.WriteEndObject();
+        w.WriteEndArray();
+        w.WriteEndObject();
+        w.WriteEndObject();
         w.WriteEndArray();
     }
 

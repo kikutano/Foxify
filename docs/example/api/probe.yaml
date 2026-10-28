@@ -1,0 +1,15 @@
+# A second API file of the test server, as if it were another service: it has an
+# endpoint named `public`, like testserver.yaml. A workflow that imports both gives
+# this one a name (`- probe: ../api/probe.yaml`) and calls `probe.public`.
+
+base_url: ${baseUrl}
+
+headers:
+  X-Client: tinyprobe-probe
+
+endpoints:
+  health:
+    path: /
+
+  public:
+    path: /api/public

@@ -3,6 +3,7 @@ description: Query strings, request and response headers, status codes and slow 
 
 import:
   - ../api/testserver.yaml
+  - probe: ../api/probe.yaml          # a named import: its endpoints are probe.health, probe.public
 
 settings:
   timeout: 10
@@ -12,6 +13,17 @@ steps:
   - use: ../sequences/log-in.yaml   # the shared login: saves ${token}
     with:
       password: password
+
+  - name: Health of the other API file
+    call: probe.health
+    expect:
+      body:
+        $.status: ok
+
+  - call: probe.public                 # not the `public` of testserver.yaml
+    expect:
+      body:
+        $.authenticated: false
 
   - name: Echo returns what was sent
     call: echo

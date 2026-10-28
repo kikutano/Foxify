@@ -38,9 +38,11 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
   "variables": [
     { "name": "email", "value": "smoke-${$uuid}@example.com", "location": { "file": "tinyprobe/workflows/users.yaml", "line": 5, "column": 10 } }
   ],
+  "imports": [ { "name": null, "file": "/home/me/project/tinyprobe/api/backend.yaml" } ],
   "endpoints": [
     {
       "name": "login",
+      "import_name": null,
       "method": "POST",
       "base_url": "${baseUrl}",
       "path": "/login",
@@ -89,6 +91,8 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
   - `sequence`: `{ "name", "file" }` of the `use` it comes from, or `null`.
 
   For those steps `location` is the `use` step's, the line a tool shows the result on.
+- `name` is the name a step calls. For an endpoint of a named import (`- billing: ../api/billing.yaml`) it is `billing.login`, and `import_name` is `billing`; otherwise `import_name` is `null`.
+- `imports` (top level) lists the imported API files in load order, sequences' imports included: `{ "name": "billing" | null, "file": "/…/api/billing.yaml" }`.
 - `headers` are the effective headers of the endpoint: file headers, then `auth` sets, then the endpoint's own, where a later one with the same name replaces an earlier one.
 - `body`, `form` and `multipart`: at most one is not `null`. `form` and `multipart` are the fields in order, one entry per field sent (a YAML list gives one entry per item): `{ "name", "value" }` for a text field, `{ "name", "file", "filename", "content_type" }` for a file, with `filename` and `content_type` `null` when they are not written. Values are the literal YAML, placeholders included, as in `body`:
   ```json

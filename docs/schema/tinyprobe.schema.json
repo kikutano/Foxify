@@ -14,7 +14,7 @@
       "type": "string"
     },
     "import": {
-      "description": "API files whose endpoints the steps can call, relative to this file: one path or a list.",
+      "description": "API files whose endpoints the steps can call, relative to this file: one path or a list. An item `billing: ../api/billing.yaml` names the import: its endpoints are called `billing.login`.",
       "anyOf": [
         {
           "type": "string"
@@ -22,7 +22,22 @@
         {
           "type": "array",
           "items": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "minProperties": 1,
+                "maxProperties": 1,
+                "propertyNames": {
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            ]
           }
         }
       ]

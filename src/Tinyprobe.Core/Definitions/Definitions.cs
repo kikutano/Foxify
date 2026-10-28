@@ -34,6 +34,8 @@ public sealed class WorkflowDefinition
     public string Description { get; init; } = string.Empty;
     public string SourceFile { get; init; } = string.Empty;
     public IReadOnlyDictionary<string, EndpointDefinition> Endpoints { get; init; } = new Dictionary<string, EndpointDefinition>();
+    /// <summary>The imported API files, with the import's name or null, in the order they were loaded (sequences' included).</summary>
+    public IReadOnlyList<KeyValuePair<string?, string>> Imports { get; init; } = [];
     public IReadOnlyList<StepDefinition> Steps { get; init; } = [];
     /// <summary>
     /// Default variables; the environment file overrides them. Each one is resolved once per run,
@@ -55,9 +57,12 @@ public sealed class WorkflowSettings
     public int MaxRetries { get; init; }
 }
 
-public sealed class EndpointDefinition
+public sealed record EndpointDefinition
 {
+    /// <summary>The name a step calls: <c>login</c>, or <c>billing.login</c> from an import named <c>billing</c>.</summary>
     public required string Name { get; init; }
+    /// <summary>The name of the import the endpoint comes from (<c>- billing: ../api/billing.yaml</c>), or null.</summary>
+    public string? ImportName { get; init; }
     public string Method { get; init; } = "GET";
     public Template? BaseUrl { get; init; }
     public required Template Path { get; init; }

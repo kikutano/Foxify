@@ -50,6 +50,16 @@ public static class ProtocolJson
         }
         w.WriteEndArray();
 
+        w.WriteStartArray("imports");
+        foreach (var (name, file) in workflow.Imports)
+        {
+            w.WriteStartObject();
+            WriteNullableString(w, "name", name);
+            w.WriteString("file", file);
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+
         w.WriteStartArray("endpoints");
         foreach (var endpoint in workflow.Endpoints.Values)
             WriteEndpoint(w, endpoint);
@@ -101,6 +111,7 @@ public static class ProtocolJson
     {
         w.WriteStartObject();
         w.WriteString("name", endpoint.Name);
+        WriteNullableString(w, "import_name", endpoint.ImportName);
         w.WriteString("method", endpoint.Method);
         if (endpoint.BaseUrl is null)
             w.WriteNull("base_url");

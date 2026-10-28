@@ -409,7 +409,9 @@ endpoints:
 ```yaml
 # workflows/users.yaml: steps that call the endpoints
 name: Users
-import: [../api/server.yaml]
+import:
+  - ../api/server.yaml
+  - billing: ../api/billing.yaml     # another service: its endpoints are billing.<name>
 steps:
   - call: login
     with: { password: password }
