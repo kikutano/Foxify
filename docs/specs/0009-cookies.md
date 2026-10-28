@@ -1,6 +1,6 @@
 # 0009 — Cookies
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M4-2
 - **Repositories:** tinyprobe
 - **PRs:** —
@@ -186,3 +186,11 @@ Nothing required. The response view shows the request's `Cookie` header once the
 1. **What a cookie check reads.** Option A is the jar after the response, for the request's URL, as proposed: `exists: false` works after a logout, and it matches Postman's `pm.cookies`. Option B is only the cookies set by this response's `Set-Cookie`: "set by this response" is explicit, but a logout check has to read the expired `Set-Cookie`, and a step cannot check a cookie set earlier. *Recommendation: the jar (A).*
 2. **The `save` syntax.** The proposal is `csrf: { cookie: XSRF-TOKEN }`, a mapping that can later take `{ header: Location }`. The alternative is a string such as `cookie XSRF-TOKEN` next to `$.id`: shorter, but a string whose meaning depends on its first word is easy for agents to get wrong. *Recommendation: the mapping.*
 3. **`save` from a cookie in this task.** It is needed only for the CSRF pattern, which is common in browser-facing APIs (Laravel, Django, Spring, Angular). Without it, M4-2 is documentation, the recorded header and checks. *Recommendation: include it.*
+
+## Decisions
+
+Approved on 2026-10-28 with the recommendations:
+
+1. A cookie check reads the jar after the response, for the request's URL.
+2. `save` from a cookie is written `{ cookie: name }`.
+3. `save` from a cookie is part of this task.
