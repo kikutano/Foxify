@@ -11,7 +11,7 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 
 ## Where we are
 
-Released: **tinyprobe 0.18.0** (cookies, Basic and OAuth2, `for_each`, sequences, named imports, `run --to`) and the extension **0.6.0** (Run to here). M1, M2 and M3 are done; M4 is in progress (the extension tasks M4-7, M4-8 and M4-9 remain).
+Released: **tinyprobe 0.18.0** (cookies, Basic and OAuth2, `for_each`, sequences, named imports, `run --to`) and the extension **0.6.0** (Run to here). M1, M2 and M3 are done; M4 is in progress (the extension tasks M4-7 and M4-8 remain).
 
 - Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
 - CLI: `run` (one workflow, or a folder as a suite, with a JUnit report), `call`, `inspect`, `init`, `mcp` (an MCP server for agents), `schema` (JSON Schema of the format), `update`, `guide`; console and ndjson reporters; a GitHub Action (`kikutano/tinyprobe@vX.Y.Z`); Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
@@ -84,17 +84,18 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [x] **M4-6** `cli` Namespaced imports (`call: server.login`): `- billing: ../api/billing.yaml` in `import`. Spec: [0013](docs/specs/0013-namespaced-imports.md). PR #30.
 - [ ] **M4-7** `ext` Request history: the last calls with their responses, to send again.
 - [ ] **M4-8** `ext` Environment editor: see and edit the variables of the selected environment.
-- [ ] **M4-9** `ext` Visual request editor for people who prefer forms to YAML; it writes the YAML.
+- M4-9, the visual request editor, moved to M5 as M5-4.
 - [x] **M4-10** `cli` `ext` Run to here: `tinyprobe run <workflow> --to <step>` runs the workflow up to that step and stops; in the extension, a ▶ Run to here on every step shows that step's response. Tries a flow one request at a time without state between single calls ([decision 0003](docs/decisions/0003-endpoints-declare-workflows-run.md)). Spec: [0014](docs/specs/0014-run-to-here.md). PR #31, tinyprobe-vscode PR #6 (the extension is released after tinyprobe 0.18.0).
 - [x] **M4-11** `repo` A performance guard in CI: the Native AOT binary must stay under a size budget, and `--version`, `inspect` and a run of many fast requests under a time budget (measured on 2026-10-28: 9.09 MB, 13 ms to start, 0.6 ms per step against the local test server). A PR that goes over fails, so a slower or heavier tinyprobe is a choice and never an accident. `scripts/perf.sh`, in the CI job and as `scripts/dev.sh perf`; budgets 10 MiB, 50 ms, 500 ms for `inspect` of 500 steps, 2 s for a run of them. PR #29.
 
-## M5 — A client outside the editor
+## M5 — The visual side: a client outside the editor
 
-A Postman-like app for people who don't work in VS Code, as light as the binary: no account, no cloud, the files of the repository.
+A Postman-like app for people who don't work in VS Code, as light as the binary: no account, no cloud, the files of the repository. Everything visual goes here too: forms instead of YAML, and pictures of the flows, in the client and in the extension.
 
 - [ ] **M5-1** `client` A standalone client in plain JavaScript on Node, with **no dependencies**: `node` serves a small local web UI and opens it in the browser. It lists the API files and workflows of a folder, calls an endpoint from a form (params, query, body), runs workflows with live results, and picks the environment. Like the extension, it has no engine of its own: it runs the `tinyprobe` binary and reads its [JSON protocol](docs/protocol.md), and it reuses the run view of the extension (`media/run-view.js`, which already renders ndjson events in any browser). *Spec needed:* where it lives (a third repository or a folder), how it is installed (`npx`, a single file), and what it shows first.
 - [ ] **M5-2** `client` Request history and an environment editor in the client, shared with the extension tasks M4-7 and M4-8 where the code can be the same.
 - [ ] **M5-3** `client` A self-explanatory picture of the flows being run: the steps of a workflow as a diagram (what each step calls, the values it saves and the steps that use them, `until` loops, `for_each` iterations), lit up live as the run goes. Someone who opens a workflow for the first time understands it at a glance. To explore in the spec of M5-1, when the client is designed.
+- [ ] **M5-4** `client` `ext` Visual request editor for people who prefer forms to YAML; it writes the YAML (it was M4-9). The same forms in the client and in the extension, where the code can be shared.
 
 ## M6 — Tell the world
 
