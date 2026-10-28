@@ -20,7 +20,7 @@ public sealed class McpServerTests : IDisposable
     {
         public readonly List<(string Path, string? Body)> Requests = [];
 
-        public HttpMessageHandler CreateHandler() => new Handler(this);
+        public HttpMessageHandler CreateHandler(CookieContainer cookies) => new Handler(this);
 
         private sealed class Handler(Server server) : HttpMessageHandler
         {

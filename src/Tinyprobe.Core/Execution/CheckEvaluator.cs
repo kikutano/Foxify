@@ -4,7 +4,7 @@ using Tinyprobe.Core.Models;
 
 namespace Tinyprobe.Core.Execution;
 
-/// <summary>Evaluates the conditions of <c>expect.body</c>, <c>expect.headers</c> and <c>expect.duration</c>.</summary>
+/// <summary>Evaluates the conditions of <c>expect.body</c>, <c>expect.headers</c>, <c>expect.cookies</c> and <c>expect.duration</c>.</summary>
 internal static class CheckEvaluator
 {
     private const string Missing = "(missing)";
@@ -23,12 +23,19 @@ internal static class CheckEvaluator
         };
 
     /// <summary>A header condition: header values are text, so values are compared as text.</summary>
-    public static AssertionResult EvaluateHeader(string name, Condition condition, string? actual, IVariableScope scope)
+    public static AssertionResult EvaluateHeader(string name, Condition condition, string? actual, IVariableScope scope) =>
+        EvaluateText($"header {name}", condition, actual, scope);
+
+    /// <summary>A cookie condition: <paramref name="actual"/> is the cookie's value, null when the jar has no such cookie.</summary>
+    public static AssertionResult EvaluateCookie(string name, Condition condition, string? actual, IVariableScope scope) =>
+        EvaluateText($"cookie {name}", condition, actual, scope);
+
+    private static AssertionResult EvaluateText(string subject, Condition condition, string? actual, IVariableScope scope)
     {
         JsonElement? value = actual is null ? null : JsonValues.FromString(actual);
         return new AssertionResult
         {
-            Subject = $"header {name}",
+            Subject = subject,
             Condition = Describe(condition, scope),
             ActualValue = value is { } v ? JsonValues.ToDisplay(v) : Missing,
             Passed = Passes(condition, value, scope, textual: true)

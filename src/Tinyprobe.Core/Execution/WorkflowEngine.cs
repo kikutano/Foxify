@@ -19,6 +19,7 @@ public sealed record StepProgress(int Index, string Name, int Attempt = 1, bool 
 /// Runs a loaded workflow: executes the steps in order, carries saved values from one
 /// call to the next and stops at the first failing step.
 /// The <see cref="HttpClient"/> is owned by the caller and is not disposed by the engine.
+/// Use one engine, client and cookie jar per workflow run, so every run starts with no cookies.
 /// </summary>
 public sealed class WorkflowEngine
 {
@@ -30,6 +31,7 @@ public sealed class WorkflowEngine
 
     private readonly HttpClient _httpClient;
     private readonly TextWriter _log;
+    private readonly CookieContainer _cookies;
 
     /// <summary>Raised before each step runs, and again before each new attempt of an <c>until</c> step.</summary>
     public event Action<StepProgress>? StepStarted;
@@ -37,10 +39,15 @@ public sealed class WorkflowEngine
     /// <summary>Raised after each call step, successful or not.</summary>
     public event Action<StepReport>? StepCompleted;
 
-    public WorkflowEngine(HttpClient httpClient, TextWriter? log = null)
+    /// <param name="cookies">
+    /// The jar of the client's handler (<see cref="HttpClientHandler.CookieContainer"/>). The handler stores and sends
+    /// the cookies, redirects included; the engine reads the jar for cookie checks, <c>save</c> and the recorded request.
+    /// </param>
+    public WorkflowEngine(HttpClient httpClient, TextWriter? log = null, CookieContainer? cookies = null)
     {
         _httpClient = httpClient;
         _log = log ?? TextWriter.Null;
+        _cookies = cookies ?? new CookieContainer();
     }
 
     /// <summary>Record the request and response of every call in <see cref="StepReport.Request"/> and <see cref="StepReport.Response"/>.</summary>
@@ -161,7 +168,7 @@ public sealed class WorkflowEngine
                 _log.WriteLine($"Executing {request.Method} {request.RequestUri}");
             if (RecordExchanges)
             {
-                report.Request = await RecordAsync(request);
+                report.Request = await RecordAsync(request, _cookies);
                 report.Response = null; // a network error must not leave the previous attempt's response
             }
 
@@ -194,7 +201,7 @@ public sealed class WorkflowEngine
     private sealed record UntilPending(string Reason, List<AssertionResult> FailedChecks);
 
     /// <summary>The checks of <c>until</c> on one response: null when they all pass, otherwise what is still missing.</summary>
-    private static UntilPending? CheckUntil(RetryUntil until, HttpResponseMessage response, byte[] body, CallScope scope)
+    private UntilPending? CheckUntil(RetryUntil until, HttpResponseMessage response, byte[] body, CallScope scope)
     {
         var checks = until.Checks;
         int status = (int)response.StatusCode;
@@ -202,6 +209,7 @@ public sealed class WorkflowEngine
             return new UntilPending($"status {status}, waiting for {string.Join(" or ", checks.Status)}", []);
 
         var results = EvaluateHeaders(checks.Headers, response, scope);
+        results.AddRange(EvaluateCookies(checks.Cookies, response, scope));
         if (checks.Body.Count > 0)
         {
             if (TryParseJson(body) is not { } json)
@@ -219,6 +227,19 @@ public sealed class WorkflowEngine
     private static List<AssertionResult> EvaluateHeaders(IReadOnlyList<Check> checks, HttpResponseMessage response, CallScope scope) =>
         checks.SelectMany(check => check.Conditions.Select(condition =>
             CheckEvaluator.EvaluateHeader(check.Subject, condition, HeaderValue(response, check.Subject), scope))).ToList();
+
+    private IEnumerable<AssertionResult> EvaluateCookies(IReadOnlyList<Check> checks, HttpResponseMessage response, CallScope scope) =>
+        checks.SelectMany(check => check.Conditions.Select(condition =>
+            CheckEvaluator.EvaluateCookie(check.Subject, condition, CookieValue(response, check.Subject), scope)));
+
+    /// <summary>
+    /// The value of a cookie in the jar after the response, among those sent to the response's URL
+    /// (the last one of a redirect); null when there is none. Names are case-sensitive, as in HTTP.
+    /// </summary>
+    private string? CookieValue(HttpResponseMessage response, string name) =>
+        response.RequestMessage?.RequestUri is { } uri
+            ? _cookies.GetCookies(uri).FirstOrDefault(c => c.Name == name)?.Value
+            : null;
 
     private static IEnumerable<AssertionResult> EvaluateBody(IReadOnlyList<Check> checks, JsonDocument json, CallScope scope)
     {
@@ -270,9 +291,10 @@ public sealed class WorkflowEngine
         }
 
         report.Assertions.AddRange(EvaluateHeaders(expect.Headers, response, scope));
+        report.Assertions.AddRange(EvaluateCookies(expect.Cookies, response, scope));
 
         JsonDocument? json = null;
-        if (expect.Body.Count > 0 || step.Save.Count > 0)
+        if (expect.Body.Count > 0 || step.Save.Values.Any(s => s.Path is not null))
         {
             json = TryParseJson(bodyBytes);
             if (json is null)
@@ -298,27 +320,40 @@ public sealed class WorkflowEngine
                 return;
             }
 
-            foreach (var (name, path) in step.Save)
+            foreach (var (name, source) in step.Save)
             {
-                if (!JsonPath.TrySelect(json!.RootElement, path, out var value))
+                JsonElement saved;
+                if (source.Cookie is { } cookie)
                 {
-                    Fail(report, $"Cannot save '{name}': {path} not found in the response");
+                    if (CookieValue(response, cookie) is not { } cookieValue)
+                    {
+                        Fail(report, $"Cannot save '{name}': no cookie '{cookie}' after this response");
+                        return;
+                    }
+                    saved = JsonValues.FromString(cookieValue);
+                }
+                else if (JsonPath.TrySelect(json!.RootElement, source.Path!, out var value))
+                {
+                    saved = value.Clone();
+                }
+                else
+                {
+                    Fail(report, $"Cannot save '{name}': {source.Path} not found in the response");
                     return;
                 }
 
-                var saved = value.Clone();
                 globals.Save(name, saved);
                 report.Saved.Add(new(name, saved));
-                _log.WriteLine($"Saved {name} = {JsonValues.ToDisplay(value)}");
+                _log.WriteLine($"Saved {name} = {JsonValues.ToDisplay(saved)}");
             }
         }
     }
 
-    private static async Task<RecordedRequest> RecordAsync(HttpRequestMessage request) => new()
+    private static async Task<RecordedRequest> RecordAsync(HttpRequestMessage request, CookieContainer cookies) => new()
     {
         Method = request.Method.Method,
         Url = request.RequestUri?.ToString() ?? "",
-        Headers = Headers(request.Headers, request.Content?.Headers),
+        Headers = WithJarCookies(Headers(request.Headers, request.Content?.Headers), request.RequestUri, cookies),
         Body = request.Options.TryGetValue(RequestBuilder.RecordedBody, out var recorded) ? recorded
             : request.Content is null ? null
             : await request.Content.ReadAsStringAsync()
@@ -337,6 +372,24 @@ public sealed class WorkflowEngine
         headers.Concat(contentHeaders ?? Enumerable.Empty<KeyValuePair<string, IEnumerable<string>>>())
             .Select(h => new KeyValuePair<string, string>(h.Key, string.Join(", ", h.Value)))
             .ToList();
+
+    /// <summary>
+    /// The handler adds the jar's cookies after the request is recorded, so they are added here as it sends them:
+    /// after a <c>Cookie</c> header written in the API file, in the same header.
+    /// </summary>
+    private static List<KeyValuePair<string, string>> WithJarCookies(
+        List<KeyValuePair<string, string>> headers, Uri? uri, CookieContainer cookies)
+    {
+        if (uri is null || cookies.GetCookieHeader(uri) is not { Length: > 0 } fromJar)
+            return headers;
+
+        int index = headers.FindIndex(h => h.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+            headers.Add(new("Cookie", fromJar));
+        else
+            headers[index] = new(headers[index].Key, $"{headers[index].Value}; {fromJar}");
+        return headers;
+    }
 
     private static string? HeaderValue(HttpResponseMessage response, string name) =>
         response.Headers.TryGetValues(name, out var values) || response.Content.Headers.TryGetValues(name, out values)

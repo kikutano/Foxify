@@ -35,6 +35,7 @@ public sealed class FormatSchemaTests : IDisposable
         Assert.Equal(Loader.ExpectKeys, Keys(Definition("expect")));
         Assert.Equal(Loader.UntilKeys, Keys(Definition("until")));
         Assert.Equal(Loader.SettingsKeys, Keys(Definition("settings")));
+        Assert.Equal(Loader.SaveKeys, Keys(Definition("save_cookie")));
         Assert.Equal(Loader.Operators.Keys, Keys(Definition("condition")));
         Assert.Equal(Loader.DurationOperators, Keys(Definition("duration_condition")));
 

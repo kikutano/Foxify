@@ -148,10 +148,11 @@ A workflow may also contain `base_url`, `headers`, `auth` and `endpoints` itself
 | `with` | Arguments: values for the endpoint's placeholders. May use variables: `id: ${orderId}`. An argument the endpoint does not use (not a param, query name or placeholder of its path, headers, auth sets, base URL or body) is an error, so typos such as `pagesize` are caught. Query values are URL-encoded; `true`, `42` are sent as written. |
 | `expect.status` | A code (`201`) or a list (`[200, 204]`). **Without it, any 2xx is accepted and anything else fails the step.** |
 | `expect.headers` | Checks on response headers, keyed by header name (case-insensitive). Every operator works (`exists`, `in`, `any`, `ne`, `contains`, numeric ones). Header values are text and are compared as text, so quoting the expected value makes no difference: `X-Count: 3` and `X-Count: "3"` are the same check. |
+| `expect.cookies` | Checks on cookies, keyed by cookie name (case-sensitive), in the workflow's cookie jar after the response: see section 6c. |
 | `expect.body` | Checks on the JSON body, keyed by JSONPath. |
 | `expect.duration` | Response time: `{ lt: 500ms }`. Only `gt`, `gte`, `lt`, `lte`. |
 | `until` | Repeat the call until conditions pass (polling): see section 6b. |
-| `save` | `variable: <JSONPath>`. A path that matches nothing fails the step. |
+| `save` | `variable: <JSONPath>`. A path that matches nothing fails the step. `variable: { cookie: name }` saves a cookie's value (section 6c). |
 | `sleep` | `sleep: 500ms`. A sleep step has no `call`, `with`, `expect`, `until` or `save`. Durations use `ms`, `s`, `m`, `h`, `d`. |
 
 ## 5. Checks
@@ -233,7 +234,7 @@ YAML types matter in bodies and checks:
   call: get_booking
   with:
     id: ${bookingId}
-  until:                            # same status / headers / body checks as expect
+  until:                            # same status / headers / cookies / body checks as expect
     body:
       $.status: { in: [Confirmed, Rejected] }   # stop waiting on any final state
     every: 1s                       # default 1s
@@ -258,6 +259,38 @@ variables:
   noteTitle: "tinyprobe note ${$randomString}"   # one value for the whole run
   remindAt: ${$now+1d}
 ```
+
+## 6c. Cookies
+
+**Cookies are automatic.** Each workflow run has its own cookie jar, empty at the start: a `Set-Cookie` is stored (redirects included) and sent with every later request whose URL matches. A session kept by a cookie needs nothing in the API file: log in as a step, and the next steps are logged in. Each workflow logs in itself; `tinyprobe call` keeps no cookies between calls.
+
+```yaml
+- name: Log in
+  call: login                     # the server answers with Set-Cookie: sid=...
+  with: { email: "${email}", password: "${password}" }
+  expect:
+    cookies:
+      sid: { exists: true }       # in the jar after this response
+  save:
+    csrf: { cookie: XSRF-TOKEN }  # a cookie's value, for an X-XSRF-TOKEN header
+
+- name: Create a note
+  call: create_note               # its API file sends X-XSRF-TOKEN: ${csrf}, with csrf in params
+  with: { csrf: "${csrf}", title: Hello }
+  expect: { status: 201 }
+
+- name: Log out
+  call: logout
+  expect:
+    status: 204
+    cookies:
+      sid: { exists: false }      # removed by the server
+```
+
+- `expect.cookies` (and `until.cookies`) take the same operators as headers; values are text. A name refers to the jar **after** the response, for the request's URL: `{ exists: false }` passes after a logout and when the cookie was never set.
+- `save: { x: { cookie: name } }` stores the value only (no attributes). A missing cookie fails the step.
+- **Never write a cookie's value into a file**, and never copy `Set-Cookie` into a `Cookie` header by hand: the jar sends it. A `Cookie` header in the API file is only for a cookie the server never sets (a fixed preference, a cookie parameter), and is sent before the jar's cookies.
+- CSRF: when the API wants a cookie copied into a header (`XSRF-TOKEN` → `X-XSRF-TOKEN`, Django's `csrftoken` → `X-CSRFToken`), declare the header with a param in the API file and `save` the cookie in the workflow.
 
 ## 7. Environment file
 
@@ -342,6 +375,8 @@ Safety: run workflows only against a **local or test** environment, never agains
 | a Postman request or check skipped without a word | a line in `MIGRATION.md` that says what and why |
 | a multipart body built by hand in a string `body`, or `body: "a=${a}&b=${b}"` | `multipart:` or `form:`: tinyprobe encodes the values and writes the boundary |
 | a `Content-Type` header on an endpoint with `form` or `multipart` | no header: tinyprobe sets it, and reports the header as an error |
+| `save: { sid: $.sid }` after a cookie login, then `Cookie: "sid=${sid}"` in the API file | nothing: the cookie jar sends the session cookie; `expect.cookies` to check it, `save: { x: { cookie: name } }` only to copy a cookie into a header |
+| `expect.headers: { Set-Cookie: sid=abc }` | `expect.cookies: { sid: { exists: true } }`: `Set-Cookie` holds every cookie and its attributes |
 | `file: tinyprobe/fixtures/a.png` in a workflow of `tinyprobe/workflows/`, or `--with file=tinyprobe/fixtures/a.png` in a `tinyprobe call` | `../fixtures/a.png`: paths are relative to the workflow, or to the API file for `call` |
 
 ## 11. Complete example
@@ -616,6 +651,11 @@ Follow this section when the user gives you exports of another API tool (a Postm
 | `pm.response.to.have.header("X-Id")` | `headers: { X-Id: { exists: true } }` |
 | `pm.response.headers.get("X-Id")` compared to a value | `headers: { X-Id: value }` |
 | `pm.response.responseTime` below `500` | `duration: { lt: 500ms }` |
+| `pm.cookies.has("sid")`, `pm.expect(pm.cookies.get("sid")).to.exist` | `cookies: { sid: { exists: true } }` |
+| `pm.cookies.get("theme")` compared to a value | `cookies: { theme: dark }` |
+| `pm.environment.set("csrf", pm.cookies.get("XSRF-TOKEN"))` | `save: { csrf: { cookie: XSRF-TOKEN } }` |
+| a session cookie that Postman's cookie jar kept between requests | nothing: each workflow has a cookie jar; the login request must be a step of the workflow |
+| a `Cookie` header copied from the browser (`sid=…`) | drop it, and log in as a step; a cookie the server never sets becomes a header with a placeholder |
 | `{{$guid}}`, `{{$timestamp}}`, `{{$randomInt}}`, `{{$isoTimestamp}}` | `${$uuid}`, `${$timestamp}`, `${$randomInt}`, `${$now}` |
 | other `{{$random...}}` (`$randomFirstName`, `$randomEmail`) | text built on a generated value: `"name-${$randomString}"`, `"user-${$randomString}@example.com"` |
 | a value computed in a pre-request script (`Date.now()`, a unique email) | a workflow variable built on a generated value, so it is the same in every step |
@@ -777,7 +817,6 @@ Either way, write a line in `MIGRATION.md`: the request, what was not translated
 | data files, `pm.iterationData` | translate one iteration with the first row; report that `for_each` is not supported yet |
 | a `formdata` file whose `src` is not in the repository (a path on someone's machine) | ask the user for the file; otherwise create a small file in `tinyprobe/fixtures/` with the same extension (a few lines of text are enough for most servers) and say so in `MIGRATION.md` |
 | the OAuth 2.0 auth helper | client credentials: a token request as the first step, with `save`; other grant types: report them, and ask the user for a token in `env.local.yaml` |
-| cookies set by one response and sent by the next | report it (cookies are not supported yet) |
 | regex checks (`.to.match`), type checks (`.to.be.a("string")`), JSON schema (`jsonSchema`, `tv4`) | keep what has an equivalent (`{ exists: true }`, `contains` for a fixed part of the text); drop the rest and report it |
 | a loop over a response array (`json.forEach`) | check the first items by index; report that the others are not checked |
 | XML or HTML responses | check `status` and headers only; report the body checks |
@@ -813,7 +852,7 @@ An OpenAPI document describes the endpoints but contains no tests. Use it as ste
 | `{id}` in the path | `${id}`, declared in `params` |
 | `in: query` parameters | `query: [name, ...]` |
 | `in: header` parameters | a header with a placeholder (`X-Tenant: ${tenant}`), and the param declared |
-| `in: cookie` parameters | report it (cookies are not supported yet) |
+| `in: cookie` parameters | a `Cookie: "name=${name}"` header (several joined with `; `), and the params declared; a session cookie set by a login operation needs nothing (section 6c) |
 | `requestBody` with `application/json` (3), the `in: body` parameter (2) | a YAML `body` with the schema's `required` properties, each from a param; optional properties only where a workflow needs them |
 | `requestBody` with `application/x-www-form-urlencoded` | `form`, as `urlencoded` in 12.2 |
 | `requestBody` with `multipart/form-data`, the `in: formData` parameters (2) | `multipart`, as `formdata` in 12.2: a property with `format: binary` (or `type: file` in 2) is a file field, `{ file: "${name}" }`, with a small file in `tinyprobe/fixtures/`; the others are text fields |
@@ -997,7 +1036,7 @@ A HAR file (`log.entries[]`) is a recording of the requests of one session, from
 - **Headers.** Keep `Content-Type`, `Accept` and the API's own headers. Drop the browser's (`User-Agent`, `Accept-Encoding`, `Origin`, `Referer`, `sec-*`, `Cookie`) and the HTTP/2 pseudo-headers (`:authority`, `:path`). `Authorization` becomes an `auth` set with a placeholder.
 - **The order is the flow.** Entries are in time order: a value that a response returned and a later request sent (an id in a URL, a token) becomes a `save`.
 - **Responses** (`response.content.text`, base64 when `encoding: base64`) show the shape for the checks. Don't copy volatile values (ids, dates) as expected values; check with `tinyprobe call`.
-- A session kept by cookies: report it (12.3).
+- **A session kept by cookies** (a `Set-Cookie` on the login, `Cookie` on the next requests) needs nothing: the login becomes a step, and the cookie jar sends the cookie (section 6c). Never copy the `Cookie` values. A cookie copied into a header by the page's script (`X-XSRF-TOKEN` equal to the `XSRF-TOKEN` cookie) becomes `save: { csrf: { cookie: XSRF-TOKEN } }` and a header with a placeholder.
 
 ### 12.9 curl commands
 
@@ -1014,7 +1053,8 @@ From a README, a script, or "Copy as cURL" in a browser.
 | `-u user:password` | as `basic` auth in 12.2 |
 | `-F "name=value"` | `multipart: { name: value }` |
 | `-F "file=@path"` (`;type=…`, `;filename=…`) | `multipart: { file: { file: "${file}" } }` (`content_type`, `filename`), the file in `tinyprobe/fixtures/` and its path in the step's `with` |
-| `-b`, `--cookie`, `-c` | report it (cookies are not supported yet) |
+| `-c file`, `-b file` (a cookie jar between commands) | nothing: the login command becomes a step, and each workflow keeps its cookies |
+| `-b "name=value"` | a `Cookie: "name=${name}"` header with a param; for a session cookie set by a login, log in as a step instead |
 | `-k`, `--insecure` | report it: tinyprobe always checks certificates |
 | `-s`, `-v`, `-i`, `-L`, `--compressed` | leave them out |
 | `$VAR`, `${VAR}` | keys of the env files |

@@ -102,7 +102,7 @@ public sealed class WorkflowLoaderTests : IDisposable
     [InlineData("  - call: get_user\n    expect: { body: { $.a: { in: [] } } }", "in needs a list of values")]
     [InlineData("  - call: get_user\n    expect: { body: { $.a: { any: { lt: 1 } } } }", "any needs a list of conditions")]
     [InlineData("  - call: get_user\n    expect: { body: { $.a: { any: [ { lt: 1, x: 2 } ] } } }", "cannot mix operators")]
-    [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { every: 1s }", "until needs a condition: status, headers or body")]
+    [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { every: 1s }", "until needs a condition: status, headers, cookies or body")]
     [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { status: 200, every: soon }", "invalid duration 'soon'")]
     [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { status: 200, every: 0ms }", "every must be greater than 0")]
     [InlineData("  - call: get_user\n    with: { id: 1 }\n    until: { status: 200, every: 5s, timeout: 1s }", "timeout (1s) must be at least every (5s)")]
@@ -271,7 +271,7 @@ public sealed class WorkflowLoaderTests : IDisposable
         Assert.Equal([Operator.GreaterOrEqual, Operator.LessThan], step.Expect.Body[1].Conditions.Select(c => c.Operator));
         Assert.False(step.Expect.Body[2].Conditions.Single().Exists);
         Assert.Equal(TimeSpan.FromMilliseconds(500), step.Expect.Duration.Single().DurationValue);
-        Assert.Equal("$.id", step.Save["userId"]);
+        Assert.Equal("$.id", step.Save["userId"].Path);
     }
 
     [Fact]

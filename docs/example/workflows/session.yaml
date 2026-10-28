@@ -1,0 +1,78 @@
+name: Cookie session
+description: Log in with cookies, send the CSRF token, log out. Every workflow starts with no cookies.
+
+import:
+  - ../api/testserver.yaml
+
+steps:
+  - name: Not logged in yet
+    call: session_me
+    expect:
+      status: 401
+      cookies:
+        sid: { exists: false }
+
+  - name: Log in
+    call: session_login
+    with:
+      password: password
+    expect:
+      status: 200
+      cookies:
+        sid: { exists: true }
+        XSRF-TOKEN: { exists: true }
+    save:
+      csrf: { cookie: XSRF-TOKEN }
+
+  - name: The session cookie is sent
+    call: session_me
+    expect:
+      status: 200
+      body:
+        $.username: admin
+
+  - name: A write without the CSRF token is refused
+    call: session_note
+    with: { csrf: wrong-token, text: Hello }
+    expect:
+      status: 403
+      body:
+        $.error: csrf
+
+  - name: A write with the CSRF token
+    call: session_note
+    with: { csrf: "${csrf}", text: Hello }
+    expect:
+      status: 201
+      body:
+        $.text: Hello
+        $.author: admin
+
+  - name: Log out
+    call: session_logout
+    expect:
+      status: 204
+      cookies:
+        sid: { exists: false }
+        XSRF-TOKEN: { exists: false }
+
+  - name: Logged out
+    call: session_me
+    expect:
+      status: 401
+
+  - name: A form login follows the redirect, with the new cookie
+    call: session_form_login
+    with:
+      password: password
+    expect:
+      status: 200
+      body:
+        $.username: admin
+      cookies:
+        sid: { exists: true }
+
+  - name: Log out again
+    call: session_logout
+    expect:
+      status: 204

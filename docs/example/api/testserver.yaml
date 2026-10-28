@@ -159,3 +159,41 @@ endpoints:
         filename: notes.md
         content_type: text/markdown
       tags: [profile, public]
+
+  # --- Cookie session -------------------------------------------------------
+
+  # The server sets the session cookies; each workflow keeps them in its own
+  # cookie jar and sends them with the next requests. Nothing to declare here.
+  session_login:
+    method: POST
+    path: /api/session
+    params: { username: admin, password: }
+    body:
+      username: ${username}
+      password: ${password}
+
+  # An HTML form login, answered with a redirect to session_me.
+  session_form_login:
+    method: POST
+    path: /api/session/form
+    params: { username: admin, password: }
+    form:
+      username: ${username}
+      password: ${password}
+
+  session_me:
+    path: /api/session/me
+
+  # A write protected against CSRF: the token is the XSRF-TOKEN cookie.
+  session_note:
+    method: POST
+    path: /api/session/notes
+    params: { csrf:, text: }
+    headers:
+      X-XSRF-TOKEN: ${csrf}
+    body:
+      text: ${text}
+
+  session_logout:
+    method: DELETE
+    path: /api/session

@@ -170,10 +170,11 @@ steps:
 | `with` | Arguments for the endpoint's placeholders. They may reference variables (`id: ${userId}`). |
 | `expect.status` | Expected status code, or a list of accepted ones (`[200, 204]`). Without it any 2xx status is accepted and anything else fails the step. |
 | `expect.headers` | Checks on response headers (case-insensitive names). |
+| `expect.cookies` | Checks on cookies (case-sensitive names) in the workflow's cookie jar after the response, see [Cookies](#cookies). |
 | `expect.body` | Checks on the JSON body, keyed by JSONPath. |
 | `expect.duration` | Check on the response time, e.g. `{ lt: 500ms }`. |
 | `until` | Repeat the call until conditions pass (polling), see below. |
-| `save` | `variable: <JSONPath>` pairs stored for the following steps, after every check passed. A path that matches nothing fails the step. |
+| `save` | `variable: <JSONPath>` pairs stored for the following steps, after every check passed. A path that matches nothing fails the step. `variable: { cookie: name }` saves the value of a cookie instead, see [Cookies](#cookies). |
 | `sleep` | A step of its own: waits, e.g. `sleep: 500ms` or `sleep: 2s`. Durations use `ms`, `s`, `m`, `h` or `d`. |
 
 ## Variables
@@ -219,11 +220,52 @@ For operations that complete asynchronously (a booking confirmed by a background
     paymentId: $.paymentId
 ```
 
-- `until` takes `status`, `headers` and `body`, written exactly like in `expect`, plus `every` and `timeout`.
+- `until` takes `status`, `headers`, `cookies` and `body`, written exactly like in `expect`, plus `every` and `timeout`.
 - While its conditions do not hold, the step waits `every` and sends the request again, with the same arguments. Any status is accepted while waiting, unless `until.status` is set (`until: { status: 200 }` waits for a resource to appear).
 - When they hold, `expect` and `save` are applied to that last response.
 - If they still do not hold after `timeout`, the step fails with `Gave up after N attempts in 30s` and the report shows the values of the last attempt.
 - A network error is not a reason to keep waiting: after the `settings.max_retries` retries of that attempt, it fails the step.
+
+## Cookies
+
+Every workflow run has its own cookie jar, empty at the start. A `Set-Cookie` of any response is stored, redirects included, and every later request of the workflow sends the cookies that match its URL (domain, path, `Secure`, expiry). A cookie that expires, or that the server removes (`Max-Age=0`), is no longer sent. A session kept by cookies needs nothing in the API file:
+
+```yaml
+name: Cookie session
+import:
+  - ../api/testserver.yaml
+
+steps:
+  - name: Log in
+    call: session_login
+    with:
+      password: password
+    expect:
+      cookies:
+        sid: { exists: true }              # set by this response, or by an earlier one
+    save:
+      csrf: { cookie: XSRF-TOKEN }         # the value of a cookie, for a header
+
+  - name: A write with the CSRF token
+    call: session_note
+    with: { csrf: "${csrf}", text: Hello }  # the endpoint sends X-XSRF-TOKEN: ${csrf}
+    expect:
+      status: 201
+
+  - name: Log out
+    call: session_logout
+    expect:
+      status: 204
+      cookies:
+        sid: { exists: false }             # removed by the server
+```
+
+- **Each workflow starts with no cookies**, also in a suite (`tinyprobe run tinyprobe/workflows`), so workflows do not depend on each other. `tinyprobe call` keeps no cookies from one call to the next ([decision 0003](decisions/0003-endpoints-declare-workflows-run.md)).
+- `expect.cookies` and `until.cookies` check cookies by name, with the same operators as headers; values are text. A name refers to a cookie in the jar **after** the response, among those that would be sent to the request's URL. So `exists: true` passes after a login, and `exists: false` passes after a logout or when the cookie was never set. Names are case-sensitive.
+- `save: { name: { cookie: XSRF-TOKEN } }` saves the cookie's value (no attributes), read the same way. A cookie that is not in the jar fails the step: `Cannot save 'csrf': no cookie 'XSRF-TOKEN' after this response`.
+- A `Cookie` header written in the API file is sent as written, followed by the jar's cookies: `Cookie: lang=it; sid=abc`.
+- The recorded request (`-v`, `--reporter ndjson`, the extension's response view) shows the `Cookie` header as it was sent, the jar's cookies included.
+- Cookie attributes (`HttpOnly`, `Secure`, `SameSite`) cannot be checked yet; a header check on the text does it meanwhile: `Set-Cookie: { contains: HttpOnly }`.
 
 ## Generated values
 

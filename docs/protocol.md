@@ -88,7 +88,9 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
   ```
 - `arguments` are the names a call of the endpoint can pass with `--with` (or a step's `with`): its params, its query names and every placeholder of its base URL, path, headers, body, form and multipart fields. Generated values (`${$uuid}`) are not listed. A UI can build the form of an endpoint from `params` (required ones first) and `arguments`.
 - `until`, when present, has the same `status` and `checks` as `expect`, plus `every_ms` and `timeout_ms`.
+- `checks[].subject` is a JSONPath, `duration`, `header <name>` or `cookie <name>`.
 - `checks[].condition` is the text the report shows, such as `>= 3`, `in ["a","b"]`, `< 0 or > 100`.
+- `save` maps each variable to where its value is read: a JSONPath (`"$.token"`) or `cookie <name>` (`"cookie XSRF-TOKEN"`).
 
 An invalid file gives exit code `2` and:
 
@@ -135,7 +137,7 @@ One JSON object per line on standard output, written and flushed as soon as it h
 - `index` is the position of the step in the workflow, sleeps included, and matches `steps[].index` of `inspect` and `run_started`.
 - `step_completed` of a failed step has `success: false` and either `failure` (a status, network or variable problem) or failed `assertions`. Steps after it are not run: they are counted in `not_run_steps`.
 - `status` is `null` when no response was received, for example on a network error. Then `response` is `null` too, while `request` shows what was sent.
-- `request` and `response` belong to the last attempt. `headers` keep their order and include content headers. Bodies are text; a response body over 1 MiB is cut and has `body_truncated: true`. A `multipart/form-data` request body is the body as sent with each file's content replaced by one line, `(file ../fixtures/avatar.png, 79 B)`, with `\n` line endings. Headers set by the HTTP client itself (such as `Host`) are not listed.
+- `request` and `response` belong to the last attempt. `headers` keep their order and include content headers. Bodies are text; a response body over 1 MiB is cut and has `body_truncated: true`. A `multipart/form-data` request body is the body as sent with each file's content replaced by one line, `(file ../fixtures/avatar.png, 79 B)`, with `\n` line endings. Headers set by the HTTP client itself (such as `Host`) are not listed. The `Cookie` header is listed as sent: a `Cookie` header of the API file followed by the cookies of the workflow's cookie jar.
 - `saved` holds the values stored by `save` in this step, with their JSON type.
 - `assertions[].actual` is the actual value as JSON text, or `(missing)`.
 - `http_req_duration_ms` is `null` when no request got a response.

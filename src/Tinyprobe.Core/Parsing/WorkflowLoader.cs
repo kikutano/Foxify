@@ -88,8 +88,9 @@ internal sealed partial class Loader
     internal static readonly string[] EndpointKeys = ["method", "path", "query", "headers", "auth", "body", "form", "multipart", "params"];
     internal static readonly string[] MultipartFileKeys = ["file", "filename", "content_type"];
     internal static readonly string[] StepKeys = ["name", "call", "with", "expect", "until", "save", "sleep"];
-    internal static readonly string[] ExpectKeys = ["status", "headers", "body", "duration"];
-    internal static readonly string[] UntilKeys = ["status", "headers", "body", "every", "timeout"];
+    internal static readonly string[] ExpectKeys = ["status", "headers", "cookies", "body", "duration"];
+    internal static readonly string[] UntilKeys = ["status", "headers", "cookies", "body", "every", "timeout"];
+    internal static readonly string[] SaveKeys = ["cookie"];
     internal static readonly string[] SettingsKeys = ["timeout", "max_retries"];
 
     internal static readonly Dictionary<string, Operator> Operators = new()
@@ -538,17 +539,13 @@ internal sealed partial class Loader
                     with[name] = Template(file, value);
             }
 
-            var save = new Dictionary<string, string>();
+            var save = new Dictionary<string, SaveSource>();
             if (entries.TryGetValue("save", out var saveNode))
             {
                 foreach (var (name, _, value) in Entries(file, saveNode, "save"))
                 {
-                    if (Scalar(file, value, $"save '{name}'") is not { } path)
-                        continue;
-                    if (JsonPath.IsValid(path))
-                        save[name] = path;
-                    else
-                        Error(file, value, $"invalid JSONPath '{path}': use e.g. $.id or $.data[0].email");
+                    if (ParseSave(file, name, value) is { } source)
+                        save[name] = source;
                 }
             }
 
@@ -582,22 +579,57 @@ internal sealed partial class Loader
         return name.Length <= 40 ? name : step.Call;
     }
 
+    /// <summary>A <c>save</c> value: a JSONPath of the body (<c>$.id</c>), or <c>{ cookie: name }</c>.</summary>
+    private SaveSource? ParseSave(FileContext file, string name, YamlNode node)
+    {
+        if (node is YamlScalarNode)
+        {
+            if (Scalar(file, node, $"save '{name}'") is not { } path)
+                return null;
+            if (JsonPath.IsValid(path))
+                return new SaveSource(Path: path);
+            Error(file, node, $"invalid JSONPath '{path}': use e.g. $.id or $.data[0].email");
+            return null;
+        }
+
+        if (node is not YamlMappingNode mapping)
+        {
+            Error(file, node, $"save '{name}' must be a JSONPath ($.token) or {{ cookie: name }}");
+            return null;
+        }
+
+        var entries = Collect(file, mapping, $"save '{name}'", SaveKeys);
+        if (!entries.TryGetValue("cookie", out var cookieNode))
+        {
+            // An unknown key is already reported, with its suggestion.
+            if (mapping.Children.Count == 0)
+                Error(file, node, $"save '{name}' must be a JSONPath ($.token) or {{ cookie: name }}");
+            return null;
+        }
+        if (Scalar(file, cookieNode, $"cookie of save '{name}'") is not { } cookie)
+            return null;
+        if (cookie.Length > 0)
+            return new SaveSource(Cookie: cookie);
+        Error(file, cookieNode, $"save '{name}' needs the name of a cookie: {{ cookie: name }}");
+        return null;
+    }
+
     private Expectation ParseExpect(FileContext file, YamlNode node)
     {
         var entries = Collect(file, node, "expect", ExpectKeys);
         var checks = ParseChecks(file, entries, "expect");
         var duration = entries.TryGetValue("duration", out var durationNode) ? ParseDurationConditions(file, durationNode) : [];
 
-        return new Expectation { Status = checks.Status, Headers = checks.Headers, Body = checks.Body, Duration = duration };
+        return new Expectation { Status = checks.Status, Headers = checks.Headers, Cookies = checks.Cookies, Body = checks.Body, Duration = duration };
     }
 
-    /// <summary><c>until</c>: the same status, header and body checks as <c>expect</c>, plus <c>every</c> and <c>timeout</c>.</summary>
+    /// <summary><c>until</c>: the same status, header, cookie and body checks as <c>expect</c>, plus <c>every</c> and <c>timeout</c>.</summary>
     private RetryUntil? ParseUntil(FileContext file, YamlNode node)
     {
         var entries = Collect(file, node, "until", UntilKeys);
-        if (!entries.Keys.Any(k => k is "status" or "headers" or "body"))
+        if (!entries.Keys.Any(k => k is "status" or "headers" or "cookies" or "body"))
         {
-            Error(file, node, "until needs a condition: status, headers or body");
+            Error(file, node, "until needs a condition: status, headers, cookies or body");
             return null;
         }
 
@@ -650,6 +682,13 @@ internal sealed partial class Loader
                 headers.Add(new Check { Subject = name, Conditions = ParseConditions(file, value) });
         }
 
+        var cookies = new List<Check>();
+        if (entries.TryGetValue("cookies", out var cookiesNode))
+        {
+            foreach (var (name, _, value) in Entries(file, cookiesNode, $"{what}.cookies"))
+                cookies.Add(new Check { Subject = name, Conditions = ParseConditions(file, value) });
+        }
+
         var body = new List<Check>();
         if (entries.TryGetValue("body", out var bodyNode))
         {
@@ -662,7 +701,7 @@ internal sealed partial class Loader
             }
         }
 
-        return new Expectation { Status = status, Headers = headers, Body = body };
+        return new Expectation { Status = status, Headers = headers, Cookies = cookies, Body = body };
     }
 
     /// <summary>

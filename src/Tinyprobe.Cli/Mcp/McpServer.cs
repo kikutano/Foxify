@@ -1,5 +1,6 @@
-using System.Text;
+using System.Net;
 using System.Text.Json;
+using System.Text;
 
 namespace Tinyprobe.Cli.Mcp;
 
@@ -8,7 +9,7 @@ namespace Tinyprobe.Cli.Mcp;
 /// Written by hand with <see cref="JsonDocument"/> and <see cref="Utf8JsonWriter"/>, like ProtocolJson,
 /// so it stays Native AOT-safe. See docs/specs/0005-mcp-server.md.
 /// </summary>
-internal sealed class McpServer(string version, Func<HttpMessageHandler> createHandler)
+internal sealed class McpServer(string version, Func<CookieContainer, HttpMessageHandler> createHandler)
 {
     /// <summary>The MCP versions this server speaks, newest first.</summary>
     public static readonly string[] ProtocolVersions = ["2025-06-18", "2025-03-26", "2024-11-05"];

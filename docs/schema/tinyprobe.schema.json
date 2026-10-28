@@ -164,6 +164,24 @@
         }
       ]
     },
+    "save_cookie": {
+      "description": "A value saved from a cookie.",
+      "type": "object",
+      "properties": {
+        "cookie": {
+          "description": "The name of a cookie in the jar after the response, for the request's URL. Its value is saved.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "cookie"
+          ]
+        }
+      ]
+    },
     "step": {
       "description": "A step: `call` an endpoint, or `sleep`.",
       "type": "object",
@@ -181,7 +199,7 @@
           "type": "object"
         },
         "expect": {
-          "description": "What the response must be: `status`, `headers`, `body` (by JSONPath) and `duration`. Without `status`, any 2xx passes.",
+          "description": "What the response must be: `status`, `headers`, `cookies`, `body` (by JSONPath) and `duration`. Without `status`, any 2xx passes.",
           "$ref": "#/$defs/expect"
         },
         "until": {
@@ -189,10 +207,17 @@
           "$ref": "#/$defs/until"
         },
         "save": {
-          "description": "Values of the response for the next steps, `variable: <JSONPath>`, saved after every check passed.",
+          "description": "Values of the response for the next steps, `variable: <JSONPath>` or `variable: { cookie: name }`, saved after every check passed.",
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/save_cookie"
+              }
+            ]
           }
         },
         "sleep": {
@@ -239,6 +264,13 @@
             "$ref": "#/$defs/check"
           }
         },
+        "cookies": {
+          "description": "Checks on cookies by name (case-sensitive), in the workflow's cookie jar after the response, for the request's URL: a value, or conditions such as `{ exists: false }`.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/check"
+          }
+        },
         "body": {
           "description": "Checks on the JSON body, by JSONPath (`$.id`, `$.items[0].name`): a value, or conditions such as `{ gt: 0 }`.",
           "type": "object",
@@ -273,6 +305,13 @@
         },
         "headers": {
           "description": "Wait until these header checks pass.",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/check"
+          }
+        },
+        "cookies": {
+          "description": "Wait until these cookie checks pass.",
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/check"

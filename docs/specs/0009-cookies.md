@@ -116,7 +116,7 @@ save:
 
 - A `save` value is a JSONPath, as today, or `{ cookie: name }`. The cookie is read like an `expect.cookies` name: from the jar after the response, for the request's URL.
 - A cookie that is not in the jar fails the step, like a JSONPath that matches nothing:
-  `cannot save 'csrf': no cookie 'XSRF-TOKEN' after this response`.
+  `Cannot save 'csrf': no cookie 'XSRF-TOKEN' after this response`.
 - The saved value is the cookie's value, with no attributes.
 
 ## Validation
@@ -139,7 +139,7 @@ New values only, protocol `1`.
 
 - `inspect --json`, in `expect` and `until`: a cookie check has the subject `cookie <name>`, as a header check has `header <name>`. For example: `{ "subject": "cookie sid", "condition": "exists" }`.
 - `inspect --json`, `save`: a value read from a cookie is the string `cookie <name>`, so `save` stays an object of strings, for example `"csrf": "cookie XSRF-TOKEN"`.
-- ndjson `assertions`: subject `cookie sid`, `actual` is the cookie's value, or `(not set)` as for a missing header.
+- ndjson `assertions`: subject `cookie sid`, `actual` is the cookie's value, or `(missing)` as for a missing header.
 - ndjson `request.headers`: also contains the `Cookie` header added from the jar. The key keeps its meaning (the headers as sent), and is now complete.
 
 ## Extension

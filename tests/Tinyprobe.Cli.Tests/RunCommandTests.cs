@@ -16,10 +16,12 @@ public sealed class RunCommandTests : IDisposable
     {
         public int Requests;
         public int Handlers;
+        public List<CookieContainer> Jars { get; } = new();
 
-        public HttpMessageHandler CreateHandler()
+        public HttpMessageHandler CreateHandler(CookieContainer cookies)
         {
             Handlers++;
+            Jars.Add(cookies);
             return new Handler(this);
         }
 
@@ -83,6 +85,7 @@ public sealed class RunCommandTests : IDisposable
             Names(events));
         Assert.Equal(2, server.Requests);
         Assert.Equal(2, server.Handlers); // one per workflow: nothing is shared between them
+        Assert.NotSame(server.Jars[0], server.Jars[1]); // and each one starts with an empty cookie jar
 
         var finished = events[^1];
         Assert.False(finished.GetProperty("success").GetBoolean());

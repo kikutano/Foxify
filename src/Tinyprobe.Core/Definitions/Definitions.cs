@@ -110,10 +110,17 @@ public sealed class CallStep : StepDefinition
     public Expectation Expect { get; init; } = new();
     /// <summary>When set, the call is repeated until these checks pass (polling), then <see cref="Expect"/> is evaluated.</summary>
     public RetryUntil? Until { get; init; }
-    /// <summary>Variable name to JSONPath of the response body.</summary>
-    public IReadOnlyDictionary<string, string> Save { get; init; } = new Dictionary<string, string>();
+    /// <summary>Variable name to where its value is read: a JSONPath of the response body, or a cookie.</summary>
+    public IReadOnlyDictionary<string, SaveSource> Save { get; init; } = new Dictionary<string, SaveSource>();
     /// <summary>The endpoint named by <see cref="Call"/>, bound when the workflow is loaded.</summary>
     public EndpointDefinition Endpoint { get; internal set; } = null!;
+}
+
+/// <summary>Where a <c>save</c> value is read: a JSONPath of the response body, or (<c>{ cookie: name }</c>) a cookie in the jar.</summary>
+public sealed record SaveSource(string? Path = null, string? Cookie = null)
+{
+    /// <summary>How it is shown, in <c>inspect --json</c> too: <c>$.id</c> or <c>cookie XSRF-TOKEN</c>.</summary>
+    public override string ToString() => Cookie is null ? Path ?? string.Empty : $"cookie {Cookie}";
 }
 
 /// <summary><c>until</c>: repeat a call every <see cref="Every"/> until <see cref="Checks"/> pass, for at most <see cref="Timeout"/>.</summary>
@@ -122,7 +129,7 @@ public sealed class RetryUntil
     public static readonly TimeSpan DefaultEvery = TimeSpan.FromSeconds(1);
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
 
-    /// <summary>Status, header and body checks; duration checks are not used.</summary>
+    /// <summary>Status, header, cookie and body checks; duration checks are not used.</summary>
     public Expectation Checks { get; init; } = new();
     public TimeSpan Every { get; init; } = DefaultEvery;
     public TimeSpan Timeout { get; init; } = DefaultTimeout;
@@ -135,11 +142,13 @@ public sealed class Expectation
     /// <summary>Accept any status, also 4xx and 5xx: set by <c>tinyprobe call</c>, which explores an endpoint.</summary>
     public bool AnyStatus { get; init; }
     public IReadOnlyList<Check> Headers { get; init; } = [];
+    /// <summary>Cookies by name, read from the jar after the response, for the request's URL.</summary>
+    public IReadOnlyList<Check> Cookies { get; init; } = [];
     public IReadOnlyList<Check> Body { get; init; } = [];
     public IReadOnlyList<Condition> Duration { get; init; } = [];
 }
 
-/// <summary>Conditions on one header (by name) or one body value (by JSONPath).</summary>
+/// <summary>Conditions on one header or cookie (by name) or one body value (by JSONPath).</summary>
 public sealed class Check
 {
     public required string Subject { get; init; }

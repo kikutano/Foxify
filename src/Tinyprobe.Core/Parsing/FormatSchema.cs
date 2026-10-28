@@ -47,18 +47,21 @@ public static class FormatSchema
         ["step.name"] = "Shown in the report. Default: the call and its path and query arguments.",
         ["step.call"] = "The endpoint to call, by name.",
         ["step.with"] = "Arguments of the endpoint, `name: value`. Values may use variables, such as `id: ${userId}`.",
-        ["step.expect"] = "What the response must be: `status`, `headers`, `body` (by JSONPath) and `duration`. Without `status`, any 2xx passes.",
+        ["step.expect"] = "What the response must be: `status`, `headers`, `cookies`, `body` (by JSONPath) and `duration`. Without `status`, any 2xx passes.",
         ["step.until"] = "Polling: repeat the call until these conditions pass, every `every`, at most `timeout`. Then `expect` is checked on the last response.",
-        ["step.save"] = "Values of the response for the next steps, `variable: <JSONPath>`, saved after every check passed.",
+        ["step.save"] = "Values of the response for the next steps, `variable: <JSONPath>` or `variable: { cookie: name }`, saved after every check passed.",
+        ["save_cookie.cookie"] = "The name of a cookie in the jar after the response, for the request's URL. Its value is saved.",
         ["step.sleep"] = "A step of its own that waits, such as `500ms` or `2s`.",
 
         // expect and until
         ["expect.status"] = "Expected status code, or a list of accepted ones (`[200, 204]`).",
         ["expect.headers"] = "Checks on response headers, by name (case-insensitive): a value, or conditions such as `{ exists: true }`.",
+        ["expect.cookies"] = "Checks on cookies by name (case-sensitive), in the workflow's cookie jar after the response, for the request's URL: a value, or conditions such as `{ exists: false }`.",
         ["expect.body"] = "Checks on the JSON body, by JSONPath (`$.id`, `$.items[0].name`): a value, or conditions such as `{ gt: 0 }`.",
         ["expect.duration"] = "Check on the response time, such as `{ lt: 500ms }`.",
         ["until.status"] = "Wait until the status is this code, or one of a list. Without it, any status is accepted while waiting.",
         ["until.headers"] = "Wait until these header checks pass.",
+        ["until.cookies"] = "Wait until these cookie checks pass.",
         ["until.body"] = "Wait until these body checks pass, by JSONPath. Stop on every final state, then check the expected one in `expect`.",
         ["until.every"] = "Time between attempts. Default: 1s.",
         ["until.timeout"] = "Give up after this time. Default: 30s.",
@@ -103,6 +106,7 @@ public static class FormatSchema
             w.WriteStartObject("$defs");
             Definition(w, "endpoint", "An endpoint: what to send.", Loader.EndpointKeys);
             Definition(w, "multipart_file", "A file of a multipart body.", Loader.MultipartFileKeys, anyOfRequired: ["file"]);
+            Definition(w, "save_cookie", "A value saved from a cookie.", Loader.SaveKeys, anyOfRequired: ["cookie"]);
             Definition(w, "step", "A step: `call` an endpoint, or `sleep`.", Loader.StepKeys, anyOfRequired: ["call", "sleep"]);
             Definition(w, "expect", "What the response must be.", Loader.ExpectKeys);
             Definition(w, "until", "Polling conditions.", Loader.UntilKeys);
@@ -236,7 +240,7 @@ public static class FormatSchema
         {
             case "file.name" or "file.description" or "file.base_url" or "endpoint.path"
                 or "multipart_file.file" or "multipart_file.filename" or "multipart_file.content_type"
-                or "step.name" or "step.call" or "step.sleep" or "until.every" or "until.timeout":
+                or "save_cookie.cookie" or "step.name" or "step.call" or "step.sleep" or "until.every" or "until.timeout":
                 w.WriteString("type", "string");
                 break;
             case "endpoint.method":
@@ -284,7 +288,15 @@ public static class FormatSchema
                 w.WriteString("type", "object");
                 break;
             case "step.save":
-                MapOf(w, () => w.WriteString("type", "string"));
+                MapOf(w, () =>
+                {
+                    w.WriteStartArray("anyOf");
+                    w.WriteStartObject();
+                    w.WriteString("type", "string");
+                    w.WriteEndObject();
+                    Ref(w, "save_cookie");
+                    w.WriteEndArray();
+                });
                 break;
             case "step.expect":
                 Ref(w, "expect", inline: true);
@@ -305,7 +317,7 @@ public static class FormatSchema
                 w.WriteEndObject();
                 w.WriteEndArray();
                 break;
-            case "expect.headers" or "expect.body" or "until.headers" or "until.body":
+            case "expect.headers" or "expect.cookies" or "expect.body" or "until.headers" or "until.cookies" or "until.body":
                 MapOf(w, () => Ref(w, "check", inline: true));
                 break;
             case "expect.duration":
