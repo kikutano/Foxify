@@ -116,6 +116,8 @@ Not planned now. We reconsider them after M4.
 New ideas, not planned yet.
 
 - `cli` Faster loading of large workflows: loading and validating cost about 0.2 ms per step (450 ms for 2000 steps, the same in 0.17.0), likely the arguments of every step being recomputed from the endpoint's templates. Profile before changing it.
+- `cli` `for_each` over a sequence (`use` with `for_each`): the steps of the sequence once per item, for a create/read/delete per item. Builds on spec 0012.
+- `ext` Sequence files: no ▶ Run workflow or Test Explorer entry for them, completion of a `use` step's `with` from the sequence's `params`, and "go to definition" on a `use` path.
 - `ext` Show the items of a `for_each` step in the run view (the `iterations` of `step_completed`), each with its request and response, and in the Test Explorer.
 
 - `ext` Publish to the VS Code Marketplace from the release workflow, without a token: Trusted Publishing when Microsoft ships it, or Microsoft Entra ID with a GitHub federated credential. Until then each `.vsix` is uploaded by hand.

@@ -18,7 +18,8 @@ internal static class InitCommand
     private const string AgentSection = """
         ## API tests (tinyprobe)
 
-        The API tests are tinyprobe files in `tinyprobe/`: endpoints in `api/`, workflows in `workflows/`.
+        The API tests are tinyprobe files in `tinyprobe/`: endpoints in `api/`, workflows in `workflows/`,
+        and the steps that several workflows share (a login) in `sequences/`.
         Before you write or change them, run `tinyprobe guide` and follow it. Check a file with
         `tinyprobe inspect <file>`, and run the tests with `tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml`.
         With the tinyprobe MCP server (`tinyprobe mcp`), use its tools `inspect`, `call` and `run` instead of the shell.
@@ -78,6 +79,7 @@ internal static class InitCommand
         {
             Folder(root, "tinyprobe/api/"),
             Folder(root, "tinyprobe/workflows/"),
+            Folder(root, "tinyprobe/sequences/"),
             NewFile(root, "tinyprobe/env.example.yaml", EnvFile(baseUrl,
                 "Committed: every variable of the workflows, with placeholder values. Real values go in env.local.yaml.")),
             NewFile(root, "tinyprobe/env.local.yaml", EnvFile(baseUrl,

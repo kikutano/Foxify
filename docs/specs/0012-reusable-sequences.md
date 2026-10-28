@@ -1,6 +1,6 @@
 # 0012 — Reusable step sequences (`use`)
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M4-5
 - **Repositories:** tinyprobe
 - **PRs:** —
@@ -168,3 +168,12 @@ Later, in the extension (Inbox): ▶ Run workflow and CodeLens are not shown in 
 2. **`sequence:` as the key of the steps.** A sequence file uses `sequence:` instead of `steps:`, so `run <folder>` and the extension never take it for a workflow, and a reader sees at once what it is. The alternative is `steps:` plus `params:`: one key less to learn, but whether a file is a workflow then depends on another key. *Recommendation: `sequence:`.*
 3. **Saves visible to the workflow.** The proposal makes a sequence's saves visible to the workflow, as for written steps: that is how a login hands over its token. The alternative is declared outputs (`outputs: [token]`): more explicit, but the common case gets longer. *Recommendation: visible, no outputs for now.*
 4. **Where a sequence step is reported.** The proposal reports it at the `use` line of the workflow, with `source_location` for the line in the sequence file. The extension 0.5.0 then puts the results on the right line of the open workflow, and JUnit annotations point to the workflow that failed. The alternative is its line in the sequence file: more precise, but the extension today would draw it on that line number of the workflow. *Recommendation: the `use` line, plus `source_location`.*
+
+## Decisions
+
+Approved on 2026-10-28 with the recommendations:
+
+1. A file per sequence: `use: ../sequences/log-in.yaml`.
+2. The steps of a sequence file are under `sequence:`.
+3. A sequence's saves are visible to the workflow; no declared outputs.
+4. A sequence's steps are reported at the `use` line, with `source_location` for the line in the sequence file.

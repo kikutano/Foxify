@@ -68,6 +68,7 @@ public sealed class WorkflowEngine
     {
         var report = new WorkflowReport { WorkflowName = workflow.Name };
         var globals = new GlobalVariables(workflow.Variables, environment ?? NoVariables);
+        var sequences = new Dictionary<SequenceUse, SequenceScope>(ReferenceEqualityComparer.Instance);
         // Files are relative to the file tinyprobe was given, as imports are: the workflow, or the API file of a call.
         var files = new FileAccess(
             string.IsNullOrEmpty(workflow.SourceFile) ? Environment.CurrentDirectory : Path.GetDirectoryName(workflow.SourceFile)!,
@@ -89,16 +90,17 @@ public sealed class WorkflowEngine
             bool passed;
             if (call.ForEach is { } forEach)
             {
-                passed = await ExecuteForEachAsync(call, forEach, index, globals, workflow.Settings, files, report);
+                passed = await ExecuteForEachAsync(call, forEach, index, globals, Variables(call.Sequence), workflow.Settings, files, report);
             }
             else
             {
                 var stepReport = new StepReport { Index = index, StepName = call.Name };
                 StepStarted?.Invoke(new StepProgress(index, call.Name));
-                // Arguments are resolved against the globals (e.g. `id: ${userId}`), then become
+                // Arguments are resolved against the variables (e.g. `id: ${userId}`), then become
                 // the scope of the endpoint's placeholders.
-                await ExecuteCallAsync(call, () => call.With.ToDictionary(a => a.Key, a => TemplateRenderer.RenderValue(a.Value, globals)),
-                    globals, workflow.Settings, files, stepReport);
+                var variables = Variables(call.Sequence);
+                await ExecuteCallAsync(call, () => call.With.ToDictionary(a => a.Key, a => TemplateRenderer.RenderValue(a.Value, variables)),
+                    globals, variables, workflow.Settings, files, stepReport);
                 Completed(report, stepReport);
                 passed = stepReport.IsSuccess;
             }
@@ -111,6 +113,16 @@ public sealed class WorkflowEngine
         }
 
         return report;
+
+        // The steps of a sequence see its params first; one scope per use, so a param is resolved once.
+        IVariableScope Variables(SequenceUse? use)
+        {
+            if (use is null)
+                return globals;
+            if (!sequences.TryGetValue(use, out var scope))
+                sequences[use] = scope = new SequenceScope(use, Variables(use.Parent));
+            return scope;
+        }
     }
 
     private void Completed(WorkflowReport report, StepReport step)
@@ -124,7 +136,7 @@ public sealed class WorkflowEngine
     /// of cases shows every failure; the step passes when all of them passed.
     /// </summary>
     private async Task<bool> ExecuteForEachAsync(CallStep step, ForEach forEach, int index, GlobalVariables globals,
-        WorkflowSettings settings, FileAccess files, WorkflowReport report)
+        IVariableScope variables, WorkflowSettings settings, FileAccess files, WorkflowReport report)
     {
         int count;
         Func<int, Dictionary<string, JsonElement>> item;
@@ -132,14 +144,14 @@ public sealed class WorkflowEngine
         {
             count = items.Count;
             // Rendered when the item runs, so a generated value is new for each item.
-            item = i => items[i].ToDictionary(a => a.Key, a => TemplateRenderer.RenderValue(a.Value, globals));
+            item = i => items[i].ToDictionary(a => a.Key, a => TemplateRenderer.RenderValue(a.Value, variables));
         }
         else
         {
             List<Dictionary<string, JsonElement>> values;
             try
             {
-                values = VariableItems(forEach.Variable!, globals);
+                values = VariableItems(forEach.Variable!, variables);
             }
             catch (InvalidOperationException ex)
             {
@@ -170,14 +182,14 @@ public sealed class WorkflowEngine
             {
                 values = item(i);
                 // `with` may read the item's values: `email: "${name}@example.com"`.
-                var itemScope = new ItemScope(values, globals);
+                var itemScope = new ItemScope(values, variables);
                 var arguments = new Dictionary<string, JsonElement>(values);
                 foreach (var (name, template) in step.With)
                     arguments[name] = TemplateRenderer.RenderValue(template, itemScope);
                 stepReport.StepName = $"{IterationName(step, arguments)} [{i + 1}/{count}]";
                 StepStarted?.Invoke(new StepProgress(index, stepReport.StepName, Iteration: i + 1, Iterations: count));
                 return arguments;
-            }, globals, settings, files, stepReport);
+            }, globals, variables, settings, files, stepReport);
 
             if (values is null)
                 stepReport.StepName = $"{step.Name} [{i + 1}/{count}]";
@@ -221,17 +233,17 @@ public sealed class WorkflowEngine
     private static string IterationName(CallStep step, Dictionary<string, JsonElement> arguments) =>
         step.HasExplicitName
             ? step.Name
-            : Parsing.Loader.DefaultName(step.Call, step.Endpoint, arguments
+            : step.NamePrefix + Parsing.Loader.DefaultName(step.Call, step.Endpoint, arguments
                 .Where(a => a.Value.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array))
                 .Select(a => KeyValuePair.Create(a.Key, JsonValues.ToText(a.Value))));
 
     private async Task ExecuteCallAsync(CallStep step, Func<Dictionary<string, JsonElement>> resolveArguments,
-        GlobalVariables globals, WorkflowSettings settings, FileAccess files, StepReport report)
+        GlobalVariables globals, IVariableScope variables, WorkflowSettings settings, FileAccess files, StepReport report)
     {
         try
         {
             var arguments = resolveArguments();
-            var scope = new CallScope(step.Endpoint, arguments, globals);
+            var scope = new CallScope(step.Endpoint, arguments, variables);
             var polling = Stopwatch.StartNew();
 
             for (int attempt = 1; ; attempt++)

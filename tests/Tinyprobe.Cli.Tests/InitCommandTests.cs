@@ -15,7 +15,7 @@ public sealed class InitCommandTests : IDisposable
         var changes = InitCommand.Apply(_root, "http://localhost:5000");
 
         Assert.Equal(
-            ["tinyprobe/api/", "tinyprobe/workflows/", "tinyprobe/env.example.yaml", "tinyprobe/env.local.yaml", ".gitignore", "AGENTS.md"],
+            ["tinyprobe/api/", "tinyprobe/workflows/", "tinyprobe/sequences/", "tinyprobe/env.example.yaml", "tinyprobe/env.local.yaml", ".gitignore", "AGENTS.md"],
             changes.Select(c => c.Path));
         Assert.All(changes, c => Assert.True(c.Created));
         Assert.True(Directory.Exists(PathOf("tinyprobe/api")));

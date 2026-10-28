@@ -102,3 +102,28 @@ internal sealed class ItemScope(IReadOnlyDictionary<string, JsonElement> item, I
     public bool TryGet(string name, out JsonElement value) =>
         item.TryGetValue(name, out value) || globals.TryGet(name, out value);
 }
+
+/// <summary>
+/// The variables of the steps of one <c>use</c>: its params (the <c>use</c> step's <c>with</c>, then the defaults), then
+/// the scope it is used in. A param is resolved the first time it is read, against that outer scope, and then kept.
+/// </summary>
+internal sealed class SequenceScope(SequenceUse use, IVariableScope outer) : IVariableScope
+{
+    private readonly Dictionary<string, JsonElement> _resolved = new();
+
+    public bool TryGet(string name, out JsonElement value)
+    {
+        if (_resolved.TryGetValue(name, out value))
+            return true;
+
+        Template? template = use.Arguments.TryGetValue(name, out var argument) ? argument
+            : use.Params.TryGetValue(name, out var defaultValue) ? defaultValue
+            : null;
+        if (template is null)
+            return outer.TryGet(name, out value);
+
+        value = TemplateRenderer.RenderValue(template, outer);
+        _resolved[name] = value;
+        return true;
+    }
+}

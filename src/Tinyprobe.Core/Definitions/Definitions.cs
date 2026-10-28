@@ -41,6 +41,10 @@ public sealed class WorkflowDefinition
     /// </summary>
     public IReadOnlyDictionary<string, Template> Variables { get; init; } = new Dictionary<string, Template>();
     public WorkflowSettings Settings { get; init; } = new();
+    /// <summary>The file is a sequence (<c>sequence:</c>), loaded on its own by <c>inspect</c>; it cannot run.</summary>
+    public bool IsSequence { get; init; }
+    /// <summary>A sequence's declared params, with their default (null = required).</summary>
+    public IReadOnlyDictionary<string, Template?>? Params { get; init; }
 }
 
 public sealed class WorkflowSettings
@@ -127,7 +131,35 @@ public sealed class OAuth2ClientCredentials
 
 public abstract class StepDefinition
 {
+    /// <summary>Where the step is reported: for a step of a sequence, the <c>use</c> step of the workflow.</summary>
     public required SourceLocation Location { get; init; }
+    /// <summary>Where a step of a sequence is written, in the sequence file; null for a step of the workflow.</summary>
+    public SourceLocation? SourceLocation { get; init; }
+    /// <summary>The <c>use</c> that brought the step into the workflow; null for a step of the workflow.</summary>
+    public SequenceUse? Sequence { get; init; }
+
+    /// <summary>Where the step is written: errors about it point there.</summary>
+    internal SourceLocation WrittenAt => SourceLocation ?? Location;
+
+    /// <summary><c>Log in › </c> for a step of a sequence, nested sequences included.</summary>
+    internal string NamePrefix => Sequence?.Prefix ?? string.Empty;
+}
+
+/// <summary>
+/// One <c>use</c> of a sequence: its steps are expanded in place of the <c>use</c> step, and see its params
+/// (<see cref="Arguments"/>, then the <see cref="Params"/> defaults) before the workflow's variables.
+/// </summary>
+public sealed class SequenceUse
+{
+    /// <summary>The sequence's name, or the <c>use</c> step's own <c>name</c>.</summary>
+    public required string Name { get; init; }
+    public required string File { get; init; }
+    public IReadOnlyDictionary<string, Template> Arguments { get; init; } = new Dictionary<string, Template>();
+    public IReadOnlyDictionary<string, Template?> Params { get; init; } = new Dictionary<string, Template?>();
+    /// <summary>The <c>use</c> this one is written in, for a nested sequence.</summary>
+    public SequenceUse? Parent { get; init; }
+
+    internal string Prefix => $"{Parent?.Prefix}{Name} › ";
 }
 
 public sealed class SleepStep : StepDefinition
@@ -135,7 +167,7 @@ public sealed class SleepStep : StepDefinition
     public required TimeSpan Duration { get; init; }
 
     /// <summary>How the step is shown: <c>sleep 500ms</c>.</summary>
-    public string Name => $"sleep {Execution.Durations.Format(Duration)}";
+    public string Name => $"{NamePrefix}sleep {Execution.Durations.Format(Duration)}";
 }
 
 public sealed class CallStep : StepDefinition

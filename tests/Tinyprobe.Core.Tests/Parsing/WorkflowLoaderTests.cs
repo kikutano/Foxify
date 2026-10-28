@@ -116,7 +116,7 @@ public sealed class WorkflowLoaderTests : IDisposable
     [InlineData("  - call: get_user\n    expect: { duration: { eq: 1s } }", "unknown key 'eq' in expect.duration")]
     [InlineData("  - sleep: soon", "invalid duration 'soon'")]
     [InlineData("  - sleep: 1s\n    call: login", "a sleep step cannot have 'call'")]
-    [InlineData("  - name: nothing", "a step needs 'call' (or 'sleep')")]
+    [InlineData("  - name: nothing", "a step needs 'call' (or 'use', or 'sleep')")]
     public void InvalidSteps_AreReportedWithTheirLocation(string step, string message)
     {
         var errors = LoadFails($"{Endpoints}\nsteps:\n{step}\n").Errors;

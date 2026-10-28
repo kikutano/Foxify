@@ -87,7 +87,10 @@ internal sealed partial class Loader
     internal static readonly string[] WorkflowKeys = ["name", "description", "import", "variables", "settings", "steps", .. ApiKeys];
     internal static readonly string[] EndpointKeys = ["method", "path", "query", "headers", "auth", "body", "form", "multipart", "params"];
     internal static readonly string[] MultipartFileKeys = ["file", "filename", "content_type"];
-    internal static readonly string[] StepKeys = ["name", "call", "with", "for_each", "expect", "until", "save", "sleep"];
+    internal static readonly string[] StepKeys = ["name", "call", "use", "with", "for_each", "expect", "until", "save", "sleep"];
+    internal static readonly string[] SequenceKeys = ["name", "description", "import", "params", "sequence"];
+    /// <summary>The top-level keys of any tinyprobe file, for the JSON Schema: a workflow's, then those only a sequence has.</summary>
+    internal static readonly string[] FileKeys = [.. WorkflowKeys, .. SequenceKeys.Except(WorkflowKeys)];
     internal static readonly string[] ForEachFileKeys = ["file"];
     internal static readonly string[] ExpectKeys = ["status", "headers", "cookies", "body", "duration"];
     internal static readonly string[] UntilKeys = ["status", "headers", "cookies", "body", "every", "timeout"];
@@ -122,35 +125,29 @@ internal sealed partial class Loader
 
     private sealed record FileContext(string Display, string Directory);
 
+    // The workflow being loaded: sequences add the endpoints of their imports to it, each API file once.
+    private Dictionary<string, EndpointDefinition> _endpoints = new();
+    private readonly HashSet<string> _imported = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> _sequenceStack = new();
+
     public WorkflowDefinition LoadWorkflow(string text, string fullPath)
     {
         var root = Open(text, fullPath, out var file);
         if (root is null)
             throw Problems();
+        if (root.Children.ContainsKey(new YamlScalarNode("sequence")))
+        {
+            Error(file, root, $"{file.Display} is a sequence, not a workflow: run it with `use:` from a workflow");
+            throw Problems();
+        }
 
         var entries = Collect(file, root, "workflow", WorkflowKeys);
 
-        var endpoints = new Dictionary<string, EndpointDefinition>();
-        var imported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var endpoints = _endpoints = new Dictionary<string, EndpointDefinition>();
+        _imported.Clear();
         var problemsBeforeImports = _problems.Count;
         if (entries.TryGetValue("import", out var imports))
-        {
-            foreach (var item in Items(file, imports, "import"))
-            {
-                if (Scalar(file, item, "an import") is not { } importPath)
-                    continue;
-
-                var importFullPath = Path.GetFullPath(Path.Combine(file.Directory, importPath));
-                if (!File.Exists(importFullPath))
-                {
-                    Error(file, item, $"imported file not found: {importPath}");
-                    continue;
-                }
-
-                if (imported.Add(importFullPath))
-                    AddEndpoints(endpoints, LoadApiFile(importFullPath));
-            }
-        }
+            Import(file, imports);
 
         // An editor completes endpoint names while the workflow is still invalid: when every import loaded,
         // the problems carry the endpoints found.
@@ -193,6 +190,8 @@ internal sealed partial class Loader
 
         if (root.Children.Keys.Any(k => k is YamlScalarNode { Value: "steps" }))
             return LoadWorkflow(text, fullPath);
+        if (root.Children.ContainsKey(new YamlScalarNode("sequence")))
+            return LoadSequence(file, root, fullPath);
 
         var endpoints = new Dictionary<string, EndpointDefinition>();
         AddEndpoints(endpoints, ParseApi(file, Collect(file, root, "an API file", ApiKeys)));
@@ -292,6 +291,156 @@ internal sealed partial class Loader
         }
 
         return root;
+    }
+
+    /// <summary>The API files of <c>import</c>, relative to the file: their endpoints join the workflow's, each file once.</summary>
+    private void Import(FileContext file, YamlNode imports)
+    {
+        foreach (var item in Items(file, imports, "import"))
+        {
+            if (Scalar(file, item, "an import") is not { } importPath)
+                continue;
+
+            var importFullPath = Path.GetFullPath(Path.Combine(file.Directory, importPath));
+            if (!File.Exists(importFullPath))
+            {
+                Error(file, item, $"imported file not found: {importPath}");
+                continue;
+            }
+
+            if (_imported.Add(importFullPath))
+                AddEndpoints(_endpoints, LoadApiFile(importFullPath));
+        }
+    }
+
+    /// <summary><c>inspect</c> of a sequence file: its params and steps, checked against its own imports.</summary>
+    private WorkflowDefinition LoadSequence(FileContext file, YamlMappingNode root, string fullPath)
+    {
+        var entries = Collect(file, root, "a sequence", SequenceKeys);
+        _endpoints = new Dictionary<string, EndpointDefinition>();
+        _imported.Clear();
+        if (entries.TryGetValue("import", out var imports))
+            Import(file, imports);
+
+        var parameters = ParseSequenceParams(file, entries);
+        _sequenceStack.Add(fullPath);
+        var steps = ParseSteps(file, entries["sequence"]);
+        if (steps.Count == 0 && _problems.Count == 0)
+            Error(file, entries["sequence"], "the sequence has no steps");
+        foreach (var step in steps.OfType<CallStep>())
+            Bind(step, _endpoints);
+        ValidateGeneratedValues(_endpoints.Values, steps.OfType<CallStep>(), []);
+
+        if (_problems.Count > 0)
+            throw Problems();
+
+        return new WorkflowDefinition
+        {
+            Name = SequenceName(file, entries, fullPath),
+            Description = entries.TryGetValue("description", out var description) ? Scalar(file, description, "description") ?? "" : "",
+            SourceFile = fullPath,
+            Endpoints = _endpoints,
+            Steps = steps,
+            IsSequence = true,
+            Params = parameters
+        };
+    }
+
+    private string SequenceName(FileContext file, Dictionary<string, YamlNode> entries, string fullPath) =>
+        entries.TryGetValue("name", out var name) && Scalar(file, name, "name") is { Length: > 0 } text
+            ? text
+            : Path.GetFileNameWithoutExtension(fullPath);
+
+    private Dictionary<string, Template?> ParseSequenceParams(FileContext file, Dictionary<string, YamlNode> entries)
+    {
+        var parameters = new Dictionary<string, Template?>();
+        if (entries.TryGetValue("params", out var paramsNode))
+        {
+            foreach (var (name, _, value) in Entries(file, paramsNode, "params"))
+                parameters[name] = IsNull(value) ? null : Template(file, value);
+        }
+        return parameters;
+    }
+
+    /// <summary>
+    /// <c>use: path</c>: the steps of the sequence file, parsed again for this use, so each use has its own params.
+    /// They are reported at the outermost <c>use</c> step, and remember where they are written.
+    /// </summary>
+    private List<StepDefinition> ExpandUse(
+        FileContext file, YamlNode item, YamlNode useNode, Dictionary<string, YamlNode> entries, SequenceUse? parent, SourceLocation reportedAt)
+    {
+        if (Scalar(file, useNode, "use") is not { Length: > 0 } path)
+            return [];
+
+        var fullPath = Path.GetFullPath(Path.Combine(file.Directory, path));
+        if (!File.Exists(fullPath))
+        {
+            Error(file, useNode, $"sequence not found: {path}");
+            return [];
+        }
+        if (_sequenceStack.Contains(fullPath, StringComparer.OrdinalIgnoreCase))
+        {
+            var chain = _sequenceStack.SkipWhile(p => !p.Equals(fullPath, StringComparison.OrdinalIgnoreCase)).Append(fullPath).Select(Path.GetFileName);
+            Error(file, useNode, $"sequence '{Path.GetFileNameWithoutExtension(fullPath)}' uses itself: {string.Join(" → ", chain)}");
+            return [];
+        }
+
+        var root = Open(File.ReadAllText(fullPath), fullPath, out var sequenceFile);
+        if (root is null)
+            return [];
+        if (!root.Children.ContainsKey(new YamlScalarNode("sequence")))
+        {
+            Error(file, useNode, $"{path} is not a sequence (it has no 'sequence:')");
+            return [];
+        }
+
+        var sequenceEntries = Collect(sequenceFile, root, "a sequence", SequenceKeys);
+        if (sequenceEntries.TryGetValue("import", out var imports))
+            Import(sequenceFile, imports);
+        var parameters = ParseSequenceParams(sequenceFile, sequenceEntries);
+        var name = SequenceName(sequenceFile, sequenceEntries, fullPath);
+
+        var arguments = new Dictionary<string, Template>();
+        if (entries.TryGetValue("with", out var withNode))
+        {
+            foreach (var (key, keyNode, value) in Entries(file, withNode, "with"))
+            {
+                if (parameters.ContainsKey(key))
+                    arguments[key] = Template(file, value);
+                else
+                    Error(file, keyNode, $"unknown param '{key}' for sequence '{name}'{Suggest(key, parameters.Keys)}");
+            }
+        }
+        foreach (var (param, defaultValue) in parameters)
+        {
+            if (defaultValue is null && !arguments.ContainsKey(param))
+            {
+                var declared = sequenceEntries.TryGetValue("params", out var paramsNode) ? At(sequenceFile, paramsNode).ToString() : sequenceFile.Display;
+                Error(file, item, $"missing required param '{param}' of sequence '{name}' (defined at {declared})");
+            }
+        }
+
+        var use = new SequenceUse
+        {
+            Name = entries.TryGetValue("name", out var nameNode) && Scalar(file, nameNode, "name") is { Length: > 0 } own ? own : name,
+            File = fullPath,
+            Arguments = arguments,
+            Params = parameters,
+            Parent = parent
+        };
+
+        _sequenceStack.Add(fullPath);
+        try
+        {
+            var steps = ParseSteps(sequenceFile, sequenceEntries["sequence"], use, reportedAt);
+            if (steps.Count == 0)
+                Error(sequenceFile, sequenceEntries["sequence"], "the sequence has no steps");
+            return steps;
+        }
+        finally
+        {
+            _sequenceStack.RemoveAt(_sequenceStack.Count - 1);
+        }
     }
 
     private List<EndpointDefinition> LoadApiFile(string fullPath)
@@ -618,13 +767,25 @@ internal sealed partial class Loader
 
     // --- Steps ---------------------------------------------------------------
 
-    private List<StepDefinition> ParseSteps(FileContext file, YamlNode node)
+    /// <param name="sequence">The use whose sequence these steps belong to; null for a workflow's steps.</param>
+    /// <param name="reportedAt">For a sequence's steps: the location of the workflow's <c>use</c> step.</param>
+    private List<StepDefinition> ParseSteps(FileContext file, YamlNode node, SequenceUse? sequence = null, SourceLocation? reportedAt = null)
     {
         var steps = new List<StepDefinition>();
-        foreach (var item in Items(file, node, "steps"))
+        foreach (var item in Items(file, node, sequence is null ? "steps" : "sequence"))
         {
             var entries = Collect(file, item, "a step", StepKeys);
-            var location = At(file, item);
+            var written = At(file, item);
+            var location = reportedAt ?? written;
+            SourceLocation? sourceLocation = sequence is null ? null : written;
+
+            if (entries.TryGetValue("use", out var useNode))
+            {
+                foreach (var key in new[] { "call", "for_each", "expect", "until", "save", "sleep" }.Where(entries.ContainsKey))
+                    Error(file, item, $"a use step cannot have '{key}'");
+                steps.AddRange(ExpandUse(file, item, useNode, entries, sequence, location));
+                continue;
+            }
 
             if (entries.TryGetValue("sleep", out var sleepNode))
             {
@@ -634,7 +795,7 @@ internal sealed partial class Loader
                 if (Scalar(file, sleepNode, "sleep") is { } text)
                 {
                     if (Durations.TryParse(text, out var duration))
-                        steps.Add(new SleepStep { Duration = duration, Location = location });
+                        steps.Add(new SleepStep { Duration = duration, Location = location, SourceLocation = sourceLocation, Sequence = sequence });
                     else
                         Error(file, sleepNode, $"invalid duration '{text}': use e.g. 500ms, 2s or 1m");
                 }
@@ -644,7 +805,7 @@ internal sealed partial class Loader
             if (!entries.TryGetValue("call", out var callNode))
             {
                 if (entries.Count > 0 || item is not YamlMappingNode)
-                    Error(file, item, "a step needs 'call' (or 'sleep')");
+                    Error(file, item, "a step needs 'call' (or 'use', or 'sleep')");
                 continue;
             }
 
@@ -678,7 +839,7 @@ internal sealed partial class Loader
 
             steps.Add(new CallStep
             {
-                Name = entries.TryGetValue("name", out var nameNode) ? Scalar(file, nameNode, "name") ?? call : call,
+                Name = (sequence?.Prefix ?? "") + (entries.TryGetValue("name", out var nameNode) ? Scalar(file, nameNode, "name") ?? call : call),
                 HasExplicitName = nameNode is not null,
                 Call = call,
                 With = with,
@@ -686,7 +847,9 @@ internal sealed partial class Loader
                 Save = save,
                 Expect = expect,
                 Until = entries.TryGetValue("until", out var untilNode) ? ParseUntil(file, untilNode) : null,
-                Location = location
+                Location = location,
+                SourceLocation = sourceLocation,
+                Sequence = sequence
             });
         }
 
@@ -1034,20 +1197,20 @@ internal sealed partial class Loader
     {
         if (!endpoints.TryGetValue(step.Call, out var endpoint))
         {
-            Report(step.Location, $"unknown endpoint '{step.Call}'{Suggest(step.Call, endpoints.Keys)}");
+            Report(step.WrittenAt, $"unknown endpoint '{step.Call}'{Suggest(step.Call, endpoints.Keys)}");
             return;
         }
 
         step.Endpoint = endpoint;
         if (!step.HasExplicitName)
-            step.Name = DefaultName(step, endpoint);
+            step.Name = step.NamePrefix + DefaultName(step, endpoint);
 
         foreach (var (name, defaultValue) in endpoint.Params ?? new Dictionary<string, Template?>())
         {
             // Items of a variable are known only when the step runs.
             var fromItems = step.ForEach is { } items && (items.Variable is not null || items.Items!.All(item => item.ContainsKey(name)));
             if (defaultValue is null && !step.With.ContainsKey(name) && !fromItems)
-                Report(step.Location, $"missing required param '{name}' of endpoint '{endpoint.Name}' (defined at {endpoint.Location})");
+                Report(step.WrittenAt, $"missing required param '{name}' of endpoint '{endpoint.Name}' (defined at {endpoint.Location})");
         }
 
         // An argument nothing reads is almost always a typo (`pagesize` for `pageSize`): it would
@@ -1178,7 +1341,12 @@ internal sealed partial class Loader
 
     private void Error(FileContext file, YamlNode node, string message) => Report(At(file, node), message);
 
-    private void Report(SourceLocation location, string message) => _problems.Add((location, message));
+    private void Report(SourceLocation location, string message)
+    {
+        // A sequence used twice is parsed twice: its problems are reported once.
+        if (!_problems.Contains((location, message)))
+            _problems.Add((location, message));
+    }
 
     /// <summary>All problems, ordered by file (in the order the files were read) and position.</summary>
     private WorkflowLoadException Problems(IReadOnlyDictionary<string, EndpointDefinition>? endpoints = null) => new(_problems

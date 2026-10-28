@@ -29,7 +29,7 @@ public sealed class FormatSchemaTests : IDisposable
     [Fact]
     public void Keys_AreExactlyThoseTheLoaderAccepts_EachWithADescription()
     {
-        Assert.Equal(Loader.WorkflowKeys, Keys(Schema));
+        Assert.Equal(Loader.FileKeys, Keys(Schema));
         Assert.Equal(Loader.EndpointKeys, Keys(Definition("endpoint")));
         Assert.Equal(Loader.StepKeys, Keys(Definition("step")));
         Assert.Equal(Loader.ExpectKeys, Keys(Definition("expect")));
@@ -64,6 +64,9 @@ public sealed class FormatSchemaTests : IDisposable
     {
         var files = Directory.GetFiles(RepositoryFile(Path.Combine(folder, "api")), "*.yaml")
             .Concat(Directory.GetFiles(RepositoryFile(Path.Combine(folder, "workflows")), "*.yaml"))
+            .Concat(Directory.Exists(RepositoryFile(Path.Combine(folder, "sequences")))
+                ? Directory.GetFiles(RepositoryFile(Path.Combine(folder, "sequences")), "*.yaml")
+                : [])
             .ToList();
 
         Assert.NotEmpty(files);

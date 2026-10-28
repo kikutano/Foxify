@@ -219,6 +219,7 @@ steps:
 | Key | Description |
 |---|---|
 | `call` | Name of the endpoint. |
+| `use` | A step of its own: run the steps of a sequence file here, see [Reusable sequences](#reusable-sequences). |
 | `name` | Shown in the report. Without it the step is shown as the call plus its path and query arguments, e.g. `status code=200`; body and header arguments are left out, since they may be secrets. |
 | `with` | Arguments for the endpoint's placeholders. They may reference variables (`id: ${userId}`). |
 | `expect.status` | Expected status code, or a list of accepted ones (`[200, 204]`). Without it any 2xx status is accepted and anything else fails the step. |
@@ -279,6 +280,61 @@ For operations that complete asynchronously (a booking confirmed by a background
 - When they hold, `expect` and `save` are applied to that last response.
 - If they still do not hold after `timeout`, the step fails with `Gave up after N attempts in 30s` and the report shows the values of the last attempt.
 - A network error is not a reason to keep waiting: after the `settings.max_retries` retries of that attempt, it fails the step.
+
+## Reusable sequences
+
+A sequence is a file of steps that several workflows run with `use`: a login, a shared setup. Every workflow still starts from zero ([decision 0003](decisions/0003-endpoints-declare-workflows-run.md)); now it starts with one `use` instead of a copy of the steps.
+
+```yaml
+# file: sequences/log-in.yaml
+name: Log in
+import:
+  - ../api/forms.yaml                      # the API files the sequence calls
+params:                                    # passed by `use` with `with`
+  client_id: tinyprobe                     # with a default
+  client_secret:                           # required
+sequence:
+  - name: Get a token
+    call: token
+    with: { client_id: "${client_id}", client_secret: "${client_secret}" }
+    save:
+      token: $.access_token                # visible to the workflow after the `use`
+```
+
+```yaml
+# file: workflows/with-login.yaml
+name: With a login
+import: [../api/forms.yaml]
+steps:
+  - use: ../sequences/log-in.yaml          # relative to this file, like import
+    with:
+      client_secret: ${clientSecret}
+  - call: upload_avatar                    # can use ${token}
+    with: { id: 1, avatar: ../fixtures/avatar.png }
+```
+
+```text
+  ✓ Log in › Get a token   POST   200    12.10ms  /oauth/token
+  ✓ upload_avatar id=1     POST   201    20.43ms  /api/users/1/avatar
+```
+
+**The sequence file.**
+
+- It has `sequence:` where a workflow has `steps:`. The steps are written as in a workflow, and may `use` other sequences; a sequence that uses itself is an error.
+- `params` declares what a `use` passes: `name: default`, or `name:` for a required one. Inside the sequence a param is a variable (`${client_secret}`), read before the workflow's variables, and the workflow does not see it afterwards.
+- `import` loads the API files it calls, so `tinyprobe inspect sequences/log-in.yaml` checks it on its own. An API file imported by both the workflow and the sequence is loaded once.
+- `name` and `description` are optional. The name prefixes its steps in the report (`Log in › Get a token`); without it, the file name is used.
+- `tinyprobe run <folder>` skips sequence files, and `tinyprobe run` of a sequence file is an error: a sequence runs from a workflow.
+
+**`use` in a workflow.**
+
+- `use: <path>`, with `with` for the params and an optional `name` that replaces the sequence's name in the report. A `use` step has no `call`, `expect`, `until`, `save` or `for_each`.
+- The sequence's steps run in its place, as if written there:
+  - they see the workflow's variables;
+  - their `save` values are visible to the next steps;
+  - the workflow stops at the first failing step, inside the sequence or not.
+- An unknown param in `with`, or a missing required one, is an error with its location.
+- The report shows each step of the sequence as a step. The console, the JUnit report and the extension place it at the `use` line of the workflow. Errors in a sequence file point to that file.
 
 ## Repeating a step: `for_each`
 
@@ -527,4 +583,3 @@ The whole workflow, imports included, is checked before the first request. Every
 ## Not supported yet
 
 - Namespaced imports (`call: server.login`) — duplicate names are an error for now.
-- Reusable step sequences (e.g. a shared "log in" block).
