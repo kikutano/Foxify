@@ -97,6 +97,14 @@ internal sealed class McpTools(string version, Func<CookieContainer, HttpMessage
         }
 
         var (workflows, problems) = RunCommand.LoadSuite(files);
+        if (OptionalStep(arguments) is { } stopAfter && problems.Count == 0)
+        {
+            if (workflows.Count != 1 || Directory.Exists(paths[0]))
+                return ("'to' runs one workflow file: give one path, a workflow file.", true);
+            if (!WorkflowLoader.TryStopAfter(workflows[0].Workflow, stopAfter, out var upTo, out var stepError))
+                return (stepError, true);
+            workflows[0] = (workflows[0].File, upTo);
+        }
         Dictionary<string, JsonElement> environment;
         try
         {
@@ -160,6 +168,18 @@ internal sealed class McpTools(string version, Func<CookieContainer, HttpMessage
 
     private static string RequiredString(JsonElement arguments, string name) =>
         OptionalString(arguments, name) ?? throw new ToolArgumentException($"Missing argument '{name}'.");
+
+    /// <summary>The <c>to</c> argument of <c>run</c>: a step number or a step name.</summary>
+    private static string? OptionalStep(JsonElement arguments) =>
+        arguments.ValueKind == JsonValueKind.Object && arguments.TryGetProperty("to", out var to)
+            ? to.ValueKind switch
+            {
+                JsonValueKind.Number => to.GetRawText(),
+                JsonValueKind.String => to.GetString(),
+                JsonValueKind.Null => null,
+                _ => throw new ToolArgumentException("'to' must be a step number or a step name.")
+            }
+            : null;
 
     private static string? OptionalString(JsonElement arguments, string name)
     {
@@ -244,6 +264,14 @@ internal sealed class McpTools(string version, Func<CookieContainer, HttpMessage
                 s.WriteEndObject();
                 s.WriteNumber("minItems", 1);
                 s.WriteString("description", "Workflow files or folders, relative to the workspace, for example [\"tinyprobe/workflows\"].");
+                s.WriteEndObject();
+                s.WriteStartObject("to");
+                s.WriteStartArray("type");
+                s.WriteStringValue("integer");
+                s.WriteStringValue("string");
+                s.WriteEndArray();
+                s.WriteString("description", "Run to here (like --to): with one workflow file, run up to this step, included, and stop. " +
+                    "The step's number as inspect lists the steps (1-based), or its name. Use it to look at one step of a flow.");
                 s.WriteEndObject();
                 EnvironmentProperties(s);
             },

@@ -326,6 +326,7 @@ public static class ProtocolJson
         WriteHeader(w, version);
         w.WriteString("workflow", workflow.Name);
         w.WriteString("file", workflow.SourceFile);
+        WriteNullableNumber(w, "to", workflow.StoppedAfter);
         if (environmentFile is null)
             w.WriteNull("env_file");
         else
@@ -484,6 +485,7 @@ public static class ProtocolJson
         w.WriteNumber("passed_steps", summary.PassedSteps);
         w.WriteNumber("failed_steps", summary.FailedSteps);
         w.WriteNumber("not_run_steps", summary.NotRunSteps);
+        WriteNullableNumber(w, "stopped_after", summary.StoppedAfter);
         w.WriteNumber("checks_passed", summary.ChecksPassed);
         w.WriteNumber("checks_failed", summary.ChecksFailed);
         w.WriteNumber("http_requests", summary.HttpRequests);

@@ -277,6 +277,8 @@ Options for 'run' and 'call':
   --with <name=value>     ('call' only) An argument of the endpoint, like a step's 'with'. Repeatable.
   --reporter <name>       console (default) or ndjson: one JSON event per line, for tools.
   --junit <file>          ('run' only) Also write a JUnit XML report, for CI servers.
+  --to <step>             ('run' only, one workflow) Run up to this step, included, and stop:
+                          its number, as 'inspect' lists the steps, or its name.
   -v, --verbose           Print variables, requests and responses while running.
   --no-color              Disable colors (also honored: the NO_COLOR environment variable).
 
@@ -358,6 +360,15 @@ tinyprobe call docs/example/api/testserver.yaml status --with code=404 -e docs/e
 ```
 
 `call` accepts any status, so a `404` is shown, not reported as a failure. Arguments are validated like a step's `with`: a missing required param or a misspelled name is an error.
+
+To look at one step of a flow, the one that needs the token and the ids of the steps before it, run the workflow up to it with `--to`: its number, as `inspect` lists the steps, or its name. The steps before it run again, so no state is kept between runs; the steps after it don't run and aren't counted.
+
+```bash
+tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --to 3 -v
+tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --to "Only active users"
+```
+
+In VS Code, **▶ Run to here** above each step does the same and shows that step's response.
 
 ### Use tinyprobe from other tools
 

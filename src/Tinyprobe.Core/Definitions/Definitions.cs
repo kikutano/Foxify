@@ -43,6 +43,12 @@ public sealed class WorkflowDefinition
     /// </summary>
     public IReadOnlyDictionary<string, Template> Variables { get; init; } = new Dictionary<string, Template>();
     public WorkflowSettings Settings { get; init; } = new();
+    /// <summary>
+    /// <c>run --to</c>: the index of the last step that runs (<see cref="Steps"/> ends there); null for a whole run.
+    /// </summary>
+    public int? StoppedAfter { get; init; }
+    /// <summary>How many steps the workflow has in its file, the steps after <see cref="StoppedAfter"/> included.</summary>
+    public int StepsInFile { get; init; }
     /// <summary>The file is a sequence (<c>sequence:</c>), loaded on its own by <c>inspect</c>; it cannot run.</summary>
     public bool IsSequence { get; init; }
     /// <summary>A sequence's declared params, with their default (null = required).</summary>

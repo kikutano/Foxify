@@ -50,6 +50,58 @@ public static class WorkflowLoader
     /// Loads a workflow, or an API file (a file without <c>steps</c>) as a workflow with no steps:
     /// what <c>tinyprobe inspect</c> and <c>tinyprobe call</c> accept.
     /// </summary>
+    /// <summary>
+    /// <c>run --to</c>: the workflow up to a step, that step included. <paramref name="step"/> is its number, as
+    /// <c>inspect</c> lists the steps (1-based, sleeps and the steps of sequences included), or its exact name.
+    /// </summary>
+    public static bool TryStopAfter(WorkflowDefinition workflow, string step, out WorkflowDefinition upTo, out string error)
+    {
+        upTo = workflow;
+        error = "";
+        var names = workflow.Steps.Select(s => s is CallStep call ? call.Name : ((SleepStep)s).Name).ToList();
+
+        int index;
+        if (int.TryParse(step, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var number))
+        {
+            if (number < 1 || number > names.Count)
+            {
+                error = $"--to {step}: the workflow has {names.Count} step{(names.Count == 1 ? "" : "s")}";
+                return false;
+            }
+            index = number - 1;
+        }
+        else
+        {
+            var matches = names.Select((name, i) => (name, i)).Where(n => n.name == step).Select(n => n.i).ToList();
+            if (matches.Count == 0)
+            {
+                error = $"--to \"{step}\": no step has this name{Loader.Suggest(step, names.Distinct())}";
+                return false;
+            }
+            if (matches.Count > 1)
+            {
+                error = $"--to \"{step}\": {matches.Count} steps have this name ({string.Join(", ", matches.Select(i => i + 1))}): use the number";
+                return false;
+            }
+            index = matches[0];
+        }
+
+        upTo = new WorkflowDefinition
+        {
+            Name = workflow.Name,
+            Description = workflow.Description,
+            SourceFile = workflow.SourceFile,
+            Endpoints = workflow.Endpoints,
+            Imports = workflow.Imports,
+            Steps = workflow.Steps.Take(index + 1).ToList(),
+            Variables = workflow.Variables,
+            Settings = workflow.Settings,
+            StoppedAfter = index,
+            StepsInFile = workflow.Steps.Count
+        };
+        return true;
+    }
+
     public static WorkflowDefinition LoadAny(string path)
     {
         var fullPath = Path.GetFullPath(path);
@@ -1486,7 +1538,7 @@ internal sealed partial class Loader
     }
 
     /// <summary>" (did you mean 'x'?)" for the closest candidate, or nothing when none is close.</summary>
-    private static string Suggest(string value, IEnumerable<string> candidates)
+    internal static string Suggest(string value, IEnumerable<string> candidates)
     {
         var best = candidates
             .Select(c => (Candidate: c, Distance: Distance(value.ToLowerInvariant(), c.ToLowerInvariant())))
