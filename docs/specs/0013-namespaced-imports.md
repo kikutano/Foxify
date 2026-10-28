@@ -1,6 +1,6 @@
 # 0013 — Namespaced imports
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M4-6
 - **Repositories:** tinyprobe
 - **PRs:** —
@@ -130,3 +130,11 @@ No new `MINIMUM_VERSION`.
 1. **The syntax.** The proposal mixes plain paths and `name: path` pairs in the `import` list, so a workflow adds a name only where it needs one. The alternative is a mapping for every import (`import: { shop: …, billing: … }`): uniform, but it changes how every existing workflow is written. *Recommendation: the list, with optional pairs.*
 2. **The separator.** `billing.login`, as the roadmap writes it: short, and read as "login of billing". `/` and `::` read as paths or code. A `.` inside an endpoint name stays allowed, so nothing breaks. *Recommendation: `.`.*
 3. **Required names.** Names are optional. Making every import named would remove a choice, but it would break every workflow that exists. *Recommendation: optional.*
+
+## Decisions
+
+Approved on 2026-10-28 with the recommendations:
+
+1. `name: path` pairs, optional, in the `import` list.
+2. `.` as the separator: `billing.login`.
+3. Names are optional; plain imports keep their names.

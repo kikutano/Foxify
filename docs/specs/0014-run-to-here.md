@@ -1,6 +1,6 @@
 # 0014 — Run to here
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M4-10
 - **Repositories:** tinyprobe, tinyprobe-vscode
 - **PRs:** —
@@ -121,3 +121,12 @@ The extension's own `scripts/dev.sh check` covers the gating and the command lin
 2. **The step included.** "Run to here" runs the step and stops after it: its response is what the user wants to see. *Recommendation: included.*
 3. **The summary and the exit code.** Steps after the target are left out, so a run that reached its target with every step passing exits `0`. The alternative counts them as "not run", which makes every `--to` run look failed. *Recommendation: left out.*
 4. **The extension in this task.** The roadmap task covers both repositories. Doing the CLI and the extension together means the feature ships whole in one release. *Recommendation: both in this task, the extension released after the CLI.*
+
+## Decisions
+
+Approved on 2026-10-28 with the recommendations:
+
+1. `--to` takes the step's number, as `inspect` lists it, or its exact name.
+2. The target step runs.
+3. Steps after the target are left out of the summary and the exit code.
+4. The extension's ▶ Run to here is part of this task, released after the CLI.
