@@ -1,9 +1,9 @@
 # 0014 — Run to here
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M4-10
 - **Repositories:** tinyprobe, tinyprobe-vscode
-- **PRs:** —
+- **PRs:** [#31](https://github.com/kikutano/tinyprobe/pull/31), [tinyprobe-vscode#6](https://github.com/kikutano/tinyprobe-vscode/pull/6)
 
 ## Problem
 
@@ -105,15 +105,15 @@ The extension's own `scripts/dev.sh check` covers the gating and the command lin
 
 ## Acceptance criteria
 
-- [ ] `--to` by number and by name, the step included, with every error above.
-- [ ] The summary, the exit code, ndjson and JUnit cover only the steps up to the target.
-- [ ] MCP `run` with `to`.
-- [ ] Unit and CLI tests:
+- [x] `--to` by number and by name, the step included, with every error above.
+- [x] The summary, the exit code, ndjson and JUnit cover only the steps up to the target.
+- [x] MCP `run` with `to`.
+- [x] Unit and CLI tests:
   - number, name, duplicate name, out of range, a folder;
   - a failing step before the target;
   - a `for_each` step and a sequence's step as the target.
-- [ ] Extension: the lens on each step, its command line, and the gating on the version, with tests.
-- [ ] `scripts/dev.sh check` passes in both repositories, and the performance guard.
+- [x] Extension: the lens on each step, its command line, and the gating on the version, with tests.
+- [x] `scripts/dev.sh check` passes in both repositories, and the performance guard.
 
 ## Open questions
 
