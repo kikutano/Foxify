@@ -11,7 +11,7 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 
 ## Where we are
 
-Released: **tinyprobe 0.18.0** (cookies, Basic and OAuth2, `for_each`, sequences, named imports, `run --to`) and the extension **0.6.0** (Run to here). M1, M2 and M3 are done; M4 is in progress (the extension tasks M4-7 and M4-8 remain).
+Released: **tinyprobe 0.18.0** (cookies, Basic and OAuth2, `for_each`, sequences, named imports, `run --to`) and the extension **0.6.0** (Run to here). M1, M2, M3 and M4 are done; the History and Environment views (M4-7, M4-8) are merged in the extension and ship in its next release.
 
 - Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
 - CLI: `run` (one workflow, or a folder as a suite, with a JUnit report), `call`, `inspect`, `init`, `mcp` (an MCP server for agents), `schema` (JSON Schema of the format), `update`, `guide`; console and ndjson reporters; a GitHub Action (`kikutano/tinyprobe@vX.Y.Z`); Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
@@ -82,8 +82,8 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [x] **M4-4** `cli` `for_each`: repeat a step over a list of items (written, a variable, or a CSV or JSON file). Spec: [0011](docs/specs/0011-for-each.md). PR #27.
 - [x] **M4-5** `cli` Reusable step sequences (a shared "log in"): sequence files run with `use`. Spec: [0012](docs/specs/0012-reusable-sequences.md). PR #28.
 - [x] **M4-6** `cli` Namespaced imports (`call: server.login`): `- billing: ../api/billing.yaml` in `import`. Spec: [0013](docs/specs/0013-namespaced-imports.md). PR #30.
-- [ ] **M4-7** `ext` Request history: the last calls with their responses, to send again.
-- [ ] **M4-8** `ext` Environment editor: see and edit the variables of the selected environment.
+- [x] **M4-7** `ext` Request history: the last calls with their responses, to send again. The History view of the tinyprobe sidebar (last 50 calls, kept in the extension's workspace storage). tinyprobe-vscode PR #7.
+- [x] **M4-8** `ext` Environment editor: see and edit the variables of the selected environment. The Environment view of the tinyprobe sidebar: edits only that variable's lines, comments kept, secrets hidden until shown. tinyprobe-vscode PR #7.
 - M4-9, the visual request editor, moved to M5 as M5-4.
 - [x] **M4-10** `cli` `ext` Run to here: `tinyprobe run <workflow> --to <step>` runs the workflow up to that step and stops; in the extension, a ▶ Run to here on every step shows that step's response. Tries a flow one request at a time without state between single calls ([decision 0003](docs/decisions/0003-endpoints-declare-workflows-run.md)). Spec: [0014](docs/specs/0014-run-to-here.md). PR #31, tinyprobe-vscode PR #6 (the extension is released after tinyprobe 0.18.0).
 - [x] **M4-11** `repo` A performance guard in CI: the Native AOT binary must stay under a size budget, and `--version`, `inspect` and a run of many fast requests under a time budget (measured on 2026-10-28: 9.09 MB, 13 ms to start, 0.6 ms per step against the local test server). A PR that goes over fails, so a slower or heavier tinyprobe is a choice and never an accident. `scripts/perf.sh`, in the CI job and as `scripts/dev.sh perf`; budgets 10 MiB, 50 ms, 500 ms for `inspect` of 500 steps, 2 s for a run of them. PR #29.
