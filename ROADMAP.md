@@ -77,7 +77,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 ## M4 — What Postman users miss
 
 - [x] **M4-1** `cli` `multipart/form-data` bodies and file uploads, and `application/x-www-form-urlencoded` forms. Spec: [0008](docs/specs/0008-form-and-multipart-bodies.md). PR #24.
-- [~] **M4-2** `cli` Cookies: a cookie jar per run. Spec: [0009](docs/specs/0009-cookies.md).
+- [x] **M4-2** `cli` Cookies: a cookie jar per run, `expect.cookies`, `save` from a cookie. Spec: [0009](docs/specs/0009-cookies.md). PR #25.
 - [ ] **M4-3** `cli` Basic auth and OAuth2 client credentials. *Spec needed.*
 - [ ] **M4-4** `cli` `for_each`: repeat a step over a list of arguments. *Spec needed.*
 - [ ] **M4-5** `cli` Reusable step sequences (a shared "log in"). *Spec needed.*

@@ -1,9 +1,9 @@
 # 0009 — Cookies
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M4-2
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#25](https://github.com/kikutano/tinyprobe/pull/25)
 
 ## Problem
 
@@ -173,13 +173,13 @@ Nothing required. The response view shows the request's `Cookie` header once the
 
 ## Acceptance criteria
 
-- [ ] One jar per workflow run, kept across redirects. `call` keeps nothing between calls.
-- [ ] The recorded request has the `Cookie` header as sent.
-- [ ] `expect.cookies`, `until.cookies` and `save: { x: { cookie: … } }` work as above, and every error above is reported at its location.
-- [ ] Unit tests with `FakeServer`: the jar (path, expiry, removal, one workflow does not see another's cookies), checks, save, a missing cookie, the recorded header.
-- [ ] `docs/example/workflows/session.yaml` passes against the test server, in CI and in `scripts/dev.sh e2e`.
-- [ ] `inspect --json` has the `cookie <name>` subjects and save values. The schema test passes.
-- [ ] `scripts/dev.sh check` passes.
+- [x] One jar per workflow run, kept across redirects. `call` keeps nothing between calls.
+- [x] The recorded request has the `Cookie` header as sent.
+- [x] `expect.cookies`, `until.cookies` and `save: { x: { cookie: … } }` work as above, and every error above is reported at its location.
+- [x] Unit tests with `FakeServer`: the jar (path, expiry, removal, one workflow does not see another's cookies), checks, save, a missing cookie, the recorded header.
+- [x] `docs/example/workflows/session.yaml` passes against the test server, in CI and in `scripts/dev.sh e2e`.
+- [x] `inspect --json` has the `cookie <name>` subjects and save values. The schema test passes.
+- [x] `scripts/dev.sh check` passes.
 
 ## Open questions
 
