@@ -148,6 +148,8 @@ public sealed class CallStep : StepDefinition
     public Expectation Expect { get; init; } = new();
     /// <summary>When set, the call is repeated until these checks pass (polling), then <see cref="Expect"/> is evaluated.</summary>
     public RetryUntil? Until { get; init; }
+    /// <summary>When set, the step runs once per item, with the item's keys as arguments.</summary>
+    public ForEach? ForEach { get; init; }
     /// <summary>Variable name to where its value is read: a JSONPath of the response body, or a cookie.</summary>
     public IReadOnlyDictionary<string, SaveSource> Save { get; init; } = new Dictionary<string, SaveSource>();
     /// <summary>The endpoint named by <see cref="Call"/>, bound when the workflow is loaded.</summary>
@@ -159,6 +161,19 @@ public sealed record SaveSource(string? Path = null, string? Cookie = null)
 {
     /// <summary>How it is shown, in <c>inspect --json</c> too: <c>$.id</c> or <c>cookie XSRF-TOKEN</c>.</summary>
     public override string ToString() => Cookie is null ? Path ?? string.Empty : $"cookie {Cookie}";
+}
+
+/// <summary>
+/// <c>for_each</c>: the items of a step, each one a call whose arguments are the item's keys plus <c>with</c>.
+/// Either <see cref="Items"/> (written in the workflow, or read from a data file when it loads) or <see cref="Variable"/>.
+/// </summary>
+public sealed class ForEach
+{
+    public IReadOnlyList<IReadOnlyDictionary<string, Template>>? Items { get; init; }
+    /// <summary><c>for_each: ${name}</c>: the variable's value when the step runs, a list of objects.</summary>
+    public string? Variable { get; init; }
+    /// <summary>The data file of <see cref="Items"/>, as written (<c>{ file: ../data/roles.csv }</c>).</summary>
+    public string? File { get; init; }
 }
 
 /// <summary><c>until</c>: repeat a call every <see cref="Every"/> until <see cref="Checks"/> pass, for at most <see cref="Timeout"/>.</summary>
@@ -177,6 +192,8 @@ public sealed class Expectation
 {
     /// <summary>Accepted status codes; when empty any 2xx is accepted.</summary>
     public IReadOnlyList<int> Status { get; init; } = [];
+    /// <summary><c>status: ${status}</c> in a <c>for_each</c> step: the codes come from each item.</summary>
+    public Template? StatusPlaceholder { get; init; }
     /// <summary>Accept any status, also 4xx and 5xx: set by <c>tinyprobe call</c>, which explores an endpoint.</summary>
     public bool AnyStatus { get; init; }
     public IReadOnlyList<Check> Headers { get; init; } = [];

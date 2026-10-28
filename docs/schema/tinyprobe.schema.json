@@ -254,6 +254,20 @@
         "client_secret"
       ]
     },
+    "for_each_file": {
+      "description": "A data file of items.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "A JSON list of objects, or a CSV file whose first line names the columns, relative to the workflow.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "file"
+      ]
+    },
     "save_cookie": {
       "description": "A value saved from a cookie.",
       "type": "object",
@@ -287,6 +301,24 @@
         "with": {
           "description": "Arguments of the endpoint, `name: value`. Values may use variables, such as `id: ${userId}`.",
           "type": "object"
+        },
+        "for_each": {
+          "description": "Repeat the call once per item: a list of mappings whose keys are arguments (like `with`) and variables of the step, a variable holding such a list (`${users}`), or a data file (`{ file: ../data/cases.csv }`, CSV or JSON). Every item runs; the step passes when all passed.",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            {
+              "type": "string",
+              "pattern": "^\\$\\{[^}]+\\}$"
+            },
+            {
+              "$ref": "#/$defs/for_each_file"
+            }
+          ]
         },
         "expect": {
           "description": "What the response must be: `status`, `headers`, `cookies`, `body` (by JSONPath) and `duration`. Without `status`, any 2xx passes.",
@@ -334,7 +366,7 @@
       "type": "object",
       "properties": {
         "status": {
-          "description": "Expected status code, or a list of accepted ones (`[200, 204]`).",
+          "description": "Expected status code, or a list of accepted ones (`[200, 204]`). In a `for_each` step it may be a placeholder (`${status}`) given by each item.",
           "anyOf": [
             {
               "type": "integer"
@@ -344,6 +376,10 @@
               "items": {
                 "type": "integer"
               }
+            },
+            {
+              "type": "string",
+              "pattern": "^\\$\\{[^}]+\\}$"
             }
           ]
         },

@@ -1,0 +1,4 @@
+token,status
+tinyprobe-test-token,200
+invalid-token,401
+"",401

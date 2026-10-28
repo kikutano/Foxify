@@ -31,6 +31,7 @@ tinyprobe/
 │   ├── auth.yaml
 │   └── orders.yaml
 ├── fixtures/                 # small files that workflows upload (multipart)
+├── data/                     # data files of for_each steps (CSV or JSON), if any
 ├── env.example.yaml          # committed: every variable, with placeholder values
 └── env.local.yaml            # NOT committed: real values for the local backend
 ```
@@ -168,6 +169,7 @@ A workflow may also contain `base_url`, `headers`, `auth` and `endpoints` itself
 | `expect.cookies` | Checks on cookies, keyed by cookie name (case-sensitive), in the workflow's cookie jar after the response: see section 6c. |
 | `expect.body` | Checks on the JSON body, keyed by JSONPath. |
 | `expect.duration` | Response time: `{ lt: 500ms }`. Only `gt`, `gte`, `lt`, `lte`. |
+| `for_each` | Repeat the call once per item, each item's keys being arguments: see section 6d. |
 | `until` | Repeat the call until conditions pass (polling): see section 6b. |
 | `save` | `variable: <JSONPath>`. A path that matches nothing fails the step. `variable: { cookie: name }` saves a cookie's value (section 6c). |
 | `sleep` | `sleep: 500ms`. A sleep step has no `call`, `with`, `expect`, `until` or `save`. Durations use `ms`, `s`, `m`, `h`, `d`. |
@@ -309,6 +311,39 @@ variables:
 - **Never write a cookie's value into a file**, and never copy `Set-Cookie` into a `Cookie` header by hand: the jar sends it. A `Cookie` header in the API file is only for a cookie the server never sets (a fixed preference, a cookie parameter), and is sent before the jar's cookies.
 - CSRF: when the API wants a cookie copied into a header (`XSRF-TOKEN` → `X-XSRF-TOKEN`, Django's `csrftoken` → `X-CSRFToken`), declare the header with a param in the API file and `save` the cookie in the workflow.
 
+## 6d. Tables of cases: `for_each`
+
+**One step, many inputs.** When the same call must be checked with several values (validation errors, roles, every item of a list), write one step with `for_each` instead of copying the step.
+
+```yaml
+- name: Invalid orders are rejected
+  call: create_order
+  for_each:                         # one call per item; its keys are arguments, like with
+    - { productId: "", error: product_required }
+    - { productId: p-1, quantity: 0, error: quantity_positive }
+    - { productId: p-1, quantity: -3, error: quantity_positive }
+  expect:
+    status: 422
+    body:
+      $.code: ${error}              # item values are variables of the step
+
+- name: Roles
+  call: admin_stats
+  for_each: { file: ../data/roles.csv }   # role,status: admin,200 / viewer,403
+  expect:
+    status: ${status}               # only in a for_each step: the status may come from the item
+
+- name: Every listed order can be read
+  call: get_order
+  for_each: ${orders}               # a list saved earlier: save: { orders: $.items }
+```
+
+- An item's keys must be arguments of the endpoint or variables used by the step (in `expect`, `until` or `with`). A key in both an item and `with` is an error: put shared values in `with`, varying ones in the items.
+- Every item runs, also after a failing one; then the workflow stops if any failed.
+- No `save` in a `for_each` step. Use `for_each` for checks; a flow that creates, reads and deletes stays a sequence of steps.
+- Data files go in `tinyprobe/data/`. CSV values are text; JSON keeps types.
+- Use `for_each` only when the steps differ by values. Different endpoints, different checks or a `save` mean different steps.
+
 ## 7. Environment file
 
 ```yaml
@@ -397,6 +432,9 @@ Safety: run workflows only against a **local or test** environment, never agains
 | a `Content-Type` header on an endpoint with `form` or `multipart` | no header: tinyprobe sets it, and reports the header as an error |
 | `save: { sid: $.sid }` after a cookie login, then `Cookie: "sid=${sid}"` in the API file | nothing: the cookie jar sends the session cookie; `expect.cookies` to check it, `save: { x: { cookie: name } }` only to copy a cookie into a header |
 | `expect.headers: { Set-Cookie: sid=abc }` | `expect.cookies: { sid: { exists: true } }`: `Set-Cookie` holds every cookie and its attributes |
+| the same step copied for each test case, differing in one value | one step with `for_each`, one item per case |
+| `save` in a `for_each` step | `save` in a step without `for_each`; `for_each` steps only check |
+| `status: ${code}` in a step without `for_each` | a literal status, or a `for_each` whose items give the status |
 | `file: tinyprobe/fixtures/a.png` in a workflow of `tinyprobe/workflows/`, or `--with file=tinyprobe/fixtures/a.png` in a `tinyprobe call` | `../fixtures/a.png`: paths are relative to the workflow, or to the API file for `call` |
 
 ## 11. Complete example
@@ -835,7 +873,7 @@ Either way, write a line in `MIGRATION.md`: the request, what was not translated
 | a pre-request script with logic: a signature (HMAC), a hash, a value in a format tinyprobe cannot generate | skip the request, or translate it without that value if the backend accepts it; report it |
 | `pm.sendRequest` in a script | a plain request becomes a step before; otherwise report it |
 | `postman.setNextRequest` branching (not a retry loop) | translate the main path; report the branches |
-| data files, `pm.iterationData` | translate one iteration with the first row; report that `for_each` is not supported yet |
+| data files (`newman run -d data.csv`), `pm.iterationData.get("email")`, `{{email}}` from a data file | copy the file to `tinyprobe/data/`; the requests of the run become steps with `for_each: { file: ../data/data.csv }`, and the data variables become arguments (`${email}`). A request that does not use the data stays a plain step. Note in `MIGRATION.md` that each step repeats on its own, while Newman repeated the whole collection for each row |
 | a `formdata` file whose `src` is not in the repository (a path on someone's machine) | ask the user for the file; otherwise create a small file in `tinyprobe/fixtures/` with the same extension (a few lines of text are enough for most servers) and say so in `MIGRATION.md` |
 | the OAuth 2.0 auth helper with another grant type (`authorization_code`, `password`, `implicit`, PKCE) | report it, and ask the user for a token in `env.local.yaml`, used by a bearer set (client credentials are translated: 12.2) |
 | regex checks (`.to.match`), type checks (`.to.be.a("string")`), JSON schema (`jsonSchema`, `tv4`) | keep what has an equivalent (`{ exists: true }`, `contains` for a fixed part of the text); drop the rest and report it |

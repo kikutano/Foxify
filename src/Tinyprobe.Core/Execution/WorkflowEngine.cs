@@ -8,8 +8,11 @@ using Tinyprobe.Core.Models;
 
 namespace Tinyprobe.Core.Execution;
 
-/// <summary>A step is starting: <see cref="Attempt"/> is more than 1 when an <c>until</c> step polls again.</summary>
-public sealed record StepProgress(int Index, string Name, int Attempt = 1, bool IsSleep = false)
+/// <summary>
+/// A step is starting: <see cref="Attempt"/> is more than 1 when an <c>until</c> step polls again;
+/// <see cref="Iteration"/> and <see cref="Iterations"/> are set for each item of a <c>for_each</c> step.
+/// </summary>
+public sealed record StepProgress(int Index, string Name, int Attempt = 1, bool IsSleep = false, int? Iteration = null, int? Iterations = null)
 {
     /// <summary>The name, plus the attempt when polling: <c>Wait (attempt 2)</c>.</summary>
     public string Description => Attempt > 1 ? $"{Name} (attempt {Attempt})" : Name;
@@ -83,15 +86,24 @@ public sealed class WorkflowEngine
             }
 
             var call = (CallStep)workflow.Steps[index];
-            var stepReport = new StepReport { Index = index, StepName = call.Name };
-            StepStarted?.Invoke(new StepProgress(index, call.Name));
+            bool passed;
+            if (call.ForEach is { } forEach)
+            {
+                passed = await ExecuteForEachAsync(call, forEach, index, globals, workflow.Settings, files, report);
+            }
+            else
+            {
+                var stepReport = new StepReport { Index = index, StepName = call.Name };
+                StepStarted?.Invoke(new StepProgress(index, call.Name));
+                // Arguments are resolved against the globals (e.g. `id: ${userId}`), then become
+                // the scope of the endpoint's placeholders.
+                await ExecuteCallAsync(call, () => call.With.ToDictionary(a => a.Key, a => TemplateRenderer.RenderValue(a.Value, globals)),
+                    globals, workflow.Settings, files, stepReport);
+                Completed(report, stepReport);
+                passed = stepReport.IsSuccess;
+            }
 
-            await ExecuteCallAsync(call, globals, workflow.Settings, files, stepReport);
-
-            report.StepReports.Add(stepReport);
-            StepCompleted?.Invoke(stepReport);
-
-            if (!stepReport.IsSuccess)
+            if (!passed)
             {
                 _log.WriteLine($"Step '{call.Name}' failed. Stopping workflow execution.");
                 break;
@@ -101,14 +113,124 @@ public sealed class WorkflowEngine
         return report;
     }
 
-    private async Task ExecuteCallAsync(
-        CallStep step, GlobalVariables globals, WorkflowSettings settings, FileAccess files, StepReport report)
+    private void Completed(WorkflowReport report, StepReport step)
+    {
+        report.StepReports.Add(step);
+        StepCompleted?.Invoke(step);
+    }
+
+    /// <summary>
+    /// A <c>for_each</c> step: one call per item, in order. Every item runs, also after a failing one, so a table
+    /// of cases shows every failure; the step passes when all of them passed.
+    /// </summary>
+    private async Task<bool> ExecuteForEachAsync(CallStep step, ForEach forEach, int index, GlobalVariables globals,
+        WorkflowSettings settings, FileAccess files, WorkflowReport report)
+    {
+        int count;
+        Func<int, Dictionary<string, JsonElement>> item;
+        if (forEach.Items is { } items)
+        {
+            count = items.Count;
+            // Rendered when the item runs, so a generated value is new for each item.
+            item = i => items[i].ToDictionary(a => a.Key, a => TemplateRenderer.RenderValue(a.Value, globals));
+        }
+        else
+        {
+            List<Dictionary<string, JsonElement>> values;
+            try
+            {
+                values = VariableItems(forEach.Variable!, globals);
+            }
+            catch (InvalidOperationException ex)
+            {
+                StepStarted?.Invoke(new StepProgress(index, step.Name));
+                var failed = new StepReport { Index = index, StepName = step.Name };
+                Fail(failed, ex.Message);
+                Completed(report, failed);
+                return false;
+            }
+            count = values.Count;
+            item = i => values[i];
+        }
+
+        if (count == 0)
+        {
+            StepStarted?.Invoke(new StepProgress(index, step.Name, Iterations: 0));
+            _log.WriteLine($"Step '{step.Name}' has no items.");
+            Completed(report, new StepReport { Index = index, StepName = $"{step.Name} [no items]", Iterations = 0 });
+            return true;
+        }
+
+        bool passed = true;
+        for (int i = 0; i < count; i++)
+        {
+            var stepReport = new StepReport { Index = index, StepName = step.Name, Iteration = i + 1, Iterations = count };
+            Dictionary<string, JsonElement>? values = null;
+            await ExecuteCallAsync(step, () =>
+            {
+                values = item(i);
+                // `with` may read the item's values: `email: "${name}@example.com"`.
+                var itemScope = new ItemScope(values, globals);
+                var arguments = new Dictionary<string, JsonElement>(values);
+                foreach (var (name, template) in step.With)
+                    arguments[name] = TemplateRenderer.RenderValue(template, itemScope);
+                stepReport.StepName = $"{IterationName(step, arguments)} [{i + 1}/{count}]";
+                StepStarted?.Invoke(new StepProgress(index, stepReport.StepName, Iteration: i + 1, Iterations: count));
+                return arguments;
+            }, globals, settings, files, stepReport);
+
+            if (values is null)
+                stepReport.StepName = $"{step.Name} [{i + 1}/{count}]";
+            Completed(report, stepReport);
+            passed &= stepReport.IsSuccess;
+        }
+        return passed;
+    }
+
+    /// <summary><c>for_each: ${name}</c>: the variable must be a list of objects; their keys become arguments.</summary>
+    private static List<Dictionary<string, JsonElement>> VariableItems(string name, IVariableScope globals)
+    {
+        if (!globals.TryGet(name, out var value))
+            throw new InvalidOperationException($"Variable '{name}' is not defined.");
+        if (value.ValueKind != JsonValueKind.Array)
+            throw new InvalidOperationException($"for_each: '{name}' is {Kind(value)}, not a list of objects");
+
+        var items = new List<Dictionary<string, JsonElement>>();
+        int position = 0;
+        foreach (var element in value.EnumerateArray())
+        {
+            position++;
+            if (element.ValueKind != JsonValueKind.Object)
+                throw new InvalidOperationException($"for_each: item {position} of '{name}' is {Kind(element)}, not an object");
+            items.Add(element.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone()));
+        }
+        return items;
+
+        static string Kind(JsonElement element) => element.ValueKind switch
+        {
+            JsonValueKind.Object => "an object",
+            JsonValueKind.Array => "a list",
+            JsonValueKind.String => "a string",
+            JsonValueKind.Number => "a number",
+            JsonValueKind.True or JsonValueKind.False => "a boolean",
+            _ => "null"
+        };
+    }
+
+    /// <summary>The step's name, or its default name computed with this item's path and query arguments.</summary>
+    private static string IterationName(CallStep step, Dictionary<string, JsonElement> arguments) =>
+        step.HasExplicitName
+            ? step.Name
+            : Parsing.Loader.DefaultName(step.Call, step.Endpoint, arguments
+                .Where(a => a.Value.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array))
+                .Select(a => KeyValuePair.Create(a.Key, JsonValues.ToText(a.Value))));
+
+    private async Task ExecuteCallAsync(CallStep step, Func<Dictionary<string, JsonElement>> resolveArguments,
+        GlobalVariables globals, WorkflowSettings settings, FileAccess files, StepReport report)
     {
         try
         {
-            // Arguments are resolved against the globals (e.g. `id: ${userId}`), then become
-            // the scope of the endpoint's placeholders.
-            var arguments = step.With.ToDictionary(a => a.Key, a => TemplateRenderer.RenderValue(a.Value, globals));
+            var arguments = resolveArguments();
             var scope = new CallScope(step.Endpoint, arguments, globals);
             var polling = Stopwatch.StartNew();
 
@@ -136,7 +258,7 @@ public sealed class WorkflowEngine
                     }
 
                     _log.WriteLine($"Waiting: {pending.Reason}. Next attempt in {Durations.Format(until.Every)}");
-                    StepStarted?.Invoke(new StepProgress(report.Index, step.Name, attempt + 1));
+                    StepStarted?.Invoke(new StepProgress(report.Index, report.StepName, attempt + 1, Iteration: report.Iteration, Iterations: report.Iterations));
                     await Task.Delay(until.Every);
                     continue;
                 }
@@ -292,12 +414,13 @@ public sealed class WorkflowEngine
         report.BytesReceived = bodyBytes.Length;
 
         int status = (int)response.StatusCode;
-        if (expect.Status.Count > 0)
+        var expected = expect.StatusPlaceholder is { } placeholder ? StatusCodes(placeholder, scope) : expect.Status;
+        if (expected.Count > 0)
         {
-            report.ExpectedStatusCodes.AddRange(expect.Status.Select(code => (HttpStatusCode)code));
-            if (!expect.Status.Contains(status))
+            report.ExpectedStatusCodes.AddRange(expected.Select(code => (HttpStatusCode)code));
+            if (!expected.Contains(status))
             {
-                Fail(report, $"Expected status {string.Join(" or ", expect.Status)}, got {status}");
+                Fail(report, $"Expected status {string.Join(" or ", expected)}, got {status}");
                 return;
             }
         }
@@ -364,6 +487,22 @@ public sealed class WorkflowEngine
                 _log.WriteLine($"Saved {name} = {JsonValues.ToDisplay(saved)}");
             }
         }
+    }
+
+    /// <summary><c>status: ${status}</c> of a <c>for_each</c> step: a code (a number or its text) or a list of codes.</summary>
+    private static List<int> StatusCodes(Template placeholder, CallScope scope)
+    {
+        var value = TemplateRenderer.RenderValue(placeholder, scope);
+        var items = value.ValueKind == JsonValueKind.Array ? value.EnumerateArray().ToList() : [value];
+        var codes = new List<int>();
+        foreach (var item in items)
+        {
+            var text = JsonValues.ToText(item);
+            if (!int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var code) || code is < 100 or > 599)
+                throw new InvalidOperationException($"Status {placeholder} is not a status code: '{text}'");
+            codes.Add(code);
+        }
+        return codes;
     }
 
     private static async Task<RecordedRequest> RecordAsync(HttpRequestMessage request, CookieContainer cookies) => new()

@@ -87,7 +87,8 @@ internal sealed partial class Loader
     internal static readonly string[] WorkflowKeys = ["name", "description", "import", "variables", "settings", "steps", .. ApiKeys];
     internal static readonly string[] EndpointKeys = ["method", "path", "query", "headers", "auth", "body", "form", "multipart", "params"];
     internal static readonly string[] MultipartFileKeys = ["file", "filename", "content_type"];
-    internal static readonly string[] StepKeys = ["name", "call", "with", "expect", "until", "save", "sleep"];
+    internal static readonly string[] StepKeys = ["name", "call", "with", "for_each", "expect", "until", "save", "sleep"];
+    internal static readonly string[] ForEachFileKeys = ["file"];
     internal static readonly string[] ExpectKeys = ["status", "headers", "cookies", "body", "duration"];
     internal static readonly string[] UntilKeys = ["status", "headers", "cookies", "body", "every", "timeout"];
     internal static readonly string[] SaveKeys = ["cookie"];
@@ -627,7 +628,7 @@ internal sealed partial class Loader
 
             if (entries.TryGetValue("sleep", out var sleepNode))
             {
-                foreach (var key in new[] { "call", "with", "expect", "until", "save" }.Where(entries.ContainsKey))
+                foreach (var key in new[] { "call", "with", "for_each", "expect", "until", "save" }.Where(entries.ContainsKey))
                     Error(file, item, $"a sleep step cannot have '{key}'");
 
                 if (Scalar(file, sleepNode, "sleep") is { } text)
@@ -667,14 +668,23 @@ internal sealed partial class Loader
                 }
             }
 
+            var forEach = entries.TryGetValue("for_each", out var forEachNode) ? ParseForEach(file, forEachNode, with) : null;
+            if (forEach is not null && saveNode is not null)
+                Error(file, saveNode, "save cannot be used with for_each: every iteration would overwrite the value");
+
+            var expect = entries.TryGetValue("expect", out var expectNode) ? ParseExpect(file, expectNode) : new Expectation();
+            if (expect.StatusPlaceholder is { } statusPlaceholder && forEachNode is null)
+                Report(statusPlaceholder.Location, "status must be a code, or a placeholder in a for_each step");
+
             steps.Add(new CallStep
             {
                 Name = entries.TryGetValue("name", out var nameNode) ? Scalar(file, nameNode, "name") ?? call : call,
                 HasExplicitName = nameNode is not null,
                 Call = call,
                 With = with,
+                ForEach = forEach,
                 Save = save,
-                Expect = entries.TryGetValue("expect", out var expectNode) ? ParseExpect(file, expectNode) : new Expectation(),
+                Expect = expect,
                 Until = entries.TryGetValue("until", out var untilNode) ? ParseUntil(file, untilNode) : null,
                 Location = location
             });
@@ -683,19 +693,123 @@ internal sealed partial class Loader
         return steps;
     }
 
+    private static string DefaultName(CallStep step, EndpointDefinition endpoint) =>
+        DefaultName(step.Call, endpoint, step.With.Where(a => a.Value.Node is YamlScalarNode).Select(a => KeyValuePair.Create(a.Key, a.Value.ToString())));
+
     /// <summary>
     /// An unnamed step is shown as its call plus the arguments that go into the path or query,
     /// e.g. <c>status code=200</c>. Body and header arguments are left out: they may be secrets.
     /// </summary>
-    private static string DefaultName(CallStep step, EndpointDefinition endpoint)
+    internal static string DefaultName(string call, EndpointDefinition endpoint, IEnumerable<KeyValuePair<string, string>> scalarArguments)
     {
         var visible = TemplateRenderer.Placeholders(endpoint.Path.Node).Concat(endpoint.Query).ToHashSet();
-        var arguments = step.With
-            .Where(a => visible.Contains(a.Key) && a.Value.Node is YamlScalarNode)
-            .Select(a => $"{a.Key}={a.Value}");
-        var name = string.Join(' ', [step.Call, .. arguments]);
-        return name.Length <= 40 ? name : step.Call;
+        var arguments = scalarArguments.Where(a => visible.Contains(a.Key)).Select(a => $"{a.Key}={a.Value}");
+        var name = string.Join(' ', [call, .. arguments]);
+        return name.Length <= 40 ? name : call;
     }
+
+    /// <summary><c>for_each</c>: a list of items (mappings of arguments), a variable (<c>${cases}</c>) or a data file.</summary>
+    private ForEach? ParseForEach(FileContext file, YamlNode node, Dictionary<string, Template> with)
+    {
+        if (node is YamlScalarNode { Value: { } text } && LonePlaceholder().Match(text) is { Success: true } variable
+            && !Generators.IsGenerated(variable.Groups[1].Value.Trim()))
+            return new ForEach { Variable = variable.Groups[1].Value.Trim() };
+
+        if (node is YamlSequenceNode sequence)
+            return new ForEach { Items = ParseItems(file, sequence, with) };
+
+        if (node is YamlMappingNode)
+        {
+            var entries = Collect(file, node, "for_each", ForEachFileKeys);
+            if (entries.TryGetValue("file", out var fileNode) && Scalar(file, fileNode, "file") is { Length: > 0 } path)
+                return ReadDataFile(file, fileNode, path, with) is { } items ? new ForEach { Items = items, File = path } : null;
+            // An unknown key is already reported, with its suggestion.
+            if (!entries.ContainsKey("file") && ((YamlMappingNode)node).Children.Count == 0)
+                Error(file, node, "for_each must be a list of items, a variable (${cases}) or { file: path }");
+            return null;
+        }
+
+        Error(file, node, "for_each must be a list of items, a variable (${cases}) or { file: path }");
+        return null;
+    }
+
+    private List<IReadOnlyDictionary<string, Template>> ParseItems(FileContext file, YamlSequenceNode sequence, Dictionary<string, Template> with)
+    {
+        var items = new List<IReadOnlyDictionary<string, Template>>();
+        int position = 0;
+        foreach (var itemNode in sequence.Children)
+        {
+            position++;
+            if (itemNode is not YamlMappingNode)
+            {
+                Error(file, itemNode, $"item {position} of for_each must be a mapping of arguments ({{ email: x }})");
+                continue;
+            }
+
+            var item = new Dictionary<string, Template>();
+            foreach (var (key, keyNode, value) in Entries(file, itemNode, $"item {position} of for_each"))
+            {
+                if (with.ContainsKey(key))
+                    Error(file, keyNode, $"item {position} of for_each and with both set '{key}': keep one");
+                item[key] = Template(file, value);
+            }
+            items.Add(item);
+        }
+        return items;
+    }
+
+    /// <summary>
+    /// <c>for_each: { file: path }</c>, read when the workflow loads: a JSON list of objects, or a CSV file whose first
+    /// line names the columns. CSV values are text. Every item is located at the <c>file</c> value, for errors.
+    /// </summary>
+    private List<IReadOnlyDictionary<string, Template>>? ReadDataFile(
+        FileContext file, YamlNode fileNode, string path, Dictionary<string, Template> with)
+    {
+        var fullPath = Path.GetFullPath(Path.Combine(file.Directory, path));
+        if (!File.Exists(fullPath))
+        {
+            Error(file, fileNode, $"cannot read the for_each file {path}: not found");
+            return null;
+        }
+
+        var location = At(file, fileNode);
+        List<List<KeyValuePair<string, YamlNode>>>? rows;
+        try
+        {
+            rows = Path.GetExtension(fullPath).Equals(".csv", StringComparison.OrdinalIgnoreCase)
+                ? DataFiles.ReadCsv(File.ReadAllText(fullPath))
+                : DataFiles.ReadJson(File.ReadAllText(fullPath));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or YamlException)
+        {
+            Error(file, fileNode, $"cannot read the for_each file {path}: {ex.Message}");
+            return null;
+        }
+        if (rows is null)
+        {
+            Error(file, fileNode, $"{path} must be a list of objects");
+            return null;
+        }
+
+        var items = new List<IReadOnlyDictionary<string, Template>>();
+        int position = 0;
+        foreach (var row in rows)
+        {
+            position++;
+            var item = new Dictionary<string, Template>();
+            foreach (var (key, value) in row)
+            {
+                if (with.ContainsKey(key))
+                    Report(location, $"item {position} of for_each and with both set '{key}': keep one");
+                item[key] = new Template(value, location);
+            }
+            items.Add(item);
+        }
+        return items;
+    }
+
+    [GeneratedRegex(@"^\$\{([^}]+)\}$")]
+    private static partial Regex LonePlaceholder();
 
     /// <summary>A <c>save</c> value: a JSONPath of the body (<c>$.id</c>), or <c>{ cookie: name }</c>.</summary>
     private SaveSource? ParseSave(FileContext file, string name, YamlNode node)
@@ -738,7 +852,11 @@ internal sealed partial class Loader
         var checks = ParseChecks(file, entries, "expect");
         var duration = entries.TryGetValue("duration", out var durationNode) ? ParseDurationConditions(file, durationNode) : [];
 
-        return new Expectation { Status = checks.Status, Headers = checks.Headers, Cookies = checks.Cookies, Body = checks.Body, Duration = duration };
+        return new Expectation
+        {
+            Status = checks.Status, StatusPlaceholder = checks.StatusPlaceholder, Headers = checks.Headers, Cookies = checks.Cookies,
+            Body = checks.Body, Duration = duration
+        };
     }
 
     /// <summary><c>until</c>: the same status, header, cookie and body checks as <c>expect</c>, plus <c>every</c> and <c>timeout</c>.</summary>
@@ -758,7 +876,10 @@ internal sealed partial class Loader
         else if (timeout < every)
             Error(file, entries.GetValueOrDefault("timeout") ?? node, $"timeout ({Durations.Format(timeout)}) must be at least every ({Durations.Format(every)})");
 
-        return new RetryUntil { Checks = ParseChecks(file, entries, "until"), Every = every, Timeout = timeout };
+        var checks = ParseChecks(file, entries, "until");
+        if (checks.StatusPlaceholder is { } placeholder)
+            Report(placeholder.Location, "until.status must be a code or a list of codes");
+        return new RetryUntil { Checks = checks, Every = every, Timeout = timeout };
     }
 
     private TimeSpan ParseDuration(FileContext file, Dictionary<string, YamlNode> entries, string key, TimeSpan fallback)
@@ -776,7 +897,14 @@ internal sealed partial class Loader
     {
         // `status: 200` or `status: [200, 204]`: any of the listed codes is accepted.
         var status = new List<int>();
-        if (entries.TryGetValue("status", out var statusNode))
+        Template? statusPlaceholder = null;
+        if (entries.TryGetValue("status", out var statusNode)
+            && statusNode is YamlScalarNode { Value: { } statusValue } && LonePlaceholder().IsMatch(statusValue))
+        {
+            // Allowed only in a for_each step, where each item gives its own status; checked by the step.
+            statusPlaceholder = Template(file, statusNode);
+        }
+        else if (statusNode is not null)
         {
             var codes = statusNode is YamlSequenceNode ? Items(file, statusNode, "status").ToList() : [statusNode];
             if (codes.Count == 0)
@@ -819,7 +947,7 @@ internal sealed partial class Loader
             }
         }
 
-        return new Expectation { Status = status, Headers = headers, Cookies = cookies, Body = body };
+        return new Expectation { Status = status, StatusPlaceholder = statusPlaceholder, Headers = headers, Cookies = cookies, Body = body };
     }
 
     /// <summary>
@@ -916,7 +1044,9 @@ internal sealed partial class Loader
 
         foreach (var (name, defaultValue) in endpoint.Params ?? new Dictionary<string, Template?>())
         {
-            if (defaultValue is null && !step.With.ContainsKey(name))
+            // Items of a variable are known only when the step runs.
+            var fromItems = step.ForEach is { } items && (items.Variable is not null || items.Items!.All(item => item.ContainsKey(name)));
+            if (defaultValue is null && !step.With.ContainsKey(name) && !fromItems)
                 Report(step.Location, $"missing required param '{name}' of endpoint '{endpoint.Name}' (defined at {endpoint.Location})");
         }
 
@@ -927,6 +1057,18 @@ internal sealed partial class Loader
         {
             if (!accepted.Contains(name))
                 Report(value.Location, $"unknown argument '{name}' for endpoint '{endpoint.Name}'{Suggest(name, accepted)}");
+        }
+
+        // An item's keys may also be read by `with` (`email: "${name}@example.com"`).
+        accepted.UnionWith(step.With.Values.SelectMany(v => TemplateRenderer.Placeholders(v.Node)));
+        var reported = new HashSet<string>();
+        foreach (var item in step.ForEach?.Items ?? [])
+        {
+            foreach (var (name, value) in item)
+            {
+                if (!accepted.Contains(name) && reported.Add(name))
+                    Report(value.Location, $"unknown argument '{name}' for endpoint '{endpoint.Name}'{Suggest(name, accepted)}");
+            }
         }
     }
 
@@ -969,7 +1111,7 @@ internal sealed partial class Loader
         var checks = step.Expect.Headers.Concat(step.Expect.Cookies).Concat(step.Expect.Body);
         if (step.Until is { } until)
             checks = checks.Concat(until.Checks.Headers).Concat(until.Checks.Cookies).Concat(until.Checks.Body);
-        return checks.SelectMany(c => Values(c.Conditions)).OfType<Template>();
+        return checks.SelectMany(c => Values(c.Conditions)).Append(step.Expect.StatusPlaceholder).OfType<Template>();
 
         static IEnumerable<Template?> Values(IEnumerable<Condition> conditions) =>
             conditions.SelectMany(c => c.Alternatives.SelectMany(Values).Append(c.Value));
@@ -980,7 +1122,7 @@ internal sealed partial class Loader
         IEnumerable<EndpointDefinition> endpoints, IEnumerable<CallStep> steps, IEnumerable<Template> variables)
     {
         var templates = endpoints.SelectMany(EndpointTemplates)
-            .Concat(steps.SelectMany(s => s.With.Values.Concat(CheckTemplates(s))))
+            .Concat(steps.SelectMany(s => s.With.Values.Concat(CheckTemplates(s)).Concat((s.ForEach?.Items ?? []).SelectMany(i => i.Values))))
             .Concat(variables);
 
         foreach (var template in templates)

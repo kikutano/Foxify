@@ -1,0 +1,58 @@
+name: Tables of cases
+description: for_each repeats a step over a list of items, from the workflow, a variable or a CSV file.
+
+import:
+  - ../api/testserver.yaml
+
+steps:
+  - name: Simulated status codes
+    call: status
+    for_each:                          # one call per item; the item's keys are arguments
+      - { code: 200 }
+      - { code: 404 }
+      - { code: 503 }
+    expect:
+      status: ${code}                  # in a for_each step, the status can come from the item
+      body:
+        $.status: ${code}
+
+  - name: Bearer tokens
+    call: bearer_check
+    for_each: { file: ../data/tokens.csv }   # token,status: one item per line
+    expect:
+      status: ${status}
+
+  - name: Admin logs in
+    call: login
+    with:
+      password: password
+    save:
+      token: $.access_token
+
+  - name: An email is required
+    call: create_user
+    for_each:
+      - { email: "" }
+      - { email: "   " }
+    with:                              # the same for every item
+      firstName: Test
+      lastName: User
+    expect:
+      status: 400
+      body:
+        $.field: email
+
+  - name: List the first users
+    call: list_users
+    with: { page: 1, pageSize: 3 }
+    save:
+      users: $.data                    # a list of objects
+
+  - name: Every listed user can be read
+    call: get_user                     # `id` comes from each user of the list
+    for_each: ${users}
+    expect:
+      status: 200
+      body:
+        $.id: ${id}
+        $.email: ${email}

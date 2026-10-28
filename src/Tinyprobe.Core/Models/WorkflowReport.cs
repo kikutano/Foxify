@@ -8,6 +8,10 @@ public class StepReport
     /// <summary>Position of the step in the workflow, sleeps included (0-based).</summary>
     public int Index { get; set; }
     public string StepName { get; set; } = string.Empty;
+    /// <summary>For a <c>for_each</c> step: this iteration (1-based); null otherwise, and for a step with no items.</summary>
+    public int? Iteration { get; set; }
+    /// <summary>For a <c>for_each</c> step: how many items it has (0 when the list is empty); null for other steps.</summary>
+    public int? Iterations { get; set; }
     public string? Method { get; set; }
     public Uri? Url { get; set; }
     /// <summary>Status code received from the server; null when no response was received.</summary>

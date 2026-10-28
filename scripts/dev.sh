@@ -98,7 +98,7 @@ e2e() {
 
   step "End-to-end (docs/example/workflows)"
   "$DEV_BIN" run docs/example/workflows -e docs/environment.yaml --var "baseUrl=$BASE_URL/" --junit "$DEV_DIR/junit.xml"
-  grep -q '<testsuites name="tinyprobe" tests="46" failures="0" errors="0" skipped="0"' "$DEV_DIR/junit.xml" \
+  grep -q '<testsuites name="tinyprobe" tests="59" failures="0" errors="0" skipped="0"' "$DEV_DIR/junit.xml" \
     || fail "unexpected JUnit report: $(head -2 "$DEV_DIR/junit.xml")"
 
   step "End-to-end (inspect, call, ndjson)"
@@ -113,7 +113,7 @@ e2e() {
     "$DEV_DIR/events.ndjson" > /dev/null
   "$DEV_BIN" run docs/example -e docs/environment.yaml --var "baseUrl=$BASE_URL/" --reporter ndjson \
     > "$DEV_DIR/suite.ndjson"
-  jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 6
+  jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 7
     and .[-1].event == "suite_finished" and .[-1].success' "$DEV_DIR/suite.ndjson" > /dev/null
   echo "Protocol checks passed."
 
@@ -129,7 +129,7 @@ e2e() {
     "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"run\",\"arguments\":{\"paths\":[\"docs/example/workflows\"],\"env_file\":\"docs/environment.yaml\",\"vars\":{\"baseUrl\":\"$BASE_URL/\"}}}}" \
     | "$DEV_BIN" mcp > "$DEV_DIR/mcp.ndjson"
   jq -e -s 'length == 3 and .[0].result.serverInfo.name == "tinyprobe" and (.[1].result.tools | length) == 4
-    and (.[2].result.isError | not) and (.[2].result.content[0].text | fromjson | .success and (.workflows | length) == 6)' \
+    and (.[2].result.isError | not) and (.[2].result.content[0].text | fromjson | .success and (.workflows | length) == 7)' \
     "$DEV_DIR/mcp.ndjson" > /dev/null
   echo "MCP checks passed."
 
