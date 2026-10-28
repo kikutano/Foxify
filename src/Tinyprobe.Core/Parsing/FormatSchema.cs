@@ -57,6 +57,8 @@ public static class FormatSchema
         ["step.name"] = "Shown in the report. Default: the call and its path and query arguments.",
         ["step.call"] = "The endpoint to call, by name.",
         ["step.with"] = "Arguments of the endpoint, `name: value`. Values may use variables, such as `id: ${userId}`.",
+        ["step.for_each"] = "Repeat the call once per item: a list of mappings whose keys are arguments (like `with`) and variables of the step, a variable holding such a list (`${users}`), or a data file (`{ file: ../data/cases.csv }`, CSV or JSON). Every item runs; the step passes when all passed.",
+        ["for_each_file.file"] = "A JSON list of objects, or a CSV file whose first line names the columns, relative to the workflow.",
         ["step.expect"] = "What the response must be: `status`, `headers`, `cookies`, `body` (by JSONPath) and `duration`. Without `status`, any 2xx passes.",
         ["step.until"] = "Polling: repeat the call until these conditions pass, every `every`, at most `timeout`. Then `expect` is checked on the last response.",
         ["step.save"] = "Values of the response for the next steps, `variable: <JSONPath>` or `variable: { cookie: name }`, saved after every check passed.",
@@ -64,7 +66,7 @@ public static class FormatSchema
         ["step.sleep"] = "A step of its own that waits, such as `500ms` or `2s`.",
 
         // expect and until
-        ["expect.status"] = "Expected status code, or a list of accepted ones (`[200, 204]`).",
+        ["expect.status"] = "Expected status code, or a list of accepted ones (`[200, 204]`). In a `for_each` step it may be a placeholder (`${status}`) given by each item.",
         ["expect.headers"] = "Checks on response headers, by name (case-insensitive): a value, or conditions such as `{ exists: true }`.",
         ["expect.cookies"] = "Checks on cookies by name (case-sensitive), in the workflow's cookie jar after the response, for the request's URL: a value, or conditions such as `{ exists: false }`.",
         ["expect.body"] = "Checks on the JSON body, by JSONPath (`$.id`, `$.items[0].name`): a value, or conditions such as `{ gt: 0 }`.",
@@ -119,6 +121,7 @@ public static class FormatSchema
             AuthSet(w);
             Definition(w, "basic", "Basic auth credentials.", Loader.BasicKeys, required: Loader.BasicKeys);
             Definition(w, "oauth2", "OAuth2 client credentials.", Loader.OAuth2Keys, required: ["token_url", "client_id", "client_secret"]);
+            Definition(w, "for_each_file", "A data file of items.", Loader.ForEachFileKeys, required: Loader.ForEachFileKeys);
             Definition(w, "save_cookie", "A value saved from a cookie.", Loader.SaveKeys, anyOfRequired: ["cookie"]);
             Definition(w, "step", "A step: `call` an endpoint, or `sleep`.", Loader.StepKeys, anyOfRequired: ["call", "sleep"]);
             Definition(w, "expect", "What the response must be.", Loader.ExpectKeys);
@@ -276,7 +279,7 @@ public static class FormatSchema
         {
             case "file.name" or "file.description" or "file.base_url" or "endpoint.path"
                 or "multipart_file.file" or "multipart_file.filename" or "multipart_file.content_type"
-                or "save_cookie.cookie" or "basic.username" or "basic.password"
+                or "save_cookie.cookie" or "for_each_file.file" or "basic.username" or "basic.password"
                 or "oauth2.token_url" or "oauth2.client_id" or "oauth2.client_secret" or "step.name" or "step.call" or "step.sleep" or "until.every" or "until.timeout":
                 w.WriteString("type", "string");
                 break;
@@ -357,6 +360,21 @@ public static class FormatSchema
             case "step.expect":
                 Ref(w, "expect", inline: true);
                 break;
+            case "step.for_each":
+                w.WriteStartArray("anyOf");
+                w.WriteStartObject();
+                w.WriteString("type", "array");
+                w.WriteStartObject("items");
+                w.WriteString("type", "object");
+                w.WriteEndObject();
+                w.WriteEndObject();
+                w.WriteStartObject();
+                w.WriteString("type", "string");
+                w.WriteString("pattern", "^\\$\\{[^}]+\\}$");
+                w.WriteEndObject();
+                Ref(w, "for_each_file");
+                w.WriteEndArray();
+                break;
             case "step.until":
                 Ref(w, "until", inline: true);
                 break;
@@ -371,6 +389,14 @@ public static class FormatSchema
                 w.WriteString("type", "integer");
                 w.WriteEndObject();
                 w.WriteEndObject();
+                if (key == "status" && section == "expect")
+                {
+                    // A placeholder, given by each item of a for_each step.
+                    w.WriteStartObject();
+                    w.WriteString("type", "string");
+                    w.WriteString("pattern", "^\\$\\{[^}]+\\}$");
+                    w.WriteEndObject();
+                }
                 w.WriteEndArray();
                 break;
             case "expect.headers" or "expect.cookies" or "expect.body" or "until.headers" or "until.cookies" or "until.body":

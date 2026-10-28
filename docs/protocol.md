@@ -68,8 +68,10 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
       "with": { "email": "${email}" },
       "expect": {
         "status": [200],
+        "status_placeholder": null,
         "checks": [ { "subject": "$.token", "condition": "exists" }, { "subject": "duration", "condition": "< 500ms" } ]
       },
+      "for_each": null,
       "until": null,
       "save": { "token": "$.token" },
       "location": { "file": "tinyprobe/workflows/users.yaml", "line": 9, "column": 5 }
@@ -95,6 +97,11 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
   ```
 - `arguments` are the names a call of the endpoint can pass with `--with` (or a step's `with`): its params, its query names and every placeholder of its base URL, path, headers, body, form and multipart fields, `basic_auth` and `oauth2`. Generated values (`${$uuid}`) are not listed. A UI can build the form of an endpoint from `params` (required ones first) and `arguments`.
 - `until`, when present, has the same `status` and `checks` as `expect`, plus `every_ms` and `timeout_ms`.
+- `for_each` is `null`, or `{ "items", "variable", "file" }`:
+  - `items` holds the literal items (a data file's are read and listed, with its path in `file`), or is `null` for a variable;
+  - `variable` is the name of a `for_each: ${name}`.
+  - Example: `{ "items": [ { "code": 200 }, { "code": 404 } ], "variable": null, "file": null }`.
+- `status_placeholder` is the `${…}` of a `for_each` step's `expect.status` (`status` is then empty), otherwise `null`.
 - `checks[].subject` is a JSONPath, `duration`, `header <name>` or `cookie <name>`.
 - `checks[].condition` is the text the report shows, such as `>= 3`, `in ["a","b"]`, `< 0 or > 100`.
 - `save` maps each variable to where its value is read: a JSONPath (`"$.token"`) or `cookie <name>` (`"cookie XSRF-TOKEN"`).
@@ -128,16 +135,16 @@ One JSON object per line on standard output, written and flushed as soon as it h
 | Event | When |
 |---|---|
 | `run_started` | the workflow is valid and is about to run |
-| `step_started` | a step starts, and again before each new attempt of an `until` step |
-| `step_completed` | a call step ended, passed or failed (not sent for `sleep` steps) |
+| `step_started` | a step starts, again before each new attempt of an `until` step, and for each item of a `for_each` step |
+| `step_completed` | a call step ended, passed or failed (not sent for `sleep` steps); a `for_each` step sends one, after its last item |
 | `run_finished` | the run ended; the last event |
 | `invalid` | the workflow is invalid: the only event, exit code `2` |
 
 ```json
 {"event":"run_started","protocol":1,"version":"0.9.0","workflow":"Users","file":"/home/me/project/tinyprobe/workflows/users.yaml","env_file":"/home/me/project/tinyprobe/env.local.yaml","steps":[{"index":0,"type":"call","name":"Login"},{"index":1,"type":"sleep","name":"sleep 1s"}]}
-{"event":"step_started","index":0,"type":"call","name":"Login","attempt":1}
-{"event":"step_completed","index":0,"name":"Login","success":true,"failure":null,"method":"POST","url":"http://localhost:8080/login","status":200,"expected_status":[200],"duration_ms":12.4,"attempts":1,"bytes_sent":48,"bytes_received":120,"assertions":[{"subject":"$.token","condition":"exists","actual":"\"eyJ...\"","passed":true}],"saved":{"token":"eyJ..."},"request":{"method":"POST","url":"http://localhost:8080/login","headers":[{"name":"Content-Type","value":"application/json; charset=utf-8"}],"body":"{\"email\":\"ada@example.com\",\"password\":\"...\"}"},"response":{"status":200,"reason":"OK","headers":[{"name":"Content-Type","value":"application/json"}],"body":"{\"token\":\"eyJ...\"}","body_truncated":false}}
-{"event":"step_started","index":1,"type":"sleep","name":"sleep 1s","attempt":1}
+{"event":"step_started","index":0,"type":"call","name":"Login","attempt":1,"iteration":null,"iterations":null}
+{"event":"step_completed","index":0,"name":"Login","success":true,"failure":null,"method":"POST","url":"http://localhost:8080/login","status":200,"expected_status":[200],"duration_ms":12.4,"attempts":1,"bytes_sent":48,"bytes_received":120,"assertions":[{"subject":"$.token","condition":"exists","actual":"\"eyJ...\"","passed":true}],"saved":{"token":"eyJ..."},"request":{"method":"POST","url":"http://localhost:8080/login","headers":[{"name":"Content-Type","value":"application/json; charset=utf-8"}],"body":"{\"email\":\"ada@example.com\",\"password\":\"...\"}"},"response":{"status":200,"reason":"OK","headers":[{"name":"Content-Type","value":"application/json"}],"body":"{\"token\":\"eyJ...\"}","body_truncated":false},"iterations":null}
+{"event":"step_started","index":1,"type":"sleep","name":"sleep 1s","attempt":1,"iteration":null,"iterations":null}
 {"event":"run_finished","success":true,"summary":{"total_steps":1,"passed_steps":1,"failed_steps":0,"not_run_steps":0,"checks_passed":2,"checks_failed":0,"http_requests":1,"bytes_sent":48,"bytes_received":120,"duration_ms":1015.2,"http_req_duration_ms":{"avg":12.4,"min":12.4,"med":12.4,"max":12.4,"p90":12.4,"p95":12.4}}}
 ```
 
@@ -146,6 +153,12 @@ One JSON object per line on standard output, written and flushed as soon as it h
 - `status` is `null` when no response was received, for example on a network error. Then `response` is `null` too, while `request` shows what was sent.
 - `request` and `response` belong to the last attempt. `headers` keep their order and include content headers. Bodies are text; a response body over 1 MiB is cut and has `body_truncated: true`. A `multipart/form-data` request body is the body as sent with each file's content replaced by one line, `(file ../fixtures/avatar.png, 79 B)`, with `\n` line endings. Headers set by the HTTP client itself (such as `Host`) are not listed. The `Cookie` header is listed as sent: a `Cookie` header of the API file followed by the cookies of the workflow's cookie jar.
 - `saved` holds the values stored by `save` in this step, with their JSON type.
+- **`for_each` steps.**
+  - `step_started` has `iteration` (1-based) and `iterations` for each item; both are `null` for other steps.
+  - `step_completed` is sent once, after the last item. Its `iterations` lists every item, each with `iteration` and the same fields as a step (`name`, `success`, `failure`, `status`, `assertions`, `request`, `response`...).
+  - The event's own fields are those of the first failing item, or of the last one when all passed, so a tool that does not read `iterations` still shows the right result.
+  - `iterations` is `null` for other steps, and `[]` for a `for_each` with no items.
+  - The summary counts each item as a step. The MCP `run` tool lists steps the same way.
 - `assertions[].actual` is the actual value as JSON text, or `(missing)`.
 - `http_req_duration_ms` is `null` when no request got a response.
 

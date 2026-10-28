@@ -25,7 +25,22 @@ internal sealed class NdjsonReporter(TextWriter output, string version) : IRunRe
         WorkflowEngine engine, WorkflowDefinition workflow, IReadOnlyDictionary<string, JsonElement> environment)
     {
         engine.StepStarted += progress => Emit(ProtocolJson.StepStarted(progress));
-        engine.StepCompleted += step => Emit(ProtocolJson.StepCompleted(step));
+        // The iterations of a for_each step are sent together, in one step_completed, after the last one.
+        var iterations = new List<StepReport>();
+        engine.StepCompleted += step =>
+        {
+            if (step.Iterations is not { } count || count == 0)
+            {
+                Emit(ProtocolJson.StepCompleted(step));
+                return;
+            }
+            iterations.Add(step);
+            if (step.Iteration == count)
+            {
+                Emit(ProtocolJson.StepCompleted(iterations));
+                iterations.Clear();
+            }
+        };
         return await engine.ExecuteAsync(workflow, environment);
     }
 

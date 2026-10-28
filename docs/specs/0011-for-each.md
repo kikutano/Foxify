@@ -1,6 +1,6 @@
 # 0011 — `for_each`: repeat a step over a list
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M4-4
 - **Repositories:** tinyprobe
 - **PRs:** —
@@ -166,3 +166,12 @@ Nothing required: the run view and the Test Explorer read the step's own fields,
 2. **Events.** The proposal sends one `step_completed` per step, with an `iterations` array, and the failing iteration's fields at the top: the extension 0.5.0 keeps working and shows the right result. The alternative is one `step_completed` per iteration. That is simpler, but the extension keys steps by index, so it would show only the last iteration, and a failure followed by a pass would look green. *Recommendation: one event, with `iterations`.*
 3. **Data files in this task.** `{ file: … }` with JSON and CSV makes Postman's data files (`-d users.csv`) translate one to one. Without it, an agent copies the rows into a literal list, which works for small files. *Recommendation: include JSON and CSV.*
 4. **`status: ${status}`.** Validation tables often expect a different status per case (`201` for a valid one, `422` for the others). Without it, those need two `for_each` steps, split by status. *Recommendation: allow it, only in `for_each` steps.*
+
+## Decisions
+
+Approved on 2026-10-28 with the recommendations:
+
+1. Every item runs, also after a failing one; then the workflow stops if any failed.
+2. One `step_completed` per step, with `iterations`, and the first failing item's fields at the top.
+3. Data files (`{ file: … }`, JSON and CSV) are part of this task.
+4. `expect.status` may be a placeholder in a `for_each` step only.

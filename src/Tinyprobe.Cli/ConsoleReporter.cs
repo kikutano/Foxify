@@ -40,7 +40,8 @@ internal sealed class ConsoleReporter : IRunReporter
         WorkflowDefinition workflow, IReadOnlyDictionary<string, JsonElement> environment)
     {
         var steps = workflow.Steps.OfType<CallStep>().ToList();
-        _nameWidth = Math.Clamp(steps.Select(s => s.Name.Length).DefaultIfEmpty(0).Max(), 4, MaxNameWidth);
+        // A for_each step is shown with " [2/10]" after its name.
+        _nameWidth = Math.Clamp(steps.Select(s => s.Name.Length + (s.ForEach is null ? 0 : 8)).DefaultIfEmpty(0).Max(), 4, MaxNameWidth);
 
         WriteBanner(version);
 
@@ -190,7 +191,7 @@ internal sealed class ConsoleReporter : IRunReporter
     private void WriteStep(StepReport step)
     {
         var icon = step.IsSuccess ? $"[green]{_pass}[/]" : $"[red]{_fail}[/]";
-        var name = Escape(Truncate(step.StepName, _nameWidth).PadRight(_nameWidth));
+        var name = Escape(TruncateName(step).PadRight(_nameWidth));
         var method = Escape((step.Method ?? "").PadRight(6));
         var duration = step.StatusCode is null ? "" : FormatDuration(step.Duration);
         var path = step.Url is null ? "" : step.Url.IsAbsoluteUri ? step.Url.PathAndQuery : step.Url.ToString();
@@ -299,6 +300,15 @@ internal sealed class ConsoleReporter : IRunReporter
         < 1_000_000 => $"{bytes / 1000.0:0.#} kB",
         _ => $"{bytes / 1_000_000.0:0.#} MB"
     };
+
+    /// <summary>The name of an iteration keeps its " [2/10]" when the name is cut.</summary>
+    private string TruncateName(StepReport step)
+    {
+        var suffix = step.Iteration is { } i ? $" [{i}/{step.Iterations}]" : "";
+        if (suffix.Length == 0 || !step.StepName.EndsWith(suffix, StringComparison.Ordinal) || step.StepName.Length <= _nameWidth)
+            return Truncate(step.StepName, _nameWidth);
+        return Truncate(step.StepName[..^suffix.Length], Math.Max(_nameWidth - suffix.Length, 4)) + suffix;
+    }
 
     private string Truncate(string value, int width) =>
         value.Length <= width ? value : value[..(width - 1)] + (_unicode ? "…" : "~");

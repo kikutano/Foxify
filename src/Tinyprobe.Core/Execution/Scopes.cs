@@ -95,3 +95,10 @@ internal sealed class CallScope : IVariableScope
             ? _params.TryGetValue(name, out value)
             : _arguments.TryGetValue(name, out value);
 }
+
+/// <summary>The values of a <c>for_each</c> item, then the globals: the scope of the step's <c>with</c>.</summary>
+internal sealed class ItemScope(IReadOnlyDictionary<string, JsonElement> item, IVariableScope globals) : IVariableScope
+{
+    public bool TryGet(string name, out JsonElement value) =>
+        item.TryGetValue(name, out value) || globals.TryGet(name, out value);
+}

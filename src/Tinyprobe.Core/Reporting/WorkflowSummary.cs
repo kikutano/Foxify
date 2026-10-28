@@ -6,7 +6,7 @@ namespace Tinyprobe.Core.Reporting;
 /// <summary>Aggregated metrics of a workflow run, in the spirit of the k6 end-of-test summary.</summary>
 public sealed class WorkflowSummary
 {
-    /// <summary>Call steps of the workflow (sleeps excluded).</summary>
+    /// <summary>Call steps of the workflow (sleeps excluded); each item of a <c>for_each</c> step that ran counts as a step.</summary>
     public int TotalSteps { get; init; }
     public int PassedSteps { get; init; }
     public int FailedSteps { get; init; }
@@ -45,7 +45,8 @@ public sealed class WorkflowSummary
 
         return new WorkflowSummary
         {
-            TotalSteps = workflow.Steps.OfType<CallStep>().Count(),
+            // A for_each step is one step until it runs, then one per item.
+            TotalSteps = workflow.Steps.OfType<CallStep>().Count() + report.StepReports.Count(s => s.Iteration > 1),
             PassedSteps = report.StepReports.Count(s => s.IsSuccess),
             FailedSteps = report.StepReports.Count(s => !s.IsSuccess),
             ChecksPassed = checksPassed,

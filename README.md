@@ -440,6 +440,7 @@ steps:
 | `expect.cookies` | Checks on cookies, e.g. `{ sid: { exists: true } }`. Each workflow keeps the cookies the server sets and sends them with the next requests. |
 | `expect.duration` | Response time, e.g. `{ lt: 500ms }`. |
 | `save` | Values from the response body for the next steps, or a cookie's value: `csrf: { cookie: XSRF-TOKEN }`. |
+| `for_each` | Repeat the call once per item: a list of `{ arguments }`, a variable (`${users}`) or a CSV or JSON file. Each item can set the expected status: `status: ${status}`. |
 | `until` | Polling: repeat the call until conditions pass, e.g. `until: { body: { $.status: Confirmed }, every: 1s, timeout: 30s }`. |
 | `sleep` | A pause, e.g. `sleep: 2s`. |
 
@@ -447,7 +448,7 @@ steps:
 
 ## Test server example
 
-[docs/example/](docs/example/) tests the test server of this repository, and is what CI runs: one API file and six workflows covering authentication, CRUD, nested JSON, query strings, headers, status codes, slow responses, forms and file uploads, and a cookie session. It needs the .NET SDK to start the server; for a first look, [example/](example/) needs nothing.
+[docs/example/](docs/example/) tests the test server of this repository, and is what CI runs: one API file and seven workflows covering authentication (bearer, API key, Basic, OAuth2), CRUD, nested JSON, query strings, headers, status codes, slow responses, forms and file uploads, a cookie session, and tables of cases with `for_each`. It needs the .NET SDK to start the server; for a first look, [example/](example/) needs nothing.
 
 ```bash
 # terminal 1: start the test server on http://localhost:5122

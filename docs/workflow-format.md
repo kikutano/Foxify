@@ -226,6 +226,7 @@ steps:
 | `expect.cookies` | Checks on cookies (case-sensitive names) in the workflow's cookie jar after the response, see [Cookies](#cookies). |
 | `expect.body` | Checks on the JSON body, keyed by JSONPath. |
 | `expect.duration` | Check on the response time, e.g. `{ lt: 500ms }`. |
+| `for_each` | Repeat the call once per item of a list, see [Repeating a step](#repeating-a-step-for_each). |
 | `until` | Repeat the call until conditions pass (polling), see below. |
 | `save` | `variable: <JSONPath>` pairs stored for the following steps, after every check passed. A path that matches nothing fails the step. `variable: { cookie: name }` saves the value of a cookie instead, see [Cookies](#cookies). |
 | `sleep` | A step of its own: waits, e.g. `sleep: 500ms` or `sleep: 2s`. Durations use `ms`, `s`, `m`, `h` or `d`. |
@@ -278,6 +279,77 @@ For operations that complete asynchronously (a booking confirmed by a background
 - When they hold, `expect` and `save` are applied to that last response.
 - If they still do not hold after `timeout`, the step fails with `Gave up after N attempts in 30s` and the report shows the values of the last attempt.
 - A network error is not a reason to keep waiting: after the `settings.max_retries` retries of that attempt, it fails the step.
+
+## Repeating a step: `for_each`
+
+`for_each` runs the same call once per item: a table of validation cases, every role against an endpoint, every item of a list the API returned.
+
+```yaml
+name: Tables of cases
+import:
+  - ../api/testserver.yaml
+
+steps:
+  - name: Simulated status codes
+    call: status
+    for_each:                              # one call per item; the item's keys are arguments
+      - { code: 200 }
+      - { code: 404 }
+      - { code: 503 }
+    expect:
+      status: ${code}                      # in a for_each step, the status can come from the item
+      body:
+        $.status: ${code}
+
+  - name: Bearer tokens
+    call: bearer_check
+    for_each: { file: ../data/tokens.csv } # token,status: one item per line
+    expect:
+      status: ${status}
+
+  - name: List the first users
+    call: list_users
+    with: { page: 1, pageSize: 3 }
+    save:
+      users: $.data                        # a list of objects
+
+  - name: Every listed user can be read
+    call: get_user
+    for_each: ${users}                     # `id` comes from each object
+    expect:
+      body:
+        $.email: ${email}
+```
+
+```text
+  ✓ Simulated status codes [1/3]   GET    200     4.93ms  /api/status/200
+  ✓ Simulated status codes [2/3]   GET    404     6.61ms  /api/status/404
+  ✓ Simulated status codes [3/3]   GET    503      916µs  /api/status/503
+```
+
+**Items.**
+
+- `for_each` is one of:
+  - a list of mappings;
+  - a variable holding such a list (`${users}`, from a `save`, `variables` or the environment);
+  - a data file, `{ file: path }`.
+- Each item's keys are **arguments of the call**, like `with`, and **variables of the step**, so `expect` and `until` can use them (`$.code: ${error}`).
+- `with` holds what is the same for every item, and may read the item's values (`email: "${name}@example.com"`). A key in both an item and `with` is an error.
+- The keys of a written list or of a data file are checked when the workflow loads, like `with`: a typo is reported with a suggestion, and a required param must be in `with` or in every item.
+- The objects of a variable are known only when the step runs. Their keys that the endpoint does not use are ignored, since an API response has more fields than the call needs. A variable that is not a list of objects fails the step: `for_each: 'users' is a string, not a list of objects`.
+- **Data files** are relative to the workflow and read when it loads:
+  - `.json`: a list of objects, with their types;
+  - `.csv`: the first line names the columns, each other line is an item. Values are text and empty lines are skipped.
+- An empty list runs nothing and passes.
+
+**Running.**
+
+- Items run in order, each one a whole call: `until` and `max_retries` apply to each one, and generated values are new for each one.
+- **Every item runs, also after a failing one**, so a table shows every case that fails. Then the step has failed, and the workflow stops.
+- `expect.status` may be a placeholder only in a `for_each` step (`status: ${status}`). Its value is a code, its text (`"201"`, as in a CSV) or a list of codes.
+- `save` cannot be used with `for_each`, because every item would overwrite the value.
+- The console shows one line per item: the step's name followed by `[2/3]`. A step without a `name` is shown with each item's path and query arguments, as in `get_user id=7 [2/3]`.
+- The summary and the JUnit report count each item as a step.
 
 ## Cookies
 
@@ -455,5 +527,4 @@ The whole workflow, imports included, is checked before the first request. Every
 ## Not supported yet
 
 - Namespaced imports (`call: server.login`) — duplicate names are an error for now.
-- Repeating a step over a list of arguments (`for_each`).
 - Reusable step sequences (e.g. a shared "log in" block).

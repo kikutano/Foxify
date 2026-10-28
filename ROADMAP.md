@@ -114,4 +114,6 @@ Not planned now. We reconsider them after M4.
 
 New ideas, not planned yet.
 
+- `ext` Show the items of a `for_each` step in the run view (the `iterations` of `step_completed`), each with its request and response, and in the Test Explorer.
+
 - `ext` Publish to the VS Code Marketplace from the release workflow, without a token: Trusted Publishing when Microsoft ships it, or Microsoft Entra ID with a GitHub federated credential. Until then each `.vsix` is uploaded by hand.

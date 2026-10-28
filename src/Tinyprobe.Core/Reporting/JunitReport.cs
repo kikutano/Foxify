@@ -50,7 +50,8 @@ public static class JunitReport
 
     private static SuiteXml Suite(JunitRun run)
     {
-        var reports = run.Report.StepReports.ToDictionary(s => s.Index);
+        // A for_each step has one report per item: each one is a test case.
+        var reports = run.Report.StepReports.GroupBy(s => s.Index).ToDictionary(g => g.Key, g => g.ToList());
         var cases = new List<CaseXml>();
         for (int index = 0; index < run.Workflow.Steps.Count; index++)
         {
@@ -58,15 +59,18 @@ public static class JunitReport
                 continue; // sleeps are not tests
 
             int? line = step.Location.Line > 0 ? step.Location.Line : null;
-            if (!reports.TryGetValue(index, out var report))
+            if (!reports.TryGetValue(index, out var stepReports))
             {
                 cases.Add(new CaseXml(step.Name, run.Workflow.Name, run.File, line, TimeSpan.Zero, Outcome.Skipped, NotRun));
                 continue;
             }
 
-            cases.Add(report.IsSuccess
-                ? new CaseXml(report.StepName, run.Workflow.Name, run.File, line, report.Duration, Outcome.Passed)
-                : Failed(report, run, line));
+            foreach (var report in stepReports)
+            {
+                cases.Add(report.IsSuccess
+                    ? new CaseXml(report.StepName, run.Workflow.Name, run.File, line, report.Duration, Outcome.Passed)
+                    : Failed(report, run, line));
+            }
         }
         return new SuiteXml(run.Workflow.Name, run.File, run.Elapsed, run.StartedUtc, cases);
     }

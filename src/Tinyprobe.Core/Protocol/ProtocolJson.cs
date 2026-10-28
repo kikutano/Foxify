@@ -178,6 +178,8 @@ public static class ProtocolJson
             WriteLiteral(w, name, value);
         w.WriteEndObject();
 
+        WriteForEach(w, call.ForEach);
+
         w.WritePropertyName("expect");
         WriteChecks(w, call.Expect);
 
@@ -200,6 +202,37 @@ public static class ProtocolJson
         w.WriteEndObject();
     }
 
+    /// <summary><c>for_each</c>: the items with their literal values (a data file's too, with its path), or the variable.</summary>
+    private static void WriteForEach(Utf8JsonWriter w, ForEach? forEach)
+    {
+        if (forEach is null)
+        {
+            w.WriteNull("for_each");
+            return;
+        }
+
+        w.WriteStartObject("for_each");
+        if (forEach.Items is { } items)
+        {
+            w.WriteStartArray("items");
+            foreach (var item in items)
+            {
+                w.WriteStartObject();
+                foreach (var (name, value) in item)
+                    WriteLiteral(w, name, value);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+        }
+        else
+        {
+            w.WriteNull("items");
+        }
+        WriteNullableString(w, "variable", forEach.Variable);
+        WriteNullableString(w, "file", forEach.File);
+        w.WriteEndObject();
+    }
+
     private static void WriteChecks(Utf8JsonWriter w, Expectation expectation, RetryUntil? until = null)
     {
         w.WriteStartObject();
@@ -207,6 +240,7 @@ public static class ProtocolJson
         foreach (var code in expectation.Status)
             w.WriteNumberValue(code);
         w.WriteEndArray();
+        WriteNullableString(w, "status_placeholder", expectation.StatusPlaceholder?.ToString());
 
         w.WriteStartArray("checks");
         foreach (var check in expectation.Headers)
@@ -270,13 +304,47 @@ public static class ProtocolJson
         w.WriteString("type", progress.IsSleep ? "sleep" : "call");
         w.WriteString("name", progress.Name);
         w.WriteNumber("attempt", progress.Attempt);
+        WriteNullableNumber(w, "iteration", progress.Iteration);
+        WriteNullableNumber(w, "iterations", progress.Iterations);
     });
 
-    public static string StepCompleted(StepReport step) => Write(false, w =>
+    public static string StepCompleted(StepReport step) => StepCompleted([step]);
+
+    /// <summary>
+    /// One <c>step_completed</c> per step. For a <c>for_each</c> step, <paramref name="reports"/> are its iterations:
+    /// the event's own fields are the first failing one's (or the last one's), so a tool that does not read
+    /// <c>iterations</c> still shows the right result.
+    /// </summary>
+    public static string StepCompleted(IReadOnlyList<StepReport> reports) => Write(false, w =>
     {
         w.WriteString("event", "step_completed");
-        WriteStepFields(w, step, exchange: true);
+        WriteStepGroup(w, reports, exchange: _ => true);
     });
+
+    private static void WriteStepGroup(Utf8JsonWriter w, IReadOnlyList<StepReport> reports, Func<StepReport, bool> exchange)
+    {
+        var shown = reports.FirstOrDefault(r => !r.IsSuccess) ?? reports[^1];
+        WriteStepFields(w, shown, exchange(shown));
+        if (reports[0].Iterations is null)
+        {
+            w.WriteNull("iterations");
+            return;
+        }
+
+        w.WriteStartArray("iterations");
+        foreach (var report in reports.Where(r => r.Iteration is not null))
+        {
+            w.WriteStartObject();
+            w.WriteNumber("iteration", report.Iteration!.Value);
+            WriteStepFields(w, report, exchange(report));
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+    }
+
+    /// <summary>The reports of a run, one group per step: the iterations of a <c>for_each</c> step are together.</summary>
+    public static IEnumerable<IReadOnlyList<StepReport>> ByStep(IEnumerable<StepReport> reports) =>
+        reports.GroupBy(r => r.Index).Select(g => (IReadOnlyList<StepReport>)g.ToList());
 
     /// <summary>The keys of a <c>step_completed</c> event; <paramref name="exchange"/> adds the request and the response.</summary>
     private static void WriteStepFields(Utf8JsonWriter w, StepReport step, bool exchange)
@@ -459,10 +527,11 @@ public static class ProtocolJson
             w.WriteBoolean("success", run.Summary.IsSuccess);
             WriteRunSummary(w, run.Summary, run.Elapsed);
             w.WriteStartArray("steps");
-            foreach (var step in run.Report.StepReports)
+            foreach (var group in ByStep(run.Report.StepReports))
             {
                 w.WriteStartObject();
-                WriteStepFields(w, step, exchange: !step.IsSuccess);
+                // Passing steps leave out the request and the response, iterations included.
+                WriteStepGroup(w, group, exchange: r => !r.IsSuccess);
                 w.WriteEndObject();
             }
             w.WriteEndArray();
@@ -573,6 +642,14 @@ public static class ProtocolJson
             w.WriteEndObject();
         }
         w.WriteEndArray();
+    }
+
+    private static void WriteNullableNumber(Utf8JsonWriter w, string name, int? value)
+    {
+        if (value is null)
+            w.WriteNull(name);
+        else
+            w.WriteNumber(name, value.Value);
     }
 
     private static void WriteNullableString(Utf8JsonWriter w, string name, string? value)
