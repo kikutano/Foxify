@@ -86,6 +86,7 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [ ] **M4-8** `ext` Environment editor: see and edit the variables of the selected environment.
 - [ ] **M4-9** `ext` Visual request editor for people who prefer forms to YAML; it writes the YAML.
 - [ ] **M4-10** `cli` `ext` Run to here: `tinyprobe run <workflow> --to <step>` runs the workflow up to that step and stops; in the extension, a ▶ Run to here on every step shows that step's response. Tries a flow one request at a time without state between single calls ([decision 0003](docs/decisions/0003-endpoints-declare-workflows-run.md)). *Spec needed.*
+- [ ] **M4-11** `repo` A performance guard in CI: the Native AOT binary must stay under a size budget, and `--version`, `inspect` and a run of many fast requests under a time budget (measured on 2026-10-28: 9.09 MB, 13 ms to start, 0.6 ms per step against the local test server). A PR that goes over fails, so a slower or heavier tinyprobe is a choice and never an accident.
 
 ## M5 — A client outside the editor
 
@@ -114,6 +115,7 @@ Not planned now. We reconsider them after M4.
 
 New ideas, not planned yet.
 
+- `cli` Faster loading of large workflows: loading and validating cost about 0.2 ms per step (450 ms for 2000 steps, the same in 0.17.0), likely the arguments of every step being recomputed from the endpoint's templates. Profile before changing it.
 - `ext` Show the items of a `for_each` step in the run view (the `iterations` of `step_completed`), each with its request and response, and in the Test Explorer.
 
 - `ext` Publish to the VS Code Marketplace from the release workflow, without a token: Trusted Publishing when Microsoft ships it, or Microsoft Entra ID with a GitHub federated credential. Until then each `.vsix` is uploaded by hand.
