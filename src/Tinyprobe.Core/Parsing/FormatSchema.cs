@@ -96,6 +96,7 @@ public static class FormatSchema
         ["condition.contains"] = "A string contains this text, or a list contains this item.",
         ["condition.in"] = "One of these values (OR).",
         ["condition.any"] = "One of these conditions passes (OR), such as `[{ lt: 0 }, { gt: 100 }]`.",
+        ["condition.schema"] = "The value is valid against a JSON Schema: a file (`../schemas/user.json`, `openapi.yaml#/components/schemas/User`) or a schema written here (`{ type: string }`). `$` is the whole body.",
         ["condition.matches"] = "A regular expression finds a match in the value, such as `'^ORD-[0-9]+$'` (in single quotes; `(?i)` ignores case). Numbers and booleans are matched as their text."
     };
 

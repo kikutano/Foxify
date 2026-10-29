@@ -398,7 +398,15 @@ public sealed class WorkflowEngine
         {
             JsonElement? actual = JsonPath.TrySelect(json.RootElement, check.Subject, out var value) ? value : null;
             foreach (var condition in check.Conditions)
-                yield return CheckEvaluator.EvaluateBody(check.Subject, condition, actual, scope);
+            {
+                if (condition.Operator == Operator.Schema)
+                {
+                    foreach (var result in CheckEvaluator.EvaluateSchema(check.Subject, condition, actual))
+                        yield return result;
+                }
+                else
+                    yield return CheckEvaluator.EvaluateBody(check.Subject, condition, actual, scope);
+            }
         }
     }
 

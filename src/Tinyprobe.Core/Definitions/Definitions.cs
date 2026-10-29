@@ -268,7 +268,9 @@ public enum Operator
     /// <summary>At least one of the <see cref="Condition.Alternatives"/> holds.</summary>
     Any,
     /// <summary>A regular expression finds a match in the value's text.</summary>
-    Matches
+    Matches,
+    /// <summary>The value is valid against a JSON Schema.</summary>
+    Schema
 }
 
 public sealed class Condition
@@ -284,4 +286,22 @@ public sealed class Condition
     public IReadOnlyList<IReadOnlyList<Condition>> Alternatives { get; init; } = [];
     /// <summary>For <see cref="Operator.Matches"/> without placeholders: the pattern, compiled when the file is loaded.</summary>
     public System.Text.RegularExpressions.Regex? Pattern { get; init; }
+    /// <summary>For <see cref="Operator.Schema"/>: the schema, read and checked when the file is loaded.</summary>
+    public SchemaReference? Schema { get; init; }
+}
+
+/// <summary>The JSON Schema of a <c>schema</c> check (docs/specs/0016-json-schema.md).</summary>
+public sealed class SchemaReference
+{
+    /// <summary>As the report shows it: the path and pointer as written, or a schema written in the step as JSON.</summary>
+    public required string Display { get; init; }
+    /// <summary>The full path of the file the schema is in; null for a schema written in the step.</summary>
+    public string? File { get; init; }
+    public required JsonElement Schema { get; init; }
+    /// <summary>The root of every file the schema reaches, by full path, for <c>$ref</c>.</summary>
+    public required IReadOnlyDictionary<string, JsonElement> Documents { get; init; }
+    /// <summary>The <c>pattern</c> and <c>patternProperties</c> of the schema, compiled when it was loaded.</summary>
+    public required IReadOnlyDictionary<string, System.Text.RegularExpressions.Regex> Patterns { get; init; }
+    /// <summary>Where a schema written in the step resolves a <c>$ref</c> to a file: the directory of its workflow.</summary>
+    public required string Directory { get; init; }
 }

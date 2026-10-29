@@ -19,6 +19,7 @@ steps:
     expect:
       status: 200
       body:
+        $: { schema: ../schemas/user-page.json }       # the whole page, against a JSON Schema file
         $.pagination.total: { gte: 3 }
         $.pagination.page: 1
         $.pagination.page_size: 2
@@ -51,7 +52,8 @@ steps:
     expect:
       status: 200
       body:
-        $.id: 1
+        $: { schema: ../openapi/openapi.yaml#/components/schemas/User }   # the schema of the OpenAPI document
+        $.id: { eq: 1, schema: { type: integer } }      # a schema written here: the type of a value
         $.email: { matches: '^[a-z]+@example\.com$' }   # a regular expression, in single quotes
         $.address.city: Cerignola
         $.address.country: Italy

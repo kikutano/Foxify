@@ -1,0 +1,25 @@
+{
+  "$comment": "A page of GET /api/users: the users (as in the OpenAPI document) and the pagination.",
+  "type": "object",
+  "required": ["data", "pagination"],
+  "additionalProperties": false,
+  "properties": {
+    "data": {
+      "type": "array",
+      "items": { "$ref": "../openapi/openapi.yaml#/components/schemas/User" }
+    },
+    "pagination": { "$ref": "#/$defs/pagination" }
+  },
+  "$defs": {
+    "pagination": {
+      "type": "object",
+      "required": ["page", "page_size", "total", "total_pages"],
+      "properties": {
+        "page": { "type": "integer", "minimum": 1 },
+        "page_size": { "type": "integer", "minimum": 1 },
+        "total": { "type": "integer", "minimum": 0 },
+        "total_pages": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

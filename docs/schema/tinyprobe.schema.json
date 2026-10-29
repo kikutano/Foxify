@@ -554,6 +554,9 @@
         "matches": {
           "description": "A regular expression finds a match in the value, such as `'^ORD-[0-9]+$'` (in single quotes; `(?i)` ignores case). Numbers and booleans are matched as their text.",
           "type": "string"
+        },
+        "schema": {
+          "description": "The value is valid against a JSON Schema: a file (`../schemas/user.json`, `openapi.yaml#/components/schemas/User`) or a schema written here (`{ type: string }`). `$` is the whole body."
         }
       },
       "additionalProperties": false
@@ -607,7 +610,8 @@
                 "contains",
                 "in",
                 "any",
-                "matches"
+                "matches",
+                "schema"
               ]
             }
           }
