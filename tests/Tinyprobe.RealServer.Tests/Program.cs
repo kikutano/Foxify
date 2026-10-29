@@ -1044,6 +1044,54 @@ app.MapDelete("/api/session", (HttpRequest request, HttpResponse response) =>
 
 //
 // ============================================================================
+// ASYNC JOBS
+// ============================================================================
+//
+// A report that is ready only after a few reads, for `until` (polling):
+// queued on the first read, running on the next two, done from the fourth.
+
+var jobs = new ConcurrentDictionary<int, ReportJob>();
+var nextJobId = 0;
+
+object JobView(ReportJob job) => job.Reads switch
+{
+    <= 1 => new { id = job.Id, name = job.Name, requested_at = job.RequestedAt, status = "queued", progress = 0, result = (object?)null },
+    <= 3 => new { id = job.Id, name = job.Name, requested_at = job.RequestedAt, status = "running", progress = (job.Reads - 1) * 40, result = (object?)null },
+    _ => new { id = job.Id, name = job.Name, requested_at = job.RequestedAt, status = "done", progress = 100, result = (object?)new { rows = 42 } }
+};
+
+// -----------------------------------------------------------------------------
+// POST /api/jobs
+// Starts a report job: { "name": "...", "requestedAt": "..." } -> 202 with its id.
+// -----------------------------------------------------------------------------
+
+app.MapPost("/api/jobs", (JobRequest request) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Name))
+        return Results.BadRequest(new { error = "name_required" });
+
+    var job = new ReportJob(Interlocked.Increment(ref nextJobId), request.Name, request.RequestedAt);
+    jobs[job.Id] = job;
+    return Results.Json(new { id = job.Id, status = "queued" }, statusCode: StatusCodes.Status202Accepted);
+});
+
+// -----------------------------------------------------------------------------
+// GET /api/jobs/{id}
+// The job, one state further at every read: queued, running, running, done.
+// -----------------------------------------------------------------------------
+
+app.MapGet("/api/jobs/{id:int}", (int id) =>
+{
+    if (!jobs.TryGetValue(id, out var job))
+        return Results.NotFound(new { error = "job_not_found" });
+
+    var read = job with { Reads = job.Reads + 1 };
+    jobs[id] = read;
+    return Results.Ok(JobView(read));
+});
+
+//
+// ============================================================================
 // RUN
 // ============================================================================
 
@@ -1060,6 +1108,10 @@ record LoginRequest(
     string Password);
 
 record NoteRequest(string Text);
+
+record JobRequest(string? Name, string? RequestedAt);
+
+record ReportJob(int Id, string Name, string? RequestedAt, int Reads = 0);
 
 record CookieSession(string Username, string CsrfToken);
 
