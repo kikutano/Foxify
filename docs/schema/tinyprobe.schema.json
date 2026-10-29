@@ -550,6 +550,10 @@
           "items": {
             "$ref": "#/$defs/check"
           }
+        },
+        "matches": {
+          "description": "A regular expression finds a match in the value, such as `'^ORD-[0-9]+$'` (in single quotes; `(?i)` ignores case). Numbers and booleans are matched as their text.",
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -602,7 +606,8 @@
                 "exists",
                 "contains",
                 "in",
-                "any"
+                "any",
+                "matches"
               ]
             }
           }

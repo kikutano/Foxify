@@ -449,7 +449,7 @@ steps:
 | `call` / `with` | The endpoint to call and its arguments. |
 | `use` | Run a shared sequence of steps here (a login), e.g. `use: ../sequences/log-in.yaml` with `with` for its params. |
 | `expect.status` | Expected status code, or a list (`[200, 204]`); without it any 2xx is accepted. |
-| `expect.body` | Checks by JSONPath: a plain value means equal; operators `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `exists`, `contains`. Combine them on one value, e.g. `{ gt: 0, lt: 10 }`: all must pass. For OR use `in: [a, b]` (one of these values) or `any: [ { lt: 0 }, { gt: 100 } ]` (one of these conditions). |
+| `expect.body` | Checks by JSONPath: a plain value means equal; operators `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `exists`, `contains`, `matches` (a regular expression, e.g. `{ matches: '^ORD-[0-9]+$' }`). Combine them on one value, e.g. `{ gt: 0, lt: 10 }`: all must pass. For OR use `in: [a, b]` (one of these values) or `any: [ { lt: 0 }, { gt: 100 } ]` (one of these conditions). |
 | `expect.headers` | Checks on response headers. |
 | `expect.cookies` | Checks on cookies, e.g. `{ sid: { exists: true } }`. Each workflow keeps the cookies the server sets and sends them with the next requests. |
 | `expect.duration` | Response time, e.g. `{ lt: 500ms }`. |
