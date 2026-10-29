@@ -114,7 +114,7 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
   - Example: `{ "items": [ { "code": 200 }, { "code": 404 } ], "variable": null, "file": null }`.
 - `status_placeholder` is the `${…}` of a `for_each` step's `expect.status` (`status` is then empty), otherwise `null`.
 - `checks[].subject` is a JSONPath, `duration`, `header <name>` or `cookie <name>`.
-- `checks[].condition` is the text the report shows, such as `>= 3`, `in ["a","b"]`, `< 0 or > 100`, `matches "^ORD-[0-9]+$"`. Strings in `condition` and `actual` keep characters such as `+`, `<` and `'` as they are (since 0.20.0; before, they were escaped as `\u002B`).
+- `checks[].condition` is the text the report shows, such as `>= 3`, `in ["a","b"]`, `< 0 or > 100`, `matches "^ORD-[0-9]+$"`, `schema ../openapi.yaml#/components/schemas/User`. A failed `schema` check is one assertion per problem: `subject` is the JSONPath of the value, `condition` the rule (`schema type "string"`, `schema required`), `actual` the value (objects and arrays in short: `{…}`, `[3 items]`). Strings in `condition` and `actual` keep characters such as `+`, `<` and `'` as they are (since 0.20.0; before, they were escaped as `\u002B`).
 - `save` maps each variable to where its value is read: a JSONPath (`"$.token"`) or `cookie <name>` (`"cookie XSRF-TOKEN"`).
 
 An invalid file gives exit code `2` and:
@@ -234,7 +234,7 @@ A UI that lets people change the variables of a workflow passes them with `--var
 `tinyprobe schema` prints a [JSON Schema](https://json-schema.org) (draft 2020-12) of API files and workflows: the keys of every section, with a description each, their types, and the check operators. It is built from the keys the loader accepts, and the same text is in the repository as [`docs/schema/tinyprobe.schema.json`](schema/tinyprobe.schema.json) and in every release as an asset.
 
 - One schema for both kinds of file: a workflow has every key of an API file, plus its own.
-- `$defs` has `endpoint`, `step`, `expect`, `until`, `settings`, `condition` (the operators, `matches` included), `duration_condition` and `check` (conditions, or a value to compare).
+- `$defs` has `endpoint`, `step`, `expect`, `until`, `settings`, `condition` (the operators, `matches` and `schema` included), `duration_condition` and `check` (conditions, or a value to compare).
 - The schema helps people type; it is not the validator. Imports, endpoint names, params, placeholders and JSONPath are checked only by `tinyprobe inspect` and `run`.
 
 ## JUnit report

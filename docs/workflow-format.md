@@ -524,6 +524,7 @@ expect:
 | `in` | equal to one of the values of a list: `{ in: [active, pending] }` |
 | `any` | at least one of a list of conditions holds: `{ any: [ { lt: 0 }, { gt: 100 } ] }` |
 | `matches` | a regular expression finds a match in the value: `{ matches: '^ORD-[0-9]+$' }` |
+| `schema` | the value is valid against a JSON Schema: `{ schema: ../schemas/user.json }` (see below) |
 
 Equality is typed: `$.id: 1` matches the number `1`, `$.id: "1"` matches the string `"1"`; numbers compare by value (`9.9` equals `9.90`). Header values are text, so header checks compare text. A mapping is read as operators only when all its keys are operators; mixing operators and fields is an error. Expected values may contain placeholders (`$.id: ${userId}`). Every check of a step is evaluated and reported, not only the first failure.
 
@@ -548,6 +549,46 @@ expect:
 - **Placeholders are replaced first**, as in any value: `'^${prefix}-[0-9]+$'`. The variable's text goes in as it is, not escaped: a `.` in it matches any character.
 - It works on body values, headers and cookies, in `expect` and `until`, with other operators in the same mapping and inside `any`. A pattern without placeholders is checked when the file is loaded: `invalid regular expression '^ORD-[0-9': Unterminated [] set`.
 - **Each check has 1 second.** A pattern that takes longer on a value (such as `(a+)+$` on a long text) fails the step with `the regular expression took more than 1s on this value`, instead of hanging the run.
+
+### JSON Schema: `schema`
+
+```yaml
+expect:
+  body:
+    $: { schema: ../openapi/openapi.yaml#/components/schemas/User }   # the whole body
+    $.address: { schema: ../schemas/address.json }                      # a part of it
+    $.id: { schema: { type: integer, minimum: 1 } }                     # a schema written here
+```
+
+```text
+  ✗ User by id   GET   200   2.69ms  /api/users/1
+      ✗ $.nickname schema required  actual (missing)
+      ✗ $.id schema type "string"  actual 1
+      ✗ $.address.city schema maxLength 5  actual "Cerignola"
+```
+
+- **A file or a mapping.** A path is relative to the file the check is in (a workflow or a sequence), like `import`; the file is JSON (`.json`) or YAML. After `#`, a JSON Pointer picks a schema inside it, so an OpenAPI document works as it is: `openapi.yaml#/components/schemas/User`. A mapping is a schema written in the step, for a type or a short rule.
+- **`$` is the whole body**; any other JSONPath checks that value (`$.data` inside an envelope).
+- **Read when the workflow is loaded.** A missing file, a pointer that leads nowhere, an unknown keyword or type, an invalid `pattern` is an error before any request, with the place in the schema: `../schemas/user.json#/properties/id: unknown keyword 'minimun' in a schema (did you mean 'minimum'?)`.
+- **One failed check per problem**, at the JSONPath of the value that breaks the rule, with the keyword and the value (objects and arrays in short: `{…}`, `[3 items]`). At most 20 problems are listed per check, then `schema: 14 more problems`. A valid value is one passed check.
+- **`$ref`** works inside the same file (`#/components/schemas/Address`, `#/$defs/address`) and to another file, relative to the file that has the `$ref` (`./address.json`, `common.yaml#/Money`). A schema can refer to itself (a tree). A `$ref` to a URL is an error: tinyprobe reads no schema from the network. A schema written in the step has no local `$ref`: put it in a file.
+- It works on body values in `expect` and `until`, with other operators and inside `any`; not on headers or cookies (text: use `matches`).
+
+One validator for JSON Schema drafts 4 to 2020-12 and the schema objects of OpenAPI 3.0 and 3.1:
+
+| Kind | Keywords |
+|---|---|
+| any value | `type` (a name or a list; `integer` is a number without a fraction), `enum`, `const`, `nullable` (OpenAPI 3.0) |
+| combining | `allOf`, `anyOf`, `oneOf`, `not`, `$ref`; `true` and `false` as schemas |
+| objects | `properties`, `required`, `additionalProperties`, `patternProperties`, `minProperties`, `maxProperties` |
+| arrays | `items` (a schema, or a list with `additionalItems`), `prefixItems`, `minItems`, `maxItems`, `uniqueItems`, `contains` |
+| numbers | `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum` (a number, or `true` as in draft 4 and OpenAPI 3.0), `multipleOf` |
+| strings | `minLength`, `maxLength` (in characters), `pattern` (searches, like `matches`), `format` |
+
+- `format` is checked for `date-time`, `date`, `time`, `email`, `uuid`, `uri`, `ipv4` and `ipv6`; other formats are not checked.
+- Annotations are read and ignored: `title`, `description`, `default`, `examples`, `example`, `readOnly`, `writeOnly`, `deprecated`, `$schema`, `$id`, `$comment`, `discriminator`, `xml`, `externalDocs`, `contentMediaType`, `contentEncoding`, `$defs`, `definitions`, and every key that starts with `x-`.
+- Any other keyword is an error, so a typo never makes a schema pass everything. Not supported yet: `if`/`then`/`else`, `dependentRequired`, `dependentSchemas`, `dependencies`, `propertyNames`, `unevaluatedProperties`, `unevaluatedItems`, `minContains`, `maxContains`, `$anchor`, `$dynamicRef`.
+- In YAML, `type: [string, null]` (a real null) means the type `"null"`.
 
 ### Several conditions on one value
 

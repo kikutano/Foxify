@@ -201,6 +201,8 @@ expect:
     $.tags: { contains: urgent }              # array contains this element
     $.customer.email: { contains: "@" }       # string contains this text
     $.number: { matches: '^ORD-[0-9]+$' }     # a regular expression, in single quotes
+    $: { schema: ../../openapi.yaml#/components/schemas/Order }   # the whole body against a JSON Schema
+    $.customer.id: { schema: { type: integer } }   # the type of a value
     $.discount: { any: [ null, { gte: 0 } ] } # at least ONE alternative must pass
     $.deletedAt: { exists: false }            # the path is absent
     $.createdAt: { exists: true }             # present, any value (use for timestamps, generated ids)
@@ -219,6 +221,7 @@ expect:
 | `in` | equals one of the values of a list |
 | `any` | satisfies at least one alternative of a list; an alternative is a value or a mapping of operators |
 | `matches` | is text (or a number or boolean, as its text) in which the regular expression finds a match |
+| `schema` | is valid against a JSON Schema: a file (`path` or `path#/pointer`, relative to the workflow) or a schema written in place; `$` is the whole body |
 
 Rules:
 
@@ -230,6 +233,7 @@ Rules:
 - **A path past the end of an array is missing**: with two items, `$.items[2]: { exists: false }` passes.
 - **`contains` on a string compares text**: `$.message: { contains: 404 }` looks for the text `404`.
 - **`matches` takes a regular expression in single quotes** (`'^\d+$'`: in single-quoted YAML a backslash is a plain character). It searches the value, like JavaScript: anchor with `^` and `$` to match all of it. Flags go at the start: `(?i)` ignores case, `(?m)` makes `^ $` match at each line. It works on body values, headers and cookies, in `expect` and `until`. `null`, objects and arrays never match.
+- **`schema` checks the contract of a value**: types, required fields, no extra fields, formats. Point at the schema where it already is (`../../openapi.yaml#/components/schemas/Order`, a file in `tinyprobe/schemas/`); write one in place only for a type or a one-line rule (`{ type: string }`). It works on body values only, in `expect` and `until`; each broken rule is a failed check at the JSONPath of the value. JSON Schema drafts 4 to 2020-12 and OpenAPI 3.0/3.1 schemas; `if`/`then`/`else`, `propertyNames`, `unevaluated*`, `dependent*` and `$ref` to URLs are errors.
 - **Body checks and `save` need a JSON body.** On a response without one (a `204`, or an error with an empty body) they fail with `The response body is not valid JSON`: check only `status` (and headers) there.
 
 ### JSONPath subset
@@ -482,6 +486,9 @@ Safety: run workflows only against a **local or test** environment, never agains
 | body checks on a `204` or an empty `401` | only `status`: there is no JSON body to check |
 | `matches: "^\d+$"`, `matches: /^\d+$/i` | `matches: '^\d+$'`, `matches: '(?i)^\d+$'`: single quotes, no `/` delimiters, flags inline |
 | `matches: 'ORD-[0-9]+'` to check a whole value | `matches: '^ORD-[0-9]+$'`: without `^ $` the pattern can match anywhere |
+| a response schema copied from the OpenAPI document into the step | `$: { schema: ../../openapi.yaml#/components/schemas/Note }`: one contract, in one place |
+| `schema: ../../openapi.yaml#/paths/~1notes~1{id}/get/...` | `#/components/schemas/Note`; a pointer into `paths` breaks when a path changes |
+| `schema` on a header or a cookie | `matches`: headers and cookies are text |
 | endpoints renamed (`users_login`, `billing_login`) because two services both have `login` | keep the names; import the files with a name: `- billing: ../api/billing.yaml`, then `call: billing.login` |
 | `import: [api/backend.yaml]` from `tinyprobe/workflows/` | `import: [../api/backend.yaml]`: paths are relative to the workflow |
 | one endpoint per Postman request (`login_ok`, `login_wrong_password`) | one endpoint; each variant is a step with its own `with` (section 12) |
@@ -769,6 +776,8 @@ Follow this section when the user gives you exports of another API tool (a Postm
 | `.to.include(x)` on an array or a string | `contains` |
 | `.to.be.oneOf([a, b])` | `in: [a, b]` |
 | `.to.match(/^ORD-\d+$/i)` | `matches: '(?i)^ORD-\d+$'` (no `/` delimiters, flags inline, single quotes) |
+| `.to.be.a("string")`, `.to.be.an("array")`, `.to.be.a("number")` | `{ schema: { type: string } }`, `array`, `number` (`integer` for whole numbers) |
+| `pm.response.to.have.jsonSchema(schema)`, `tv4.validate(json, schema)`, `ajv.validate(schema, json)` | the schema object of the script, as JSON, in `tinyprobe/schemas/<name>.json`, and `$: { schema: ../schemas/<name>.json }`; when it is the schema of an OpenAPI document of the project, a pointer to the document instead |
 | `.to.have.property("id")`, `.to.exist` | `{ exists: true }` |
 | `.to.be.true`, `.to.be.null` | `true`, `null` |
 | `.to.have.lengthOf(2)` on an array | `$.items[1]: { exists: true }` and `$.items[2]: { exists: false }` |
@@ -941,7 +950,7 @@ Either way, write a line in `MIGRATION.md`: the request, what was not translated
 | data files (`newman run -d data.csv`), `pm.iterationData.get("email")`, `{{email}}` from a data file | copy the file to `tinyprobe/data/`; the requests of the run become steps with `for_each: { file: ../data/data.csv }`, and the data variables become arguments (`${email}`). A request that does not use the data stays a plain step. Note in `MIGRATION.md` that each step repeats on its own, while Newman repeated the whole collection for each row |
 | a `formdata` file whose `src` is not in the repository (a path on someone's machine) | ask the user for the file; otherwise create a small file in `tinyprobe/fixtures/` with the same extension (a few lines of text are enough for most servers) and say so in `MIGRATION.md` |
 | the OAuth 2.0 auth helper with another grant type (`authorization_code`, `password`, `implicit`, PKCE) | report it, and ask the user for a token in `env.local.yaml`, used by a bearer set (client credentials are translated: 12.2) |
-| type checks (`.to.be.a("string")`), JSON schema (`jsonSchema`, `tv4`) | keep what has an equivalent (`{ exists: true }`, `matches` for the shape of a string, such as `'^[0-9]+$'` for digits); drop the rest and report it |
+| a JSON Schema with `if`/`then`/`else`, `dependentSchemas`, `propertyNames`, `unevaluatedProperties` or a `$ref` to a URL | keep the schema without those keywords (or with the remote schema saved as a file), and report what is not checked |
 | a regex with a feature .NET reads differently (rare: `\d` also matches non-Latin digits, `/u` and `/y` flags) | use `[0-9]` for digits; drop the `u` and `y` flags |
 | a loop over a response array (`json.forEach`) | check the first items by index; report that the others are not checked |
 | XML or HTML responses | check `status` and headers only; report the body checks |
@@ -989,7 +998,7 @@ An OpenAPI document describes the endpoints but contains no tests. Use it as ste
 | `security` at the top level, or on an operation; `security: []` | the endpoint's `auth`; no `auth` for `[]` |
 | the documented success response (`200`, `201`, `204`) | `expect.status` of the main step |
 | documented error responses (`400`, `401`, `404`, `422`) | a step for each, as in section 8, step 5 |
-| `required` properties of a response schema, an `enum` | `{ exists: true }`, `in: [...]` |
+| a response schema (`responses.200.content.application/json.schema`) | `$: { schema: ../../openapi.yaml#/components/schemas/Note }` in the main step: a pointer to the document, never a copy of the schema. For a schema written inline in `paths` (no `components` entry), check its `required` properties with `{ exists: true }` and its `enum` with `in: [...]` |
 | `example`, `examples`, `default` | the shape of the data, never the expected values: take values from the seed data and check them with `tinyprobe call` |
 | `$ref` | resolve it: `#/components/schemas/Note` in the same document; another file, by reading that file |
 | `deprecated: true` | convert it, and note it in `MIGRATION.md` |
@@ -1132,7 +1141,8 @@ vars:post-response {
 | `res.responseTime: lt 500` | `duration: { lt: 500ms }` |
 | `res.headers.x-id: isDefined` | `headers: { X-Id: { exists: true } }` |
 | `matches "^ORD-"` | `{ matches: '^ORD-' }` |
-| `isString`, `isNumber`, `isJson`, `length` | as type checks (12.3), and `lengthOf` (12.2) |
+| `isString`, `isNumber`, `isBoolean`, `isArray`, `isJson` | `{ schema: { type: string } }`, `number`, `boolean`, `array`, `object` |
+| `length` | as `lengthOf` (12.2) |
 | `tests { test("...", function() { expect(res.getStatus()).to.equal(200); }); }` | as `pm.test` in 12.2; `res.getStatus()`, `res.getBody()`, `res.getHeader()` are the response |
 | `environments/<name>.bru`: `vars { ... }` | `env.<name>.yaml` |
 | `vars:secret [ password, apiKey ]` | only the names are in the file. Ask the user for the values, or read them from the collection's `.env` (`{{process.env.NAME}}`), and put them only in `env.local.yaml` |

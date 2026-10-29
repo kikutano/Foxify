@@ -165,7 +165,8 @@ internal sealed partial class Loader
         ["contains"] = Operator.Contains,
         ["in"] = Operator.In,
         ["any"] = Operator.Any,
-        ["matches"] = Operator.Matches
+        ["matches"] = Operator.Matches,
+        ["schema"] = Operator.Schema
     };
 
     internal static readonly string[] DurationOperators = ["gt", "gte", "lt", "lte"];
@@ -174,6 +175,7 @@ internal sealed partial class Loader
     private static partial Regex HttpMethod();
 
     private readonly List<(SourceLocation Location, string Message)> _problems = new();
+    private readonly SchemaLoader _schemas = new();
     private readonly List<string> _files = new();
 
     private sealed record FileContext(string Display, string Directory);
@@ -1206,14 +1208,14 @@ internal sealed partial class Loader
         if (entries.TryGetValue("headers", out var headersNode))
         {
             foreach (var (name, _, value) in Entries(file, headersNode, $"{what}.headers"))
-                headers.Add(new Check { Subject = name, Conditions = ParseConditions(file, value) });
+                headers.Add(new Check { Subject = name, Conditions = ParseConditions(file, value, bodyValue: false) });
         }
 
         var cookies = new List<Check>();
         if (entries.TryGetValue("cookies", out var cookiesNode))
         {
             foreach (var (name, _, value) in Entries(file, cookiesNode, $"{what}.cookies"))
-                cookies.Add(new Check { Subject = name, Conditions = ParseConditions(file, value) });
+                cookies.Add(new Check { Subject = name, Conditions = ParseConditions(file, value, bodyValue: false) });
         }
 
         var body = new List<Check>();
@@ -1234,7 +1236,8 @@ internal sealed partial class Loader
     /// <summary>
     /// A plain value means equality; a mapping made only of operators (<c>{ gte: 3 }</c>) is a list of conditions.
     /// </summary>
-    private List<Condition> ParseConditions(FileContext file, YamlNode node)
+    /// <param name="bodyValue">false for headers and cookies, whose values are text: no <c>schema</c> there.</param>
+    private List<Condition> ParseConditions(FileContext file, YamlNode node, bool bodyValue = true)
     {
         if (node is YamlMappingNode mapping && mapping.Children.Count > 0)
         {
@@ -1272,7 +1275,7 @@ internal sealed partial class Loader
                         case Operator.Any:
                             // Each alternative is a value (equality) or a mapping of operators (all must hold).
                             if (value is YamlSequenceNode { Children.Count: > 0 } alternatives)
-                                conditions.Add(new Condition { Operator = op, Alternatives = alternatives.Children.Select(a => ParseConditions(file, a)).ToList() });
+                                conditions.Add(new Condition { Operator = op, Alternatives = alternatives.Children.Select(a => ParseConditions(file, a, bodyValue)).ToList() });
                             else
                                 Error(file, value, "any needs a list of conditions, e.g. { any: [ { lt: 0 }, { gt: 100 } ] }");
                             break;
@@ -1293,6 +1296,24 @@ internal sealed partial class Loader
                                 conditions.Add(new Condition { Operator = op, Value = Template(file, value), Pattern = regex });
                             else
                                 Error(file, value, $"invalid regular expression '{pattern}': {reason}");
+                            break;
+
+                        case Operator.Schema:
+                            if (!bodyValue)
+                            {
+                                Error(file, value, "schema works on body values only: headers and cookies are text, use matches");
+                                break;
+                            }
+                            var schema = value switch
+                            {
+                                YamlScalarNode { Value.Length: > 0 } written => _schemas.FromFile(written.Value!, file.Directory, problem => Error(file, value, problem)),
+                                YamlMappingNode => _schemas.Inline(TemplateRenderer.ToLiteral(value), file.Directory, problem => Error(file, value, problem)),
+                                _ => null
+                            };
+                            if (value is not (YamlScalarNode { Value.Length: > 0 } or YamlMappingNode))
+                                Error(file, value, "schema needs a file or a mapping, e.g. { schema: ../schemas/user.json }");
+                            else if (schema is not null)
+                                conditions.Add(new Condition { Operator = op, Schema = schema });
                             break;
 
                         default:

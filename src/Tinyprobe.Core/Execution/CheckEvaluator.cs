@@ -9,6 +9,59 @@ internal static class CheckEvaluator
 {
     private const string Missing = "(missing)";
 
+    /// <summary>The problems of one <c>schema</c> check that the report lists; the others are counted.</summary>
+    internal const int MaxSchemaProblems = 20;
+
+    /// <summary>
+    /// A <c>schema</c> check: one passed check when the value is valid, otherwise one failed check per problem,
+    /// at the JSONPath of the value that breaks the rule.
+    /// </summary>
+    public static IEnumerable<AssertionResult> EvaluateSchema(string path, Condition condition, JsonElement? actual)
+    {
+        var schema = condition.Schema!;
+        if (actual is not { } value)
+        {
+            yield return new AssertionResult { Subject = path, Condition = $"schema {schema.Display}", ActualValue = Missing, Passed = false };
+            yield break;
+        }
+
+        List<SchemaValidator.Problem> problems;
+        try
+        {
+            problems = SchemaValidator.Validate(schema, value, path);
+        }
+        catch (PatternException ex)
+        {
+            throw new InvalidOperationException($"{path} schema {schema.Display}: {ex.Message}");
+        }
+
+        if (problems.Count == 0)
+            yield return new AssertionResult { Subject = path, Condition = $"schema {schema.Display}", ActualValue = Short(value), Passed = true };
+        foreach (var problem in problems.Take(MaxSchemaProblems))
+        {
+            yield return new AssertionResult
+            {
+                Subject = problem.Path,
+                Condition = $"schema {problem.Rule}",
+                ActualValue = problem.Actual is { } a ? Short(a) : Missing,
+                Passed = false
+            };
+        }
+        if (problems.Count > MaxSchemaProblems)
+        {
+            var more = problems.Count - MaxSchemaProblems;
+            yield return new AssertionResult { Subject = path, Condition = $"schema: {more} more {(more == 1 ? "problem" : "problems")}", ActualValue = "", Passed = false };
+        }
+    }
+
+    /// <summary>A value as the report shows it next to a schema rule: objects and arrays in short, a whole body would bury the line.</summary>
+    private static string Short(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Object => "{…}",
+        JsonValueKind.Array => $"[{value.GetArrayLength()} items]",
+        _ => JsonValues.ToDisplay(value)
+    };
+
     /// <summary>
     /// A body condition: typed comparison of JSON values.
     /// <paramref name="actual"/> is null when the JSONPath matched nothing.
@@ -84,6 +137,8 @@ internal static class CheckEvaluator
                 return actual.HasValue == condition.Exists;
             case Operator.Any:
                 return condition.Alternatives.Any(alternative => alternative.All(c => Passes(c, actual, scope, textual)));
+            case Operator.Schema:
+                return actual is { } instance && SchemaValidator.IsValid(condition.Schema!, instance);
         }
 
         var expected = TemplateRenderer.RenderValue(condition.Value!, scope);
@@ -161,6 +216,7 @@ internal static class CheckEvaluator
     internal static string Describe(Condition condition, IVariableScope? scope) => condition.Operator switch
     {
         Operator.Exists => condition.Exists ? "exists" : "does not exist",
+        Operator.Schema => $"schema {condition.Schema!.Display}",
         Operator.Any => string.Join(" or ", condition.Alternatives.Select(alternative => alternative.Count == 1
             ? Describe(alternative[0], scope)
             : $"({string.Join(" and ", alternative.Select(c => Describe(c, scope)))})")),
