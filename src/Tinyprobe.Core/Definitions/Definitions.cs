@@ -266,7 +266,9 @@ public enum Operator
     /// <summary>Equal to one of the values of a list.</summary>
     In,
     /// <summary>At least one of the <see cref="Condition.Alternatives"/> holds.</summary>
-    Any
+    Any,
+    /// <summary>A regular expression finds a match in the value's text.</summary>
+    Matches
 }
 
 public sealed class Condition
@@ -280,4 +282,6 @@ public sealed class Condition
     public TimeSpan? DurationValue { get; init; }
     /// <summary>For <see cref="Operator.Any"/>: each alternative is a list of conditions that must all hold.</summary>
     public IReadOnlyList<IReadOnlyList<Condition>> Alternatives { get; init; } = [];
+    /// <summary>For <see cref="Operator.Matches"/> without placeholders: the pattern, compiled when the file is loaded.</summary>
+    public System.Text.RegularExpressions.Regex? Pattern { get; init; }
 }

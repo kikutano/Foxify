@@ -52,7 +52,7 @@ steps:
       status: 200
       body:
         $.id: 1
-        $.email: gaetano@example.com
+        $.email: { matches: '^[a-z]+@example\.com$' }   # a regular expression, in single quotes
         $.address.city: Cerignola
         $.address.country: Italy
 

@@ -164,7 +164,8 @@ internal sealed partial class Loader
         ["exists"] = Operator.Exists,
         ["contains"] = Operator.Contains,
         ["in"] = Operator.In,
-        ["any"] = Operator.Any
+        ["any"] = Operator.Any,
+        ["matches"] = Operator.Matches
     };
 
     internal static readonly string[] DurationOperators = ["gt", "gte", "lt", "lte"];
@@ -1274,6 +1275,24 @@ internal sealed partial class Loader
                                 conditions.Add(new Condition { Operator = op, Alternatives = alternatives.Children.Select(a => ParseConditions(file, a)).ToList() });
                             else
                                 Error(file, value, "any needs a list of conditions, e.g. { any: [ { lt: 0 }, { gt: 100 } ] }");
+                            break;
+
+                        case Operator.Matches:
+                            if (value is not YamlScalarNode { Value: { } pattern })
+                            {
+                                Error(file, value, "matches needs a regular expression as text, e.g. { matches: '^ORD-[0-9]+$' }");
+                                break;
+                            }
+                            // A pattern with placeholders is known only at run time.
+                            if (pattern.Contains("${", StringComparison.Ordinal))
+                            {
+                                conditions.Add(new Condition { Operator = op, Value = Template(file, value) });
+                                break;
+                            }
+                            if (Patterns.TryCreate(pattern, out var regex, out var reason))
+                                conditions.Add(new Condition { Operator = op, Value = Template(file, value), Pattern = regex });
+                            else
+                                Error(file, value, $"invalid regular expression '{pattern}': {reason}");
                             break;
 
                         default:

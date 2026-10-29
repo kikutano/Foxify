@@ -200,6 +200,7 @@ expect:
     $.total: { gt: 0, lt: 1000 }              # several operators: ALL must pass
     $.tags: { contains: urgent }              # array contains this element
     $.customer.email: { contains: "@" }       # string contains this text
+    $.number: { matches: '^ORD-[0-9]+$' }     # a regular expression, in single quotes
     $.discount: { any: [ null, { gte: 0 } ] } # at least ONE alternative must pass
     $.deletedAt: { exists: false }            # the path is absent
     $.createdAt: { exists: true }             # present, any value (use for timestamps, generated ids)
@@ -217,6 +218,7 @@ expect:
 | `contains` | is an array with an element **exactly equal** to it (objects: same fields, same values), or a string containing it as text |
 | `in` | equals one of the values of a list |
 | `any` | satisfies at least one alternative of a list; an alternative is a value or a mapping of operators |
+| `matches` | is text (or a number or boolean, as its text) in which the regular expression finds a match |
 
 Rules:
 
@@ -227,6 +229,7 @@ Rules:
 - **Arrays compare in order**: `$.tags: [a, b]` does not match `["b", "a"]`. Use `contains` for membership.
 - **A path past the end of an array is missing**: with two items, `$.items[2]: { exists: false }` passes.
 - **`contains` on a string compares text**: `$.message: { contains: 404 }` looks for the text `404`.
+- **`matches` takes a regular expression in single quotes** (`'^\d+$'`: in single-quoted YAML a backslash is a plain character). It searches the value, like JavaScript: anchor with `^` and `$` to match all of it. Flags go at the start: `(?i)` ignores case, `(?m)` makes `^ $` match at each line. It works on body values, headers and cookies, in `expect` and `until`. `null`, objects and arrays never match.
 - **Body checks and `save` need a JSON body.** On a response without one (a `204`, or an error with an empty body) they fail with `The response body is not valid JSON`: check only `status` (and headers) there.
 
 ### JSONPath subset
@@ -446,7 +449,7 @@ Safety: run workflows only against a **local or test** environment, never agains
 - **Independent workflows.** Each workflow logs in itself and creates the data it needs, with a `use` of a shared sequence when several workflows log in the same way. Never rely on another workflow having run first.
 - **Leave the data as you found it.** Create a resource, `save` its id, work on it, delete it. Do not modify or delete seed data that other tests may read.
 - **Tolerate leftovers.** A failing step stops the workflow, so the delete steps after it do not run and a failed run can leave its data behind (there is no teardown step). Identify your data by the id you saved, not by counts: check `$.total: { gte: 1 }` rather than `$.total: 1` after creating something, and never assert the exact size of a list your workflow adds to.
-- **Stable checks.** For values that change on every run (timestamps, generated ids, tokens) check `{ exists: true }`, a type-like condition (`{ gt: 0 }`) or a format (`{ contains: "@" }`), not an exact value.
+- **Stable checks.** For values that change on every run (timestamps, generated ids, tokens) check their format with `matches` (`{ matches: '^ORD-[0-9]+$' }`), or `{ exists: true }`, or a type-like condition (`{ gt: 0 }`), not an exact value.
 - **Check what matters**: the status code and the fields the feature is about. A few precise checks are better than copying the whole response.
 - **Name the steps** so the report reads like a specification: `Wrong password is rejected`, `Deleted order is gone`.
 - **Negative cases pass `with` overrides** instead of duplicating endpoints: the same `login` endpoint with a wrong password; the same `get_order` with `token: invalid-token`.
@@ -477,6 +480,8 @@ Safety: run workflows only against a **local or test** environment, never agains
 | `path: /api/notes/${id}` without `params` | `params: { id: }`: a forgotten `with.id` is then caught before running |
 | `$.total: 1` after creating an item | `$.total: { gte: 1 }`: a previous failed run may have left data |
 | body checks on a `204` or an empty `401` | only `status`: there is no JSON body to check |
+| `matches: "^\d+$"`, `matches: /^\d+$/i` | `matches: '^\d+$'`, `matches: '(?i)^\d+$'`: single quotes, no `/` delimiters, flags inline |
+| `matches: 'ORD-[0-9]+'` to check a whole value | `matches: '^ORD-[0-9]+$'`: without `^ $` the pattern can match anywhere |
 | endpoints renamed (`users_login`, `billing_login`) because two services both have `login` | keep the names; import the files with a name: `- billing: ../api/billing.yaml`, then `call: billing.login` |
 | `import: [api/backend.yaml]` from `tinyprobe/workflows/` | `import: [../api/backend.yaml]`: paths are relative to the workflow |
 | one endpoint per Postman request (`login_ok`, `login_wrong_password`) | one endpoint; each variant is a step with its own `with` (section 12) |
@@ -763,6 +768,7 @@ Follow this section when the user gives you exports of another API tool (a Postm
 | `.to.be.above(n)`, `.below(n)`, `.at.least(n)`, `.at.most(n)` | `gt`, `lt`, `gte`, `lte` |
 | `.to.include(x)` on an array or a string | `contains` |
 | `.to.be.oneOf([a, b])` | `in: [a, b]` |
+| `.to.match(/^ORD-\d+$/i)` | `matches: '(?i)^ORD-\d+$'` (no `/` delimiters, flags inline, single quotes) |
 | `.to.have.property("id")`, `.to.exist` | `{ exists: true }` |
 | `.to.be.true`, `.to.be.null` | `true`, `null` |
 | `.to.have.lengthOf(2)` on an array | `$.items[1]: { exists: true }` and `$.items[2]: { exists: false }` |
@@ -935,7 +941,8 @@ Either way, write a line in `MIGRATION.md`: the request, what was not translated
 | data files (`newman run -d data.csv`), `pm.iterationData.get("email")`, `{{email}}` from a data file | copy the file to `tinyprobe/data/`; the requests of the run become steps with `for_each: { file: ../data/data.csv }`, and the data variables become arguments (`${email}`). A request that does not use the data stays a plain step. Note in `MIGRATION.md` that each step repeats on its own, while Newman repeated the whole collection for each row |
 | a `formdata` file whose `src` is not in the repository (a path on someone's machine) | ask the user for the file; otherwise create a small file in `tinyprobe/fixtures/` with the same extension (a few lines of text are enough for most servers) and say so in `MIGRATION.md` |
 | the OAuth 2.0 auth helper with another grant type (`authorization_code`, `password`, `implicit`, PKCE) | report it, and ask the user for a token in `env.local.yaml`, used by a bearer set (client credentials are translated: 12.2) |
-| regex checks (`.to.match`), type checks (`.to.be.a("string")`), JSON schema (`jsonSchema`, `tv4`) | keep what has an equivalent (`{ exists: true }`, `contains` for a fixed part of the text); drop the rest and report it |
+| type checks (`.to.be.a("string")`), JSON schema (`jsonSchema`, `tv4`) | keep what has an equivalent (`{ exists: true }`, `matches` for the shape of a string, such as `'^[0-9]+$'` for digits); drop the rest and report it |
+| a regex with a feature .NET reads differently (rare: `\d` also matches non-Latin digits, `/u` and `/y` flags) | use `[0-9]` for digits; drop the `u` and `y` flags |
 | a loop over a response array (`json.forEach`) | check the first items by index; report that the others are not checked |
 | XML or HTML responses | check `status` and headers only; report the body checks |
 | JSONPath beyond the subset (`[*]`, filters, `..`) | index-based checks, or report it |
@@ -1124,7 +1131,8 @@ vars:post-response {
 | `isDefined`, `isUndefined`, `isNull` | `{ exists: true }`, `{ exists: false }`, `null` |
 | `res.responseTime: lt 500` | `duration: { lt: 500ms }` |
 | `res.headers.x-id: isDefined` | `headers: { X-Id: { exists: true } }` |
-| `isString`, `isNumber`, `isJson`, `matches`, `length` | as type and regex checks (12.3), and `lengthOf` (12.2) |
+| `matches "^ORD-"` | `{ matches: '^ORD-' }` |
+| `isString`, `isNumber`, `isJson`, `length` | as type checks (12.3), and `lengthOf` (12.2) |
 | `tests { test("...", function() { expect(res.getStatus()).to.equal(200); }); }` | as `pm.test` in 12.2; `res.getStatus()`, `res.getBody()`, `res.getHeader()` are the response |
 | `environments/<name>.bru`: `vars { ... }` | `env.<name>.yaml` |
 | `vars:secret [ password, apiKey ]` | only the names are in the file. Ask the user for the values, or read them from the collection's `.env` (`{{process.env.NAME}}`), and put them only in `env.local.yaml` |

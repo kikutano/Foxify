@@ -510,6 +510,7 @@ expect:
     $.id: { exists: true }
     $.tags: { contains: admin }             # array element or substring
     $.code: { ne: ERR_UNKNOWN }
+    $.number: { matches: '^ORD-[0-9]+$' }   # a regular expression (see below)
 ```
 
 | Operator | Meaning |
@@ -522,8 +523,31 @@ expect:
 | `contains` | the array contains the value, or the string contains the text |
 | `in` | equal to one of the values of a list: `{ in: [active, pending] }` |
 | `any` | at least one of a list of conditions holds: `{ any: [ { lt: 0 }, { gt: 100 } ] }` |
+| `matches` | a regular expression finds a match in the value: `{ matches: '^ORD-[0-9]+$' }` |
 
 Equality is typed: `$.id: 1` matches the number `1`, `$.id: "1"` matches the string `"1"`; numbers compare by value (`9.9` equals `9.90`). Header values are text, so header checks compare text. A mapping is read as operators only when all its keys are operators; mixing operators and fields is an error. Expected values may contain placeholders (`$.id: ${userId}`). Every check of a step is evaluated and reported, not only the first failure.
+
+### Regular expressions: `matches`
+
+```yaml
+expect:
+  headers:
+    Location: { matches: '^/api/orders/[0-9]+$' }
+  cookies:
+    sid: { matches: '^[0-9a-f]{32}$' }
+  body:
+    $.id: { matches: '^ORD-[0-9]{8}-[0-9]{4}$' }
+    $.email: { matches: '(?i)@example\.com$' }      # (?i): ignore case
+    $.createdAt: { matches: '^\d{4}-\d{2}-\d{2}T', exists: true }
+```
+
+- **It searches the value**, like JavaScript's `.match()`: `'@example\.com$'` passes for `ada@example.com`. Anchor with `^` and `$` to match the whole value.
+- **Write the pattern in single quotes.** In single-quoted YAML a backslash is a plain character, so `'\d+'` is the pattern `\d+`. In double quotes YAML reads the backslashes first (`"\\d+"`); unquoted, a `#` after a space or a `: ` ends the value.
+- **The syntax is .NET's**, the same as JavaScript's for usual patterns: classes, `\d \w \s`, anchors, groups, `a|b`, `{2,4}`, lookahead. Flags go inline at the start: `(?i)` ignores case, `(?m)` makes `^ $` match at each line, `(?s)` makes `.` match newlines; JavaScript's `/.../i` is `(?i)...`. `\d` also matches digits of other scripts; `[0-9]` matches only 0 to 9.
+- **The value is matched as text:** a string as it is, a number or a boolean as its JSON text (`42`, `true`). `null`, objects, arrays and a missing value never match.
+- **Placeholders are replaced first**, as in any value: `'^${prefix}-[0-9]+$'`. The variable's text goes in as it is, not escaped: a `.` in it matches any character.
+- It works on body values, headers and cookies, in `expect` and `until`, with other operators in the same mapping and inside `any`. A pattern without placeholders is checked when the file is loaded: `invalid regular expression '^ORD-[0-9': Unterminated [] set`.
+- **Each check has 1 second.** A pattern that takes longer on a value (such as `(a+)+$` on a long text) fails the step with `the regular expression took more than 1s on this value`, instead of hanging the run.
 
 ### Several conditions on one value
 

@@ -19,7 +19,7 @@ internal static class CheckEvaluator
             Subject = path,
             Condition = Describe(condition, scope),
             ActualValue = actual is { } a ? JsonValues.ToDisplay(a) : Missing,
-            Passed = Passes(condition, actual, scope, textual: false)
+            Passed = Evaluate(path, condition, scope, () => Passes(condition, actual, scope, textual: false))
         };
 
     /// <summary>A header condition: header values are text, so values are compared as text.</summary>
@@ -38,8 +38,21 @@ internal static class CheckEvaluator
             Subject = subject,
             Condition = Describe(condition, scope),
             ActualValue = value is { } v ? JsonValues.ToDisplay(v) : Missing,
-            Passed = Passes(condition, value, scope, textual: true)
+            Passed = Evaluate(subject, condition, scope, () => Passes(condition, value, scope, textual: true))
         };
+    }
+
+    /// <summary>A pattern that cannot be used fails the step with a message that names the check.</summary>
+    private static bool Evaluate(string subject, Condition condition, IVariableScope scope, Func<bool> passes)
+    {
+        try
+        {
+            return passes();
+        }
+        catch (PatternException ex)
+        {
+            throw new InvalidOperationException($"{subject} {Describe(condition, scope)}: {ex.Message}");
+        }
     }
 
     public static AssertionResult EvaluateDuration(Condition condition, TimeSpan actual)
@@ -79,6 +92,7 @@ internal static class CheckEvaluator
 
         return condition.Operator switch
         {
+            Operator.Matches => Matches(condition, expected, value),
             Operator.Equal => Same(expected, value, textual),
             Operator.NotEqual => !Same(expected, value, textual),
             Operator.In => expected.ValueKind == JsonValueKind.Array && expected.EnumerateArray().Any(e => Same(e, value, textual)),
@@ -97,6 +111,33 @@ internal static class CheckEvaluator
         JsonValueKind.String => actual.GetString()!.Contains(JsonValues.ToText(expected), StringComparison.Ordinal),
         _ => false
     };
+
+    /// <summary>A string as it is, a number or a boolean as its JSON text; null, objects and arrays never match.</summary>
+    private static bool Matches(Condition condition, JsonElement expected, JsonElement actual)
+    {
+        var text = actual.ValueKind switch
+        {
+            JsonValueKind.String => actual.GetString(),
+            JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => actual.GetRawText(),
+            _ => null
+        };
+        if (text is null)
+            return false;
+
+        var pattern = JsonValues.ToText(expected);
+        var regex = condition.Pattern;
+        if (regex is null && !Patterns.TryCreate(pattern, out regex, out var reason))
+            throw new PatternException($"invalid regular expression '{pattern}': {reason}");
+
+        try
+        {
+            return regex!.IsMatch(text);
+        }
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+        {
+            throw new PatternException($"the regular expression took more than {Durations.Format(Patterns.Timeout)} on this value");
+        }
+    }
 
     private static bool Compare(Operator op, JsonElement actual, JsonElement expected)
     {
@@ -153,6 +194,7 @@ internal static class CheckEvaluator
         Operator.LessOrEqual => "<=",
         Operator.Contains => "contains",
         Operator.In => "in",
+        Operator.Matches => "matches",
         _ => "exists"
     };
 }

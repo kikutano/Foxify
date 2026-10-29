@@ -51,7 +51,7 @@ steps:
       status: 200
       headers:
         X-Custom-Header: hello-world
-        X-Test-Request-Id: { exists: true }
+        X-Test-Request-Id: { matches: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' }   # a UUID
       body:
         $.message: Response contains custom headers.
 

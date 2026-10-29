@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Globalization;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace Tinyprobe.Core.Execution;
@@ -30,8 +31,13 @@ internal static class JsonValues
     };
 
     /// <summary>The value as JSON, for reports: strings quoted.</summary>
-    public static string ToDisplay(JsonElement value) =>
-        value.ValueKind == JsonValueKind.Undefined ? "undefined" : value.GetRawText();
+    public static string ToDisplay(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Undefined => "undefined",
+        // As people write it: `^(a+)+$` and `<b>`, not the \u002B and \u003C of the default JSON escaping.
+        JsonValueKind.String => $"\"{JsonEncodedText.Encode(value.GetString()!, JavaScriptEncoder.UnsafeRelaxedJsonEscaping)}\"",
+        _ => value.GetRawText()
+    };
 
     /// <summary>Typed equality: numbers by value, objects regardless of property order.</summary>
     public static bool AreEqual(JsonElement expected, JsonElement actual)

@@ -19,7 +19,7 @@ steps:
     expect:
       status: 200
       cookies:
-        sid: { exists: true }
+        sid: { matches: '^[0-9a-f]{32}$' }   # the session id: 32 hex digits
         XSRF-TOKEN: { exists: true }
     save:
       csrf: { cookie: XSRF-TOKEN }

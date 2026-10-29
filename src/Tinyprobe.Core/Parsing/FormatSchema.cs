@@ -95,7 +95,8 @@ public static class FormatSchema
         ["condition.exists"] = "`true`: the value is present; `false`: it is not.",
         ["condition.contains"] = "A string contains this text, or a list contains this item.",
         ["condition.in"] = "One of these values (OR).",
-        ["condition.any"] = "One of these conditions passes (OR), such as `[{ lt: 0 }, { gt: 100 }]`."
+        ["condition.any"] = "One of these conditions passes (OR), such as `[{ lt: 0 }, { gt: 100 }]`.",
+        ["condition.matches"] = "A regular expression finds a match in the value, such as `'^ORD-[0-9]+$'` (in single quotes; `(?i)` ignores case). Numbers and booleans are matched as their text."
     };
 
     /// <summary>The schema as indented JSON, the text of <c>tinyprobe schema</c> and of docs/schema/tinyprobe.schema.json.</summary>
@@ -422,6 +423,9 @@ public static class FormatSchema
                 break;
             case "condition.in":
                 w.WriteString("type", "array");
+                break;
+            case "condition.matches":
+                w.WriteString("type", "string");
                 break;
             case "condition.any":
                 w.WriteString("type", "array");
