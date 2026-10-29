@@ -1,9 +1,9 @@
 # 0015 — A `matches` operator
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M4-15
 - **Repositories:** tinyprobe, tinyprobe-vscode (completion only, from the schema)
-- **PRs:** —
+- **PRs:** #33
 
 ## Problem
 
@@ -89,14 +89,14 @@ Nothing to change: completion and hover of keys come from `tinyprobe schema`, so
 
 ## Acceptance criteria
 
-- [ ] `matches` in `expect` and `until`, on body, headers and cookies, alone, combined with other operators and inside `any`.
-- [ ] Search semantics; numbers and booleans as text; `null`, objects, arrays and missing values fail with the actual value shown.
-- [ ] Invalid patterns without placeholders are load errors with location and .NET's reason; a list or mapping as the value is an error; patterns with placeholders are compiled at run time.
-- [ ] A 1 s timeout per evaluation, reported as a failed check.
-- [ ] Unit tests for the loader (valid and every error), the evaluator (each value kind, flags, timeout) and the report text; `docs/example` exercises the three subjects.
-- [ ] Native AOT: the size of the binary measured before and after (runtime-built `Regex` pulls in the parser and the interpreter); the budget of `scripts/perf.sh` still holds.
-- [ ] Docs above, the guide's migration tables updated.
-- [ ] `scripts/dev.sh check` passes.
+- [x] `matches` in `expect` and `until`, on body, headers and cookies, alone, combined with other operators and inside `any`.
+- [x] Search semantics; numbers and booleans as text; `null`, objects, arrays and missing values fail with the actual value shown.
+- [x] Invalid patterns without placeholders are load errors with location and .NET's reason; a list or mapping as the value is an error; patterns with placeholders are compiled at run time.
+- [x] A 1 s timeout per evaluation, reported as a failed check.
+- [x] Unit tests for the loader (valid and every error), the evaluator (each value kind, flags, timeout) and the report text; `docs/example` exercises the three subjects.
+- [x] Native AOT: the size of the binary measured before and after (runtime-built `Regex` pulls in the parser and the interpreter); the budget of `scripts/perf.sh` still holds.
+- [x] Docs above, the guide's migration tables updated.
+- [x] `scripts/dev.sh check` passes.
 
 ## Open questions
 
