@@ -111,6 +111,7 @@ A Postman-like app for people who don't work in VS Code, as light as the binary:
 ## M6 — Tell the world
 
 - [ ] **M6-1** `repo` Rewrite `README.md` around the killer features, after M4 and M5: the migration done by the user's own AI and made reliable by the guide, the validation and the `inspect` / `call` / `run` loop (with the bench numbers); tests without hidden state (API files declare, workflows run); CI first (one binary, Docker image, GitHub Action, JUnit); one engine for the CLI, the extension, MCP and the client; no account and no cloud. Lead with what makes tinyprobe different, then install and quick start; move the reference material to `docs/`.
+- [ ] **M6-2** `repo` List `tinyprobe mcp` where agents and their users look for MCP servers: the official MCP Registry (registry.modelcontextprotocol.io, a `server.json` published with `mcp-publisher`; the Docker image `ghcr.io/kikutano/tinyprobe` can be its OCI package, with `mcp` as the argument and the label the registry checks), then catalogs such as Smithery and the awesome-mcp lists. Publish from the Release workflow if the registry allows it, so each release updates the listing.
 
 ## M7 — Later: more protocols and authentication
 
