@@ -33,7 +33,7 @@ YAML ──► Parsing/WorkflowLoader ──► Definitions (immutable model) �
 - `src/Tinyprobe.Core/Execution/`: `WorkflowEngine` (steps, retries, `until`), `RequestBuilder`, `TemplateRenderer` + `Scopes` (variable lookup order: step args → saved → env → workflow `variables`), `CheckEvaluator`, `JsonPath` (subset), `Generators` (`${$uuid}`...), `Durations`.
 - `src/Tinyprobe.Core/Protocol/ProtocolJson.cs`: hand-written JSON (Utf8JsonWriter) for `inspect --json` and the ndjson events. Contract in `docs/protocol.md`.
 - `src/Tinyprobe.Cli/Program.cs`: argument parsing and commands (`run`, `call`, `inspect`, `update`, `guide`); reporters implement `IRunReporter`.
-- `tests/Tinyprobe.RealServer.Tests`: ASP.NET test server used by `docs/example` and CI; `tests/Tinyprobe.Core.Tests/Fakes/FakeServer.cs` for unit tests.
+- `tests/Tinyprobe.RealServer.Tests`: ASP.NET test server used by `docs/example` and CI, also published as the image `ghcr.io/kikutano/tinyprobe-testserver` (`docker/testserver/`) so users run the examples without the .NET SDK; `tests/Tinyprobe.Core.Tests/Fakes/FakeServer.cs` for unit tests.
 
 ## Rules that are easy to break
 

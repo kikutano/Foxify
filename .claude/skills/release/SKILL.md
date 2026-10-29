@@ -18,6 +18,7 @@ Pushing a tag publishes binaries to every user (`tinyprobe update`, install scri
    `git tag -a vX.Y.Z --cleanup=whitespace -F notes.md && git push origin vX.Y.Z`
    (`-beta.N` suffix → pre-release). The Release workflow builds win-x64, linux-x64, linux-arm64, linux-musl-x64, linux-musl-arm64, osx-arm64, publishes checksums, then:
    - job "Docker image": pushes `ghcr.io/kikutano/tinyprobe:X.Y.Z` (plus `X.Y` and `latest` for a stable release) and pulls it without credentials. If that pull fails, the package is private: ask the user to set it to Public in the package settings on GitHub, then re-run the job;
+   - job "Test server image": pushes `ghcr.io/kikutano/tinyprobe-testserver` with the same tags (the server of `docs/example`) and pulls it without credentials. Same fix when that pull fails: a new package starts private;
    - job "GitHub Action": runs `action.yml` with the new release on Linux, macOS and Windows.
    Check both passed, since users pin `kikutano/tinyprobe@vX.Y.Z` and the image tag.
 

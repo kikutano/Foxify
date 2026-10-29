@@ -236,3 +236,19 @@ endpoints:
   session_logout:
     method: DELETE
     path: /api/session
+
+  # --- Async jobs -------------------------------------------------------------
+
+  # A report that is ready after a few reads: workflows wait for it with `until`.
+  start_report:
+    method: POST
+    path: /api/jobs
+    params:
+      name:
+      requestedAt:
+    body:
+      name: ${name}
+      requestedAt: ${requestedAt}
+
+  get_report:
+    path: /api/jobs/${id}

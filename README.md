@@ -462,11 +462,11 @@ steps:
 
 ## Test server example
 
-[docs/example/](docs/example/) tests the test server of this repository, and is what CI runs: one API file and seven workflows covering authentication (bearer, API key, Basic, OAuth2), CRUD, nested JSON, query strings, headers, status codes, slow responses, forms and file uploads, a cookie session, tables of cases with `for_each`, and a login shared through a sequence (`docs/example/sequences/`). It needs the .NET SDK to start the server; for a first look, [example/](example/) needs nothing.
+[docs/example/](docs/example/) is a complete project that uses every feature of the format against a test server you start with one command, and is what CI runs: two API files and eight workflows covering authentication (bearer, API key, Basic, OAuth2), CRUD, nested JSON, AND/OR checks, query strings, headers, status codes, slow responses, forms and file uploads, a cookie session, tables of cases with `for_each`, polling with `until`, generated values, a login shared through a sequence and a named import. Its [README](docs/example/README.md) walks through them one workflow at a time. For a first look with nothing to start, [example/](example/) calls a public API.
 
 ```bash
-# terminal 1: start the test server on http://localhost:5122
-dotnet run --project tests/Tinyprobe.RealServer.Tests
+# terminal 1: the test server on http://localhost:5122 (only your machine reaches it)
+docker run --rm -p 127.0.0.1:5122:5122 ghcr.io/kikutano/tinyprobe-testserver
 ```
 
 ```bash
@@ -475,7 +475,7 @@ tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml
 tinyprobe run docs/example/workflows -e docs/environment.yaml
 ```
 
-The workflows leave the server's data as they found it, so they can be run again without restarting it.
+Without Docker, start it from the sources with the .NET SDK: `dotnet run --project tests/Tinyprobe.RealServer.Tests`. The workflows can be run again and again without restarting the server.
 
 ## Build from source
 

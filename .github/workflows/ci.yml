@@ -85,7 +85,7 @@ jobs:
           ./publish/tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --reporter ndjson > events.ndjson
           jq -e -s '.[0].event == "run_started" and .[-1].event == "run_finished" and .[-1].success' events.ndjson
           ./publish/tinyprobe run docs/example -e docs/environment.yaml --reporter ndjson > suite.ndjson
-          jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 7 and .[-1].event == "suite_finished" and .[-1].success' suite.ndjson
+          jq -e -s '.[0].event == "suite_started" and (.[0].files | length) == 8 and .[-1].event == "suite_finished" and .[-1].success' suite.ndjson
           ./publish/tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --to 3 --reporter ndjson > to.ndjson
           jq -e -s '.[0].to == 2 and (.[0].steps | length) == 3 and .[-1].success and .[-1].summary.stopped_after == 2' to.ndjson
 
@@ -101,7 +101,7 @@ jobs:
             '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
             '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run","arguments":{"paths":["docs/example/workflows"],"env_file":"docs/environment.yaml"}}}' \
             | ./publish/tinyprobe mcp > mcp.ndjson
-          jq -e -s 'length == 3 and .[0].result.serverInfo.name == "tinyprobe" and (.[1].result.tools | length) == 4 and (.[2].result.isError | not) and (.[2].result.content[0].text | fromjson | .success and (.workflows | length) == 7)' mcp.ndjson
+          jq -e -s 'length == 3 and .[0].result.serverInfo.name == "tinyprobe" and (.[1].result.tools | length) == 4 and (.[2].result.isError | not) and (.[2].result.content[0].text | fromjson | .success and (.workflows | length) == 8)' mcp.ndjson
 
       - name: End-to-end (init)
         run: |
@@ -148,11 +148,12 @@ jobs:
         if: failure()
         run: cat server.log || true
 
-  # The Docker image (docker/Dockerfile) with an Alpine binary built from these sources, as the Release
-  # workflow builds it: the example workflows over the host network, a JUnit report written into the mounted
-  # folder by the caller's user, and an HTTPS request.
+  # The Docker images, as the Release workflow builds them: tinyprobe (docker/Dockerfile) with an Alpine binary
+  # built from these sources, and the test server (docker/testserver), which the examples run against. The
+  # example workflows over the host network, a JUnit report written into the mounted folder by the caller's
+  # user, and an HTTPS request.
   docker:
-    name: Docker image (${{ matrix.platform }})
+    name: Docker images (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -166,20 +167,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Start test server
+      # As docs/example/README.md tells users: published on 127.0.0.1 only.
+      - name: Start the test server image
         run: |
-          dotnet build tests/Tinyprobe.RealServer.Tests -c Release
-          dotnet run --project tests/Tinyprobe.RealServer.Tests -c Release --no-build --urls http://localhost:5122 > server.log 2>&1 &
+          docker build -f docker/testserver/Dockerfile -t tinyprobe-testserver:ci .
+          docker image ls tinyprobe-testserver:ci
+          docker run -d --name testserver -p 127.0.0.1:5122:5122 tinyprobe-testserver:ci
           for i in $(seq 1 60); do
             curl -sf -o /dev/null http://localhost:5122/api/public && exit 0
             sleep 1
           done
-          echo "Test server did not start"; cat server.log; exit 1
+          echo "Test server did not start"; docker logs testserver; exit 1
 
       - name: Publish Native AOT for Alpine
         run: docker/publish-musl.sh ${{ matrix.rid }} docker/${{ matrix.platform }}
@@ -200,4 +198,4 @@ jobs:
 
       - name: Test server log
         if: failure()
-        run: cat server.log || true
+        run: docker logs testserver || true

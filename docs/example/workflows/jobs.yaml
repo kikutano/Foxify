@@ -1,0 +1,50 @@
+name: Async jobs
+description: Start a report, wait until it is done with until, and check it is the one that was asked for.
+
+import:
+  - ../api/testserver.yaml
+
+# Resolved once per run, the first time they are used: every step sees the same name and time.
+# A generated value written in a step instead would be a new one at every use.
+variables:
+  reportName: "report-${$uuid}"
+  requestedAt: ${$now}
+
+steps:
+  - name: Start the report
+    call: start_report
+    with:
+      name: ${reportName}
+      requestedAt: ${requestedAt}
+    expect:
+      status: 202
+      body:
+        $.id: { gt: 0 }
+        $.status: queued
+    save:
+      reportId: $.id
+
+  - name: Wait until the report is done
+    call: get_report
+    with:
+      id: ${reportId}
+    until:                             # the call is repeated until these hold
+      body:
+        $.status: done
+      every: 100ms
+      timeout: 10s
+    expect:                            # checked once, on the last response
+      body:
+        $.name: ${reportName}
+        $.requested_at: ${requestedAt}
+        $.progress: 100
+        $.result.rows: { gte: 1 }
+
+  - name: A report that does not exist
+    call: get_report
+    with:
+      id: ${$randomInt}               # a new random number, far from the ids of this run
+    expect:
+      status: 404
+      body:
+        $.error: job_not_found

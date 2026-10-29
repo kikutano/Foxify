@@ -22,3 +22,5 @@ steps:
         $.catalog.categories[0].products[0].specifications.features[0]: mechanical
         $.catalog.categories[1].name: Software
         $.catalog.categories[1].products[0].specifications.platforms: { contains: windows }
+        $.catalog.categories[1].products[0].price: { gt: 0, lte: 100 }        # AND: every operator must hold
+        $.catalog.metadata.discontinued: { any: [ false, { exists: false } ] }   # OR: one of these conditions

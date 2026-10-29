@@ -1,0 +1,5 @@
+# The build context is the repository root: send only the test server's sources.
+*
+!tests/Tinyprobe.RealServer.Tests/
+tests/Tinyprobe.RealServer.Tests/bin/
+tests/Tinyprobe.RealServer.Tests/obj/
