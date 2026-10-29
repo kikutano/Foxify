@@ -11,11 +11,11 @@ The plan for **both repositories**: this one (the `tinyprobe` CLI, its format an
 
 ## Where we are
 
-Released: **tinyprobe 0.18.0** (cookies, Basic and OAuth2, `for_each`, sequences, named imports, `run --to`) and the extension **0.7.0** (History and Environment views). M1, M2, M3 and M4 are done.
+Released: **tinyprobe 0.18.0** (cookies, Basic and OAuth2, `for_each`, sequences, named imports, `run --to`) and the extension **0.7.0** (History and Environment views). M1, M2 and M3 are done. M4 has its features in; its consolidation tasks (M4-12 to M4-16) come before M5.
 
-- Format: API files with endpoints, params, query, headers, auth sets and bodies. Workflows import them and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
-- CLI: `run` (one workflow, or a folder as a suite, with a JUnit report), `call`, `inspect`, `init`, `mcp` (an MCP server for agents), `schema` (JSON Schema of the format), `update`, `guide`; console and ndjson reporters; a GitHub Action (`kikutano/tinyprobe@vX.Y.Z`); Native AOT binaries for win-x64, linux-x64, linux-arm64 and osx-arm64; install scripts.
-- Extension: validation on save, completion and hover, ▶ Call, ▶ Run workflow, Test Explorer, run view, environment picker, Migrate with AI, Generate Tests with AI, the MCP tools in VS Code's chat. On the VS Code Marketplace, on Open VSX (namespace claim pending) and as a `.vsix` in GitHub Releases.
+- Format: API files with endpoints, params, query, headers, JSON bodies, forms and file uploads, and auth sets (headers, Basic, OAuth2 client credentials). Workflows import them, also under a name (`billing.login`), and run `call` / `with` / `expect` / `save` steps, with `sleep`, `until` (polling), `for_each` (tables of cases from the workflow, a variable or a CSV/JSON file), sequences shared by several workflows (`use`), cookies kept per run, generated values (`${$uuid}`, `${$now+2h}`...) and AND/OR checks. Full validation before running, with `file:line:column` and "did you mean".
+- CLI: `run` (one workflow, or a folder as a suite, with a JUnit report; `--to` stops after a step), `call`, `inspect`, `init`, `mcp` (an MCP server for agents), `schema` (JSON Schema of the format), `update`, `guide`; console and ndjson reporters; a GitHub Action (`kikutano/tinyprobe@vX.Y.Z`); Native AOT binaries for win-x64, linux-x64, linux-arm64, linux-musl-x64, linux-musl-arm64 and osx-arm64; a Docker image (`ghcr.io/kikutano/tinyprobe`); install scripts. A CI guard keeps the binary under 10 MiB and its start and runs under time budgets.
+- Extension: validation on save, completion and hover, ▶ Call, ▶ Run workflow, Run to here, Test Explorer, run view, environment picker, a sidebar with the request History and the Environment editor, Migrate with AI, Generate Tests with AI, the MCP tools in VS Code's chat. On the VS Code Marketplace, on Open VSX (namespace claim pending) and as a `.vsix` in GitHub Releases.
 
 ## How we work
 
@@ -88,6 +88,17 @@ Make tinyprobe a tool that agents use directly, not only a format they write.
 - [x] **M4-10** `cli` `ext` Run to here: `tinyprobe run <workflow> --to <step>` runs the workflow up to that step and stops; in the extension, a ▶ Run to here on every step shows that step's response. Tries a flow one request at a time without state between single calls ([decision 0003](docs/decisions/0003-endpoints-declare-workflows-run.md)). Spec: [0014](docs/specs/0014-run-to-here.md). PR #31, tinyprobe-vscode PR #6 (the extension is released after tinyprobe 0.18.0).
 - [x] **M4-11** `repo` A performance guard in CI: the Native AOT binary must stay under a size budget, and `--version`, `inspect` and a run of many fast requests under a time budget (measured on 2026-10-28: 9.09 MB, 13 ms to start, 0.6 ms per step against the local test server). A PR that goes over fails, so a slower or heavier tinyprobe is a choice and never an accident. `scripts/perf.sh`, in the CI job and as `scripts/dev.sh perf`; budgets 10 MiB, 50 ms, 500 ms for `inspect` of 500 steps, 2 s for a run of them. PR #29.
 
+### Consolidation, before M5
+
+What the features of M4 need to be easy to try and complete to use, and the checks people coming from Postman look for first.
+
+- [ ] **M4-12** `repo` `cli` Examples anyone can run from the sources. Today the complete suite (`docs/example`) needs the .NET SDK to start the test server, and `example/` (JSONPlaceholder) cannot show auth, cookies, forms, `for_each`, sequences or named imports. *Done when:* the test server starts without the .NET SDK (a self-contained binary in the release assets, or a Docker image); `docs/example` has a README that walks through the features one workflow at a time, with the commands to run (`run`, a folder with `--junit`, `--to`, `call`, `init`); and `until`, generated values and workflow `variables` are added there, so one suite covers the whole format.
+- [ ] **M4-13** `ext` Sequence files in the extension: no ▶ Run workflow or Test Explorer entry for them, completion of a `use` step's `with` from the sequence's `params`, and "go to definition" on a `use` path. (Was in the Inbox.)
+- [ ] **M4-14** `ext` The items of a `for_each` step in the run view (the `iterations` of `step_completed`), each with its request and response, and in the Test Explorer. (Was in the Inbox.)
+- [ ] **M4-15** `cli` A `matches` operator: a regular expression on a body value, a header or a cookie, in `expect` and `until`. *Spec needed:* the regex flavour (.NET, with a match timeout), how it is written in YAML without escaping trouble, and its failure message.
+- [ ] **M4-16** `cli` Check a response against a JSON Schema (a file next to the API file, or a schema of the OpenAPI document the endpoints came from). *Spec needed:* which drafts and keywords, a hand-written validator that fits Native AOT and the size budget, errors that name the JSON path.
+- [x] **M4-17** `repo` "Where we are" brought up to date with tinyprobe 0.18.0 and the extension 0.7.0.
+
 ## M5 — The visual side: a client outside the editor
 
 A Postman-like app for people who don't work in VS Code, as light as the binary: no account, no cloud, the files of the repository. Everything visual goes here too: forms instead of YAML, and pictures of the flows, in the client and in the extension.
@@ -101,9 +112,23 @@ A Postman-like app for people who don't work in VS Code, as light as the binary:
 
 - [ ] **M6-1** `repo` Rewrite `README.md` around the killer features, after M4 and M5: the migration done by the user's own AI and made reliable by the guide, the validation and the `inspect` / `call` / `run` loop (with the bench numbers); tests without hidden state (API files declare, workflows run); CI first (one binary, Docker image, GitHub Action, JUnit); one engine for the CLI, the extension, MCP and the client; no account and no cloud. Lead with what makes tinyprobe different, then install and quick start; move the reference material to `docs/`.
 
+## M7 — Later: more protocols and authentication
+
+Low priority: after M5 and M6, in the order users ask for them. Each needs a spec, and each must fit the size and speed budgets of `scripts/perf.sh`, or ship apart from the main binary.
+
+- [ ] **M7-1** `cli` OAuth2 beyond client credentials: authorization code with PKCE (a browser login with a redirect to localhost), refresh tokens, and the password grant for old APIs.
+- [ ] **M7-2** `cli` Other authentication: Digest, AWS Signature v4, and HMAC signatures of the request (what Postman pre-request scripts compute most often).
+- [ ] **M7-3** `cli` Network settings: client certificates (mTLS), an HTTP proxy (and `HTTPS_PROXY`), accepting a self-signed certificate for a local server, HTTP/2.
+- [ ] **M7-4** `cli` Bodies that are not JSON: checks on the raw text of any body, XML with a small XPath subset, HTML.
+- [ ] **M7-5** `cli` GraphQL: a `graphql` body (query and variables) and checks of `data` and `errors`. GraphQL over POST works today as a JSON body.
+- [ ] **M7-6** `cli` gRPC: unary calls described from `.proto` files or server reflection, the response checked as JSON. Needs HTTP/2 and protobuf without reflection: measure the cost in size before deciding whether it lives in the main binary.
+- [ ] **M7-7** `cli` WebSocket and Server-Sent Events: connect, send messages, and expect messages within a timeout.
+- [ ] **M7-8** `cli` A mock server: `tinyprobe mock <api folder>` answers the endpoints of the API files with example responses, for front-end work and for the examples.
+- [?] **M7-9** `cli` Scripts for values that no generated value covers (signatures, computed fields). A script engine conflicts with a light binary and with declarative files ([decision 0003](docs/decisions/0003-endpoints-declare-workflows-run.md)): decide first, and prefer more generated values (`${$hmac(...)}`) if they cover the cases.
+
 ## Parked
 
-Not planned now. We reconsider them after M4.
+Not planned now. We reconsider them after M5.
 
 - Load testing: N concurrent copies of a workflow, with throughput and latency percentiles.
 - A cloud service: shared workspaces, run history, dashboards.
@@ -118,7 +143,4 @@ New ideas, not planned yet.
 
 - `cli` Faster loading of large workflows: loading and validating cost about 0.2 ms per step (450 ms for 2000 steps, the same in 0.17.0), likely the arguments of every step being recomputed from the endpoint's templates. Profile before changing it.
 - `cli` `for_each` over a sequence (`use` with `for_each`): the steps of the sequence once per item, for a create/read/delete per item. Builds on spec 0012.
-- `ext` Sequence files: no ▶ Run workflow or Test Explorer entry for them, completion of a `use` step's `with` from the sequence's `params`, and "go to definition" on a `use` path.
-- `ext` Show the items of a `for_each` step in the run view (the `iterations` of `step_completed`), each with its request and response, and in the Test Explorer.
-
 - `ext` Publish to the VS Code Marketplace from the release workflow, without a token: Trusted Publishing when Microsoft ships it, or Microsoft Entra ID with a GitHub federated credential. Until then each `.vsix` is uploaded by hand.
