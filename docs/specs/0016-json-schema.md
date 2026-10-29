@@ -1,9 +1,9 @@
 # 0016 — Check a response against a JSON Schema
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M4-16
 - **Repositories:** tinyprobe, tinyprobe-vscode (go to definition on the schema's path)
-- **PRs:** —
+- **PRs:** #34, tinyprobe-vscode #10
 
 ## Problem
 
@@ -111,14 +111,14 @@ No new keys. Each problem is an entry of `assertions` (`subject` the JSONPath of
 
 ## Acceptance criteria
 
-- [ ] `schema` with a file, a file and a pointer, and a mapping; on `$` and on a part of the body; in `expect` and `until`; with other operators and inside `any`.
-- [ ] Every keyword of the table, `$ref` within a document and to another file, OpenAPI 3.0 `nullable` and boolean `exclusiveMinimum`/`exclusiveMaximum`, the listed formats.
-- [ ] One failed check per problem at the value's JSONPath, at most 20 and then a count; one passed check when valid.
-- [ ] Every error of the Validation section, with its location, before any request.
-- [ ] Unit tests for the loader (each error), the validator (each keyword, valid and invalid) and the report; `docs/example` runs the three forms against the test server.
-- [ ] Native AOT: a hand-written validator on `JsonElement`, no reflection; the size of the binary measured before and after, within the budget of `scripts/perf.sh`.
-- [ ] Docs above; the extension's go to definition on a `schema` path.
-- [ ] `scripts/dev.sh check` passes, in both repositories.
+- [x] `schema` with a file, a file and a pointer, and a mapping; on `$` and on a part of the body; in `expect` and `until`; with other operators and inside `any`.
+- [x] Every keyword of the table, `$ref` within a document and to another file, OpenAPI 3.0 `nullable` and boolean `exclusiveMinimum`/`exclusiveMaximum`, the listed formats.
+- [x] One failed check per problem at the value's JSONPath, at most 20 and then a count; one passed check when valid.
+- [x] Every error of the Validation section, with its location, before any request.
+- [x] Unit tests for the loader (each error), the validator (each keyword, valid and invalid) and the report; `docs/example` runs the three forms against the test server.
+- [x] Native AOT: a hand-written validator on `JsonElement`, no reflection; the size of the binary measured before and after, within the budget of `scripts/perf.sh`.
+- [x] Docs above; the extension's go to definition on a `schema` path.
+- [x] `scripts/dev.sh check` passes, in both repositories.
 
 ## Open questions
 

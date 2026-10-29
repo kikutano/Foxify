@@ -96,7 +96,7 @@ What the features of M4 need to be easy to try and complete to use, and the chec
 - [x] **M4-13** `ext` Sequence files in the extension: no ▶ Run workflow or Test Explorer entry for them, completion of a `use` step's `with` from the sequence's `params`, and "go to definition" on a `use` path. (Was in the Inbox.) Done: sequences are validated and completed, with no Run lens or test; completion of a `use`'s `with` from the params, hover on a `use`, and go to definition on `call`, `use`, `import` and `file`. tinyprobe-vscode PR #8.
 - [x] **M4-14** `ext` The items of a `for_each` step in the run view (the `iterations` of `step_completed`), each with its request and response, and in the Test Explorer. (Was in the Inbox.) Done: a row per item in the run view, with its own request and response, and the items as children of their step in the Test Explorer. tinyprobe-vscode PR #9.
 - [x] **M4-15** `cli` A `matches` operator: a regular expression on a body value, a header or a cookie, in `expect` and `until`. Spec: [0015](docs/specs/0015-matches.md). PR #33.
-- [~] **M4-16** `cli` Check a response against a JSON Schema (a file next to the API file, or a schema of the OpenAPI document the endpoints came from). Spec: [0016](docs/specs/0016-json-schema.md).
+- [x] **M4-16** `cli` Check a response against a JSON Schema (a file next to the API file, or a schema of the OpenAPI document the endpoints came from). Spec: [0016](docs/specs/0016-json-schema.md). PR #34, tinyprobe-vscode PR #10.
 - [x] **M4-17** `repo` "Where we are" brought up to date with tinyprobe 0.18.0 and the extension 0.7.0.
 
 ## M5 — The visual side: a client outside the editor
