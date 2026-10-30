@@ -43,10 +43,10 @@ Or download the archive for your platform from [Releases](https://github.com/kik
 **Docker**
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/kikutano/tinyprobe:0.19.0 run tinyprobe/workflows -e tinyprobe/env.local.yaml
+docker run --rm -v "$PWD:/work" ghcr.io/kikutano/tinyprobe:0.20.0 run tinyprobe/workflows -e tinyprobe/env.local.yaml
 ```
 
-The image is the release's Alpine binary on Microsoft's .NET `runtime-deps` Alpine base, for `linux/amd64` and `linux/arm64`; tags are the version (`0.19.0`), the minor (`0.19`) and `latest`. The current folder is mounted as `/work`. Inside the container `localhost` is the container itself: on Linux add `--network host` to test an API running on your machine, on macOS and Windows use `host.docker.internal` as the host. Add `--user "$(id -u):$(id -g)"` so that a report written with `--junit` belongs to you.
+The image is the release's Alpine binary on Microsoft's .NET `runtime-deps` Alpine base, for `linux/amd64` and `linux/arm64`; tags are the version (`0.20.0`), the minor (`0.20`) and `latest`. The current folder is mounted as `/work`. Inside the container `localhost` is the container itself: on Linux add `--network host` to test an API running on your machine, on macOS and Windows use `host.docker.internal` as the host. Add `--user "$(id -u):$(id -g)"` so that a report written with `--junit` belongs to you.
 
 Check that it works:
 
@@ -324,7 +324,7 @@ GitHub Actions, with the action of this repository:
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: kikutano/tinyprobe@v0.19.0      # installs tinyprobe 0.19.0
+- uses: kikutano/tinyprobe@v0.20.0      # installs tinyprobe 0.20.0
   with:
     path: tinyprobe/workflows
     env-file: tinyprobe/env.ci.yaml
@@ -339,7 +339,7 @@ GitLab CI, with the Docker image:
 ```yaml
 api-tests:
   image:
-    name: ghcr.io/kikutano/tinyprobe:0.19.0
+    name: ghcr.io/kikutano/tinyprobe:0.20.0
     entrypoint: [""]     # GitLab runs the script in a shell, not through tinyprobe
   script:
     - tinyprobe run tinyprobe/workflows -e tinyprobe/env.ci.yaml --junit reports/tinyprobe.xml
@@ -349,7 +349,7 @@ api-tests:
       junit: reports/tinyprobe.xml
 ```
 
-The same image works on any CI that runs jobs in a container (Bitbucket Pipelines, CircleCI, Woodpecker, Jenkins with Docker). In a job that needs its own image, install the binary instead: `curl -fsSL https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.sh | TINYPROBE_VERSION=0.19.0 sh`, then run `~/.local/bin/tinyprobe`. The script picks the Alpine build on Alpine.
+The same image works on any CI that runs jobs in a container (Bitbucket Pipelines, CircleCI, Woodpecker, Jenkins with Docker). In a job that needs its own image, install the binary instead: `curl -fsSL https://raw.githubusercontent.com/kikutano/tinyprobe/main/install.sh | TINYPROBE_VERSION=0.20.0 sh`, then run `~/.local/bin/tinyprobe`. The script picks the Alpine build on Alpine.
 
 Pin the version (the action's tag, the image tag, or `TINYPROBE_VERSION`), so a new release does not change your pipeline without you choosing it. Keep credentials in the CI's secrets and write `env.ci.yaml` from them, or pass them with `--var`.
 
