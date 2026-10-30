@@ -72,10 +72,13 @@ It downloads the latest release for your platform, verifies its SHA-256 checksum
   </a>
 </p>
 
-- problems underlined as you save, with the suggestions of `tinyprobe`;
+- problems underlined as you save, with the suggestions of `tinyprobe`; completion, hover and go to definition while you type;
 - **▶ Call** above every endpoint: it asks for the arguments and shows the response;
-- **▶ Run workflow**, and workflows in the Test Explorer, one test per step;
-- the request and response of every step, and the environment file picked in the status bar.
+- **▶ Run workflow**, and workflows in the Test Explorer, one test per step and one per `for_each` item;
+- **Run to here** on every step: runs the workflow up to that step and shows its response;
+- the request and response of every step in the run view;
+- a sidebar with the **History** of your calls, to send them again, and an **Environment** editor for the selected env file, secrets hidden;
+- the tinyprobe tools for Copilot and the other chat agents of the editor, and **Generate Tests with AI** / **Migrate with AI**, which hand the right prompt to your agent.
 
 Install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=kikutano.tinyprobe-vscode), or [Open VSX](https://open-vsx.org/extension/kikutano/tinyprobe-vscode) for Cursor, Windsurf and VSCodium, or from a terminal:
 
@@ -145,22 +148,22 @@ tinyprobe run hello.yaml
 ```
 
 ```text
-  ⚡ tinyprobe 0.10.0
+  ⚡ tinyprobe 0.20.0
 
   workflow : Hello tinyprobe
   file     : hello.yaml
   steps    : 2
 
-  ✓ Create a post  POST   201    708.6ms  /posts
-  ✓ get_user id=1  GET    200    33.27ms  /users/1
+  ✓ Create a post  POST   201   587.33ms  /posts
+  ✓ get_user id=1  GET    200    76.89ms  /users/1
 
   checks..............: 100.00%  ✓ 6  ✗ 0
   steps...............: 2/2 passed
-  http_reqs...........: 2  2.3/s
-  http_req_duration...: avg=370.94ms min=33.27ms med=370.94ms max=708.6ms p(90)=641.07ms p(95)=674.84ms
+  http_reqs...........: 2  3/s
+  http_req_duration...: avg=332.11ms min=76.89ms med=332.11ms max=587.33ms p(90)=536.28ms p(95)=561.8ms
   data_received.......: 559 B
   data_sent...........: 28 B
-  workflow_duration...: 869.39ms
+  workflow_duration...: 666.86ms
 
    PASSED   2 steps
 ```
@@ -462,7 +465,7 @@ steps:
 
 ## Test server example
 
-[docs/example/](docs/example/) is a complete project that uses every feature of the format against a test server you start with one command, and is what CI runs: two API files and eight workflows covering authentication (bearer, API key, Basic, OAuth2), CRUD, nested JSON, AND/OR checks, query strings, headers, status codes, slow responses, forms and file uploads, a cookie session, tables of cases with `for_each`, polling with `until`, generated values, a login shared through a sequence and a named import. Its [README](docs/example/README.md) walks through them one workflow at a time. For a first look with nothing to start, [example/](example/) calls a public API.
+[docs/example/](docs/example/) is a complete project that uses every feature of the format against a test server you start with one command, and is what CI runs: two API files and eight workflows covering authentication (bearer, API key, Basic, OAuth2), CRUD, nested JSON, AND/OR checks, query strings, headers, status codes, slow responses, forms and file uploads, regular expressions and JSON Schema checks, a cookie session, tables of cases with `for_each`, polling with `until`, generated values, a login shared through a sequence and a named import. Its [README](docs/example/README.md) walks through them one workflow at a time. For a first look with nothing to start, [example/](example/) calls a public API.
 
 ```bash
 # terminal 1: the test server on http://localhost:5122 (only your machine reaches it)
@@ -492,30 +495,6 @@ dotnet run --project src/Tinyprobe.Cli -- run docs/example/workflows/users.yaml 
 # build the native binary (use your RID: win-x64, linux-x64, linux-arm64, osx-arm64)
 dotnet publish src/Tinyprobe.Cli/Tinyprobe.Cli.csproj -c Release -r linux-x64 -o publish
 ```
-
-## Releasing
-
-Push a SemVer tag. The [Release workflow](.github/workflows/release.yml) runs the tests, builds the native binaries for every platform, publishes a GitHub Release with checksums and generated notes, pushes the Docker image to `ghcr.io/kikutano/tinyprobe`, and runs the GitHub Action of the release on Linux, macOS and Windows.
-
-To put your own notes on top of the generated ones (a breaking change, highlights), write them in an annotated tag. The first line is the title; everything after it goes into the release notes:
-
-```markdown
-tinyprobe 0.10.0
-
-## Breaking change
-
-Describe what users must change.
-```
-
-```bash
-git tag -a v0.10.0 --cleanup=whitespace -F notes.md
-```
-
-```bash
-git push origin v0.10.0
-```
-
-`--cleanup=whitespace` keeps Markdown headings: by default git drops lines that start with `#`. A plain `git tag v0.10.0` works too and publishes only the generated notes. Tags with a suffix, like `v0.11.0-beta.1`, are published as pre-releases.
 
 ## Roadmap
 

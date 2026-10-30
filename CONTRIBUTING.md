@@ -46,6 +46,30 @@ scripts/dev.sh install   # a development binary, linked as ~/.local/bin/tinyprob
 - Commit titles in the imperative ("Add until (polling) and generated values"). The body says what changed and why, with measured numbers when they matter.
 - `scripts/dev.sh check` passes. Mark the roadmap task as done in the same pull request, if there is one.
 
+## Releasing
+
+For maintainers. Push a SemVer tag. The [Release workflow](.github/workflows/release.yml) runs the tests, builds the native binaries for every platform, publishes a GitHub Release with checksums and generated notes, pushes the Docker images to `ghcr.io/kikutano/tinyprobe` and `ghcr.io/kikutano/tinyprobe-testserver`, and runs the GitHub Action of the release on Linux, macOS and Windows.
+
+To put your own notes on top of the generated ones (a breaking change, highlights), write them in an annotated tag. The first line is the title; everything after it goes into the release notes:
+
+```text
+tinyprobe 0.10.0
+
+## Breaking change
+
+Describe what users must change.
+```
+
+```bash
+git tag -a v0.10.0 --cleanup=whitespace -F notes.md
+```
+
+```bash
+git push origin v0.10.0
+```
+
+`--cleanup=whitespace` keeps Markdown headings: by default git drops lines that start with `#`. A plain `git tag v0.10.0` works too and publishes only the generated notes. Tags with a suffix, like `v0.11.0-beta.1`, are published as pre-releases.
+
 ## Coding agents
 
 Using Claude Code or another agent to contribute is welcome. [CLAUDE.md](CLAUDE.md) and the skills in `.claude/skills/` (`/spec`, `/add-feature`, `/release`) describe how work is done here. The same rules apply as for people: a spec before format changes, and `scripts/dev.sh check` before the pull request.

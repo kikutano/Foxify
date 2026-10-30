@@ -65,4 +65,4 @@ Use the `/add-feature` skill. In short, a format feature touches:
 
 - Branch per change: `feature/…`, `fix/…`, `docs/…`, `perf/…`, `ci/…`; merged to `main` through a PR.
 - Commit title in the imperative ("Add until (polling) and generated values"), body explains what and why, with measured numbers when relevant.
-- Releases: annotated SemVer tag, see README "Releasing" and the `/release` skill.
+- Releases: annotated SemVer tag, see CONTRIBUTING "Releasing" and the `/release` skill.
