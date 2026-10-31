@@ -144,6 +144,7 @@ Not planned now. We reconsider them after M5.
 
 New ideas, not planned yet.
 
+- `app` The install command (`tinyprobe-app --install`) should also update the app's own copy of tinyprobe to the latest release, and the page should say why the visual editor is hidden when tinyprobe is older than 0.21.0 (today it just hides the buttons). Found with tinyprobe-app 0.3.0: a copy downloaded with 0.1 or 0.2 stays on 0.20.1 until updated in Settings.
 - `cli` Faster loading of large workflows: loading and validating cost about 0.2 ms per step (450 ms for 2000 steps, the same in 0.17.0), likely the arguments of every step being recomputed from the endpoint's templates. Profile before changing it.
 - `cli` `for_each` over a sequence (`use` with `for_each`): the steps of the sequence once per item, for a create/read/delete per item. Builds on spec 0012.
 - `ext` Publish to the VS Code Marketplace from the release workflow, without a token: Trusted Publishing when Microsoft ships it, or Microsoft Entra ID with a GitHub federated credential. Until then each `.vsix` is uploaded by hand.
