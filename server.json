@@ -3,7 +3,7 @@
   "name": "io.github.kikutano/tinyprobe",
   "title": "tinyprobe",
   "description": "API testing in YAML: inspect, call and run endpoints and workflows, with the guide to write them.",
-  "version": "0.20.0",
+  "version": "0.20.1",
   "websiteUrl": "https://github.com/kikutano/tinyprobe#give-your-agent-the-tinyprobe-tools-mcp",
   "repository": {
     "url": "https://github.com/kikutano/tinyprobe",
@@ -26,7 +26,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/kikutano/tinyprobe:0.20.0",
+      "identifier": "ghcr.io/kikutano/tinyprobe:0.20.1",
       "runtimeHint": "docker",
       "transport": {
         "type": "stdio"
