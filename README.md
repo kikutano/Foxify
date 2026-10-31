@@ -64,11 +64,11 @@ It downloads the latest release for your platform, verifies its SHA-256 checksum
 
 ## The app
 
-[**tinyprobe-app**](https://github.com/kikutano/tinyprobe-app) is tinyprobe for people who use neither the terminal nor VS Code: one small download for Windows, macOS and Linux that opens in the browser. Open the folder of your tests, send any request from a form, run workflows and see every request and response, or add a request without writing YAML.
+[**tinyprobe-app**](https://github.com/kikutano/tinyprobe-app) is tinyprobe for people who use neither the terminal nor VS Code: one small download for Windows, macOS and Linux that opens in the browser. Open the folder of your tests, send any request from a form, run workflows and watch them as a diagram that shows how values pass from step to step, and change endpoints and workflows with forms instead of YAML.
 
 <p align="center">
   <a href="https://github.com/kikutano/tinyprobe-app">
-    <img src="https://raw.githubusercontent.com/kikutano/tinyprobe-app/main/media/screen.png" alt="tinyprobe-app: the endpoints and workflows of a folder, a workflow run up to a step with its checks and response" width="800">
+    <img src="https://raw.githubusercontent.com/kikutano/tinyprobe-app/main/media/screen.png" alt="tinyprobe-app: a workflow as a diagram after a run, with the token and the user id drawn as lines from the step that saves them to the steps that use them" width="800">
   </a>
 </p>
 
