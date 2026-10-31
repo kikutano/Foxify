@@ -205,6 +205,59 @@ One JSON object per line on standard output, written and flushed as soon as it h
 
 A UI that lets people change the variables of a workflow passes them with `--var` and never rewrites the YAML files.
 
+## The file as written
+
+`tinyprobe inspect <file> --json --source` adds two keys to the document, for editors that change a file with forms (since 0.21.0): `source`, the file as written, and `blocks`, where its parts are. For this file:
+
+```yaml
+base_url: ${baseUrl}
+auth:
+  bearer:
+    Authorization: "Bearer ${token}"
+
+endpoints:
+  login:
+    method: POST
+    path: /login
+    body: { email: "${email}", password: "${password}" }
+  get_user:
+    path: /users/${id}
+    auth: bearer
+    headers:
+      X-Client: app
+```
+
+```json
+"source": {
+  "base_url": "${baseUrl}",
+  "auth": {
+    "bearer": { "Authorization": "Bearer ${token}" }
+  },
+  "endpoints": {
+    "login": { "method": "POST", "path": "/login", "body": { "email": "${email}", "password": "${password}" } },
+    "get_user": { "path": "/users/${id}", "auth": "bearer", "headers": { "X-Client": "app" } }
+  }
+},
+"blocks": [
+  { "kind": "key", "name": "base_url", "start": { "line": 1, "column": 1 }, "end": { "line": 1, "column": 21 } },
+  { "kind": "key", "name": "auth", "start": { "line": 2, "column": 1 }, "end": { "line": 4, "column": 37 } },
+  { "kind": "auth", "name": "bearer", "start": { "line": 3, "column": 3 }, "end": { "line": 4, "column": 37 } },
+  { "kind": "key", "name": "endpoints", "start": { "line": 6, "column": 1 }, "end": { "line": 15, "column": 20 } },
+  { "kind": "endpoint", "name": "login", "start": { "line": 7, "column": 3 }, "end": { "line": 10, "column": 57 } },
+  { "kind": "endpoint", "name": "get_user", "start": { "line": 11, "column": 3 }, "end": { "line": 15, "column": 20 } }
+]
+```
+
+- **`source`** is the inspected file as written, as JSON: mappings become objects with their keys in order, lists become arrays, and scalars are typed as YAML reads them (`42` a number, `true` a boolean, `~` and an empty value `null`, `"42"` a string). Placeholders are not resolved. Comments are not in it, nor the imported files: inspect them for theirs.
+- **`blocks`** are where things are written, in the order of the file:
+  - `key`: every top-level key (`name`, `base_url`, `headers`, `auth`, `endpoints`, `import`, `variables`, `steps`, `sequence`, `params`...), with its `name`;
+  - `auth`: each auth set, with its `name`;
+  - `endpoint`: each endpoint written in the file, with its `name`;
+  - `step`: each item of `steps` (or of `sequence` in a sequence file), `use` and `sleep` steps included, with its `index` in that list from 0. It is the index in `source.steps`, not the `index` of `steps`, which counts the steps of sequences where their `use` is.
+- **`start`** is where a block begins: the key of an entry (`login:`), or the `-` of a list item. **`end`** is just after the last character of its value: the comments and blank lines that follow belong to what comes next. Both are 1-based `{ line, column }` in the inspected file. An editor replaces a block by replacing the text from `start` to `end`.
+- An invalid file also has `source` and `blocks` when its YAML can be read, so an editor can help fix it; a file whose YAML cannot be read has neither.
+- Without `--source` the document has neither key. The MCP tool `inspect` does not add them.
+
 ## `call`
 
 `tinyprobe call <file.yaml> <endpoint> [--with name=value]...` runs a workflow of one step that calls the endpoint and accepts **any** status. `<file.yaml>` is an API file or a workflow; with a workflow, its variables and settings apply. `--with` values are typed like `--var`, and they can use variables: `--with 'id=${userId}'`. They are validated like a step's `with`: an unknown endpoint, a missing required param or an unknown argument is an `invalid` event with the file `command line`.

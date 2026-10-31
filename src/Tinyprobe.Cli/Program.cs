@@ -20,7 +20,7 @@ const string Usage = """
     Usage:
       tinyprobe run <workflow.yaml | folder>... [options]
       tinyprobe call <file.yaml> <endpoint> [--with name=value]... [options]
-      tinyprobe inspect <file.yaml> [--json]
+      tinyprobe inspect <file.yaml> [--json [--source]]
       tinyprobe init [folder] [--base-url <url>]
       tinyprobe update [--check] [--force]
       tinyprobe guide       Print the guide for coding agents (LLMs) that write tinyprobe files.
@@ -53,6 +53,7 @@ const string Usage = """
 
     Options for 'inspect':
       --json                  Print JSON, for tools.
+      --source                With --json, also the file as written and where its blocks are, for editors.
       --no-color              Disable colors.
 
     Options for 'init':
@@ -171,7 +172,7 @@ string? envFilePath = null;
 string? junitPath = null;
 string? stopAfter = null;
 string reporterName = "console";
-bool verbose = false, noColor = false, json = false;
+bool verbose = false, noColor = false, json = false, source = false;
 var variables = new List<KeyValuePair<string, string>>();
 var arguments = new List<KeyValuePair<string, string>>();
 
@@ -185,6 +186,9 @@ for (int i = 1; i < args.Length; i++)
             return ExitSuccess;
         case "--json" when command == "inspect":
             json = true;
+            break;
+        case "--source" when command == "inspect":
+            source = true;
             break;
         case "--no-color":
             noColor = true;
@@ -269,7 +273,11 @@ if (envFilePath is not null && !File.Exists(envFilePath))
     return UsageError($"Environment file not found: {envFilePath}");
 
 if (command == "inspect")
-    return InspectCommand.Run(CreateConsole(noColor), GetVersion(), filePath, json);
+{
+    if (source && !json)
+        return UsageError("Option '--source' works with '--json'.");
+    return InspectCommand.Run(CreateConsole(noColor), GetVersion(), filePath, json, source);
+}
 
 var console = CreateConsole(noColor);
 IRunReporter reporter = reporterName == "ndjson"

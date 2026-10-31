@@ -9,7 +9,7 @@ namespace Tinyprobe.Cli;
 /// <summary><c>tinyprobe inspect</c>: validates a workflow or API file and lists what it defines.</summary>
 internal static class InspectCommand
 {
-    public static int Run(IAnsiConsole console, string version, string path, bool json)
+    public static int Run(IAnsiConsole console, string version, string path, bool json, bool source = false)
     {
         WorkflowDefinition workflow;
         try
@@ -19,14 +19,14 @@ internal static class InspectCommand
         catch (WorkflowLoadException ex)
         {
             if (json)
-                Console.WriteLine(ProtocolJson.Invalid(version, path, ex.Problems, endpoints: ex.Endpoints));
+                Console.WriteLine(ProtocolJson.Invalid(version, path, ex.Problems, endpoints: ex.Endpoints, sourceFile: source ? path : null));
             else
                 ConsoleReporter.WriteLoadErrors(console, ex.Errors, "file");
             return 2;
         }
 
         if (json)
-            Console.WriteLine(ProtocolJson.Inspection(version, workflow));
+            Console.WriteLine(ProtocolJson.Inspection(version, workflow, sourceFile: source ? path : null));
         else
             Write(console, path, workflow);
         return 0;

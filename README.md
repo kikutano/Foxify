@@ -271,7 +271,7 @@ backend does not do what the document says.
 ```text
   tinyprobe run <workflow.yaml | folder>... [options]
   tinyprobe call <file.yaml> <endpoint> [--with name=value]... [options]
-  tinyprobe inspect <file.yaml> [--json]
+  tinyprobe inspect <file.yaml> [--json [--source]]
   tinyprobe init [folder] [--base-url <url>]
   tinyprobe update [--check] [--force]
   tinyprobe guide       Print the guide for coding agents (LLMs) that write tinyprobe files.
@@ -304,6 +304,7 @@ Values of --var and --with are typed like YAML: 42 is a number, true a boolean,
 
 Options for 'inspect':
   --json                  Print JSON, for tools.
+  --source                With --json, also the file as written and where its blocks are, for editors.
   --no-color              Disable colors.
 
 Options for 'init':

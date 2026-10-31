@@ -25,7 +25,8 @@ public static class ProtocolJson
     /// A valid workflow, API file or sequence: its endpoints, and for a workflow its variables, settings and steps
     /// (with the steps of its sequences in place of their <c>use</c>); for a sequence its params and steps.
     /// </summary>
-    public static string Inspection(string version, WorkflowDefinition workflow, bool indented = true) => Write(indented, w =>
+    /// <param name="sourceFile">With <c>--source</c>: the file whose text is added as <c>source</c> and <c>blocks</c>.</param>
+    public static string Inspection(string version, WorkflowDefinition workflow, bool indented = true, string? sourceFile = null) => Write(indented, w =>
     {
         WriteHeader(w, version);
         w.WriteBoolean("valid", true);
@@ -72,13 +73,16 @@ public static class ProtocolJson
 
         if (workflow.Params is { } parameters)
             WriteParams(w, parameters);
+
+        if (sourceFile is not null)
+            SourceJson.Write(w, sourceFile);
     });
 
     /// <summary>The problems of an invalid file; as a run event, <paramref name="eventName"/> is <c>invalid</c>.</summary>
     /// <param name="endpoints">The endpoints found in an invalid workflow whose imports loaded, for editors.</param>
     public static string Invalid(string version, string file, IReadOnlyList<LoadProblem> problems,
         string? eventName = null, bool indented = true,
-        IReadOnlyDictionary<string, EndpointDefinition>? endpoints = null) => Write(indented, w =>
+        IReadOnlyDictionary<string, EndpointDefinition>? endpoints = null, string? sourceFile = null) => Write(indented, w =>
     {
         if (eventName is not null)
             w.WriteString("event", eventName);
@@ -105,6 +109,10 @@ public static class ProtocolJson
                 WriteEndpoint(w, endpoint);
             w.WriteEndArray();
         }
+
+        // An editor can show the forms of a file that is not valid yet, to fix it.
+        if (sourceFile is not null && File.Exists(sourceFile))
+            SourceJson.Write(w, sourceFile);
     });
 
     private static void WriteEndpoint(Utf8JsonWriter w, EndpointDefinition endpoint)
