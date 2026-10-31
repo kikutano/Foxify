@@ -12,7 +12,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](License.md)
 [![VS Code extension](https://img.shields.io/github/v/release/kikutano/tinyprobe-vscode?label=VS%20Code%20extension&color=orange)](https://github.com/kikutano/tinyprobe-vscode)
 
-**[Install](#install)** · **[VS Code extension](#vs-code-extension)** · **[Try the example](#try-the-example)** · [Workflow format](docs/workflow-format.md) · [Guide for coding agents](docs/llm-guide.md) · [Roadmap](ROADMAP.md)
+**[Install](#install)** · **[The app](#the-app)** · **[VS Code extension](#vs-code-extension)** · **[Try the example](#try-the-example)** · [Workflow format](docs/workflow-format.md) · [Guide for coding agents](docs/llm-guide.md) · [Roadmap](ROADMAP.md)
 
 **Tired of paying for Postman?** Try tinyprobe: fast, light, and your favorite AI writes the endpoints and the end-to-end tests of your API, then runs them against your environment. Describe test flows in YAML files and make sure your API never breaks again.
 
@@ -61,6 +61,18 @@ tinyprobe update
 ```
 
 It downloads the latest release for your platform, verifies its SHA-256 checksum and replaces the binary in place. `tinyprobe update --check` only tells you whether a newer version exists. Re-running the install script works too, and `TINYPROBE_VERSION=0.10.0` pins a specific version.
+
+## The app
+
+[**tinyprobe-app**](https://github.com/kikutano/tinyprobe-app) is tinyprobe for people who use neither the terminal nor VS Code: one small download for Windows, macOS and Linux that opens in the browser. Open the folder of your tests, send any request from a form, run workflows and see every request and response, or add a request without writing YAML.
+
+<p align="center">
+  <a href="https://github.com/kikutano/tinyprobe-app">
+    <img src="https://raw.githubusercontent.com/kikutano/tinyprobe-app/main/media/screen.png" alt="tinyprobe-app: the endpoints and workflows of a folder, a workflow run up to a step with its checks and response" width="800">
+  </a>
+</p>
+
+It works on the same YAML files and runs the same `tinyprobe`, so what you do in the app runs unchanged in a terminal and in CI. Download it from its [releases](https://github.com/kikutano/tinyprobe-app/releases/latest).
 
 ## VS Code extension
 
