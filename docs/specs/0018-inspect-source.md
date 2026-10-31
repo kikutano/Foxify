@@ -1,9 +1,9 @@
 # 0018 — The file as written, for editors
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M5-4
 - **Repositories:** tinyprobe (tinyprobe-app uses it; the extension may later)
-- **PRs:** —
+- **PRs:** #35
 
 ## Problem
 
