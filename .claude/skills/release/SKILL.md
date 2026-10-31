@@ -20,6 +20,7 @@ Pushing a tag publishes binaries to every user (`tinyprobe update`, install scri
    - job "Docker image": pushes `ghcr.io/kikutano/tinyprobe:X.Y.Z` (plus `X.Y` and `latest` for a stable release) and pulls it without credentials. If that pull fails, the package is private: ask the user to set it to Public in the package settings on GitHub, then re-run the job;
    - job "Test server image": pushes `ghcr.io/kikutano/tinyprobe-testserver` with the same tags (the server of `docs/example`) and pulls it without credentials. Same fix when that pull fails: a new package starts private;
    - job "GitHub Action": runs `action.yml` with the new release on Linux, macOS and Windows.
+   - job "MCP Registry" (stable releases only): publishes `server.json` with the release's version and image to registry.modelcontextprotocol.io, logged in with GitHub OIDC. Check the listing: `curl -s 'https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.kikutano/tinyprobe'`.
    Check both passed, since users pin `kikutano/tinyprobe@vX.Y.Z` and the image tag.
 
 ## Extension (`../tinyprobe-vscode`)

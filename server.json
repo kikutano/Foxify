@@ -1,0 +1,64 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.kikutano/tinyprobe",
+  "title": "tinyprobe",
+  "description": "API testing in YAML: inspect, call and run endpoints and workflows, with the guide to write them.",
+  "version": "0.20.0",
+  "websiteUrl": "https://github.com/kikutano/tinyprobe#give-your-agent-the-tinyprobe-tools-mcp",
+  "repository": {
+    "url": "https://github.com/kikutano/tinyprobe",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/kikutano/tinyprobe/main/media/logo-light.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": ["any"],
+      "theme": "light"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/kikutano/tinyprobe/main/media/logo-dark.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": ["any"],
+      "theme": "dark"
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/kikutano/tinyprobe:0.20.0",
+      "runtimeHint": "docker",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--mount",
+          "description": "The project folder with the tinyprobe files, mounted as the working directory /work",
+          "value": "type=bind,src={project_dir},dst=/work",
+          "isRequired": true,
+          "variables": {
+            "project_dir": {
+              "description": "Absolute path of the project folder on this machine",
+              "format": "filepath",
+              "isRequired": true
+            }
+          }
+        },
+        {
+          "type": "named",
+          "name": "--network",
+          "description": "host lets the tools reach an API running on this machine at localhost (Linux; on macOS and Windows use host.docker.internal as the host instead)",
+          "default": "host"
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ]
+    }
+  ]
+}

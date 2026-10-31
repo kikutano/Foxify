@@ -199,6 +199,8 @@ jobs:
           image="ghcr.io/${{ github.repository }}:${GITHUB_REF_NAME#v}"
           docker run --rm "$image" --version | grep -qx "${GITHUB_REF_NAME#v}"
           docker run --rm -v "$PWD:/work" "$image" run docker/test/https.yaml
+          label=$(docker inspect --format '{{ index .Config.Labels "io.modelcontextprotocol.server.name" }}' "$image")
+          test "$label" = "$(jq -r .name server.json)"
 
   # ghcr.io/kikutano/tinyprobe-testserver:X.Y.Z, X.Y and latest: the server of docs/example, so the examples of
   # this release run without the .NET SDK. Same tags as the tinyprobe image.
@@ -251,6 +253,50 @@ jobs:
             sleep 1
           done
           echo "Test server did not start"; docker logs testserver; exit 1
+
+  # The listing of `tinyprobe mcp` in the official MCP Registry, as io.github.kikutano/tinyprobe, with the image of this
+  # release as its package. GitHub OIDC proves the namespace: no token to keep. Stable releases only.
+  mcp-registry:
+    name: MCP Registry
+    needs: docker
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MCP_PUBLISHER_VERSION: v1.8.7
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      # Pinned and verified against its Sigstore bundle, as the registry's guide asks.
+      - name: Download and verify mcp-publisher
+        run: |
+          set -euo pipefail
+          archive="mcp-publisher_linux_amd64.tar.gz"
+          base="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          curl -fsSL -o "$archive" "$base/$archive"
+          curl -fsSL -o "$archive.sigstore.json" "$base/$archive.sigstore.json"
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+
+      - name: Version of this release in server.json
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          jq --arg v "$version" '.version = $v | .packages[0].identifier = "ghcr.io/kikutano/tinyprobe:" + $v' server.json > server.tmp
+          mv server.tmp server.json
+          cat server.json
+
+      - name: Publish
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
 
   # Users pin `kikutano/tinyprobe@vX.Y.Z`: the action of this release, with its binary, on every OS.
   action:

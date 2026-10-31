@@ -17,3 +17,8 @@ COPY --chmod=755 ${TARGETPLATFORM}/tinyprobe /usr/local/bin/tinyprobe
 # JUnit report is written into it. Locally, `--user "$(id -u):$(id -g)"` makes the report yours.
 WORKDIR /work
 ENTRYPOINT ["tinyprobe"]
+
+# The MCP Registry checks this label to know that the image belongs to the server named in server.json
+# (`tinyprobe mcp`, listed as io.github.kikutano/tinyprobe).
+LABEL io.modelcontextprotocol.server.name="io.github.kikutano/tinyprobe"
+

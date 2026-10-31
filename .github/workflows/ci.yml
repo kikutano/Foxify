@@ -196,6 +196,17 @@ jobs:
           grep -q 'failures="0" errors="0"' reports/docker.xml
           docker run --rm -v "$PWD:/work" tinyprobe:ci run docker/test/https.yaml
 
+      # The image as the MCP Registry lists it (server.json): its label, and `mcp` started the way clients start it.
+      - name: MCP server in the image
+        run: |
+          test "$(docker inspect --format '{{ index .Config.Labels "io.modelcontextprotocol.server.name" }}' tinyprobe:ci)" = "$(jq -r .name server.json)"
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | docker run -i --rm --mount "type=bind,src=$PWD,dst=/work" --network host tinyprobe:ci mcp > mcp.out
+          for tool in guide inspect call run; do grep -q "\"name\":\"$tool\"" mcp.out; done
+
       - name: Test server log
         if: failure()
         run: docker logs testserver || true
