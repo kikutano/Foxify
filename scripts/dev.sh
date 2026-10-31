@@ -106,6 +106,10 @@ e2e() {
   "$DEV_BIN" inspect docs/example/api/testserver.yaml
   "$DEV_BIN" inspect docs/example/workflows/users.yaml --json \
     | jq -e '.valid and .kind == "workflow" and (.steps | length) > 0' > /dev/null
+  # The file as written, for editors (spec 0018): every endpoint is a block, and --source needs --json.
+  "$DEV_BIN" inspect docs/example/api/testserver.yaml --json --source \
+    | jq -e '(.source.endpoints | length) == ([.blocks[] | select(.kind == "endpoint")] | length) and (.source.auth | has("bearer"))' > /dev/null
+  if "$DEV_BIN" inspect docs/example/api/testserver.yaml --source 2>/dev/null; then fail "--source without --json was accepted"; fi
   "$DEV_BIN" call docs/example/api/testserver.yaml status --with code=404 \
     -e docs/environment.yaml --var "baseUrl=$BASE_URL/"
   "$DEV_BIN" run docs/example/workflows/users.yaml -e docs/environment.yaml \
