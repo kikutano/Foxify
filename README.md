@@ -68,7 +68,7 @@ It downloads the latest release for your platform, verifies its SHA-256 checksum
 
 <p align="center">
   <a href="https://github.com/kikutano/tinyprobe-app">
-    <img src="https://raw.githubusercontent.com/kikutano/tinyprobe-app/main/media/screen.png" alt="tinyprobe-app: a workflow as a diagram after a run, with the token and the user id drawn as lines from the step that saves them to the steps that use them" width="800">
+    <img src="https://raw.githubusercontent.com/kikutano/tinyprobe-app/main/media/flow-run.gif" alt="tinyprobe-app: a workflow as a diagram that lights up as it runs, the items of a for_each counting up and lines carrying a token and a list of users to the steps that use them" width="600">
   </a>
 </p>
 
